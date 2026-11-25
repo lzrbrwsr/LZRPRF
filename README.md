@@ -264,9 +264,9 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 129
+    release 130
     home local
-    new Buttons on sites such as yle.fi show their label in the middle, and testers can press a page through the staging control.
+    new A press on a page that keeps loading, such as the yle.fi consent box, now reaches the page.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
@@ -275,7 +275,7 @@ record:
     file lzrbrwsr-bin bf18d8a30c57d89af5107f4d53cdda6e9d002a8d8f4ceb625719951fb5c6ca7f
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf ce2ca46e3ac4252ce69c0ed345a3ac5d3cf107c8f33ea9387b5d08981466d48b
+    lzrprf 05cadc6cc3589c5b8cb57a5161f944a6633d1e52ca49f6d8b056177635dcbb88
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

@@ -10225,7 +10225,7 @@ sub link_off {                            # [C31] off: its file and its spool re
     my ($why) = @_;
     my $dir = link_folder();
     my $id = $LINK{id} // '';
-    unlink "$dir/on", "$dir/spool", glob("$dir/spool.*"), glob("$dir/shot.*"), "$dir/local", "$dir/local.log", glob("$dir/command.*");
+    unlink "$dir/on", "$dir/spool", glob("$dir/spool.*"), glob("$dir/shot.*"), "$dir/local.log", glob("$dir/command.*");    # not the file local: it is yours, and while it stays an idle window looks every 5 s (sub link_due), so a link switched on again is heard without a click
     undef $LINK{local};
     @LINK{qw(id key until)} = ();
     undef $LINK{read};
@@ -14829,7 +14829,7 @@ function pointerMethods(methods) {    // the methods of LzrprfLaid, with the poi
 var PILL_REACH = 6;    // DECLARED(the points around the address bar's pill that take its press: past the pill's 36 by a finger's slip, and short of the reload arrow's reach at 125 and of the 56 point row's edges, which still move the window)
 function pillReach() { return { x: PILL.origin.x - PILL_REACH, y: PILL.origin.y - PILL_REACH, w: PILL.size.width + 2 * PILL_REACH, h: PILL.size.height + 2 * PILL_REACH }; }    // the address bar's hit rectangle in the bar's row
 function pillHit(at) { var r = pillReach(); return at.x >= r.x && at.x <= r.x + r.w && at.y >= r.y && at.y <= r.y + r.h; }
-function pointerFree() { return liveOn && !trmnlKeys && sheet && free && !modalOpen; }
+function pointerFree() { return liveOn && !trmnlKeys && sheet && !asking && !modalOpen; }    // [1235] also while lzrprf is busy (a page that keeps loading, as yle.fi does): the lines wait in the pipe in their order and lzrprf hands them to the page when it reads them; only a question or a sheet holds the page's pointer
 function pointerPlace(event, held) {    // "X Y" in the laid page's points, or null outside it; held: kept to its edges instead
     var at = pointIn(canvas, event), x = Math.round(at.x), y = Math.round(at.y), wide = Math.min(sheet.wide, 200001), high = Math.min(sheet.high, 200001);
     if (held) { x = Math.max(0, Math.min(wide - 1, x)); y = Math.max(0, Math.min(high - 1, y)); }

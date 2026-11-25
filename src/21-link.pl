@@ -91,7 +91,7 @@ sub link_off {                            # [C31] off: its file and its spool re
     my ($why) = @_;
     my $dir = link_folder();
     my $id = $LINK{id} // '';
-    unlink "$dir/on", "$dir/spool", glob("$dir/spool.*"), glob("$dir/shot.*"), "$dir/local", "$dir/local.log", glob("$dir/command.*");
+    unlink "$dir/on", "$dir/spool", glob("$dir/spool.*"), glob("$dir/shot.*"), "$dir/local.log", glob("$dir/command.*");    # not the file local: it is yours, and while it stays an idle window looks every 5 s (sub link_due), so a link switched on again is heard without a click
     undef $LINK{local};
     @LINK{qw(id key until)} = ();
     undef $LINK{read};
