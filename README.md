@@ -1,0 +1,495 @@
+# lzrprf
+
+This README offers no opinion on what a reader should conclude about lzrprf or LZRBRWSR. It says what
+the code does, where each statement is held in the code, and which test checks it. Every statement
+here is meant to be checked against the code at one fixed commit, and the code decides where the two
+differ.
+
+## What lzrprf is
+
+lzrprf is the program that starts and contains LZRBRWSR, a browser whose source is closed. lzrprf
+treats that browser as hostile. The browser runs inside a macOS sandbox profile with no network, no
+file of the person's, no window and no service of the system. lzrprf owns the one window the person
+sees, fetches the https address typed into its bar, hands the answer to the browser in its container,
+and checks every line the browser writes back before the window draws it.
+
+It runs on macOS on Apple silicon and uses only programs macOS already has.
+
+The repository holds:
+
+| file | what it is |
+| --- | --- |
+| `lzrprf` | the whole program: the containers, the window, the fetch and the log. One file of Perl, the file that ships. |
+| `src/` | the parts `lzrprf` is joined from, one file a part: joined in the order of their names they give `lzrprf` byte for byte (AUDIT.md, "How lzrprf is built from its parts") |
+| `selftest` | a test that puts a hostile program of its own in the browser's place and probes every container and condition on the Mac it runs on |
+| `blocklist` | digests of addresses lzrprf never opens `[C23]` |
+| `release-key.pub`, `approval-keys.pub` | the public keys a release's manifest must be signed with `[C25]` |
+| `install.sh`, `lzrbrwsr-macos-arm64.tar.gz`, `release.txt`, `latest`, `release.manifest`, `release.manifest.sig`, `release.manifest.approval` | the published release: the installer, the download (the closed application, not under this repository's licence), the SHA-256 record, the newest release number, and the signed manifest |
+| `selftest-output.txt` | the `selftest` run made when the release was made |
+| `CAPABILITIES.md`, `capabilities.json` | every strong power of lzrprf, the act of the person that starts it, and the runs that check it |
+| `VERIFY.md` | how to check a release by hand with `ssh-keygen` and `shasum` |
+| `AUDIT.md` | the reading order, the trust boundary, and how to reproduce a build and the test |
+| `THREAT_MODEL.md` | what is protected, from whom, what is trusted, and what is out of scope |
+| `SECURITY.md` | how to report a finding |
+| `docs/` | the long descriptions, one file per topic (see "Where each statement is checked") |
+| `tools/join`, `tools/sub-map`, `tools/doc-index` | join the parts in `src/` into `lzrprf` and check that they do; print the map of subs by part with their lines and marks; and print the statement index of a docs file |
+
+## What "proof" means here
+
+Not a mathematical proof. Nobody has proven macOS correct, and nothing here says so. A statement in
+this repository is proven in this sense and in no stronger one:
+
+1. It is a **condition in the code**: one line or a few that can be read. Each has a mark, `[C1]` to
+   `[C29]`, listed in the first lines of `lzrprf` and set again at the line that holds it.
+2. It is **probed on the Mac**: `selftest` runs a hostile program against that condition. A probe on a
+   container is first made outside every container, where it must succeed, so a refusal inside is the
+   container's. A condition that is not a container's (what is fetched, logged or drawn) is judged by
+   what the test's own site received and by what the log holds. The closed application is never run
+   by the test.
+3. The test is **shown not to be blind** for some conditions: `selftest` builds copies of `lzrprf` with
+   one or two checks taken out (`%lost` and the runs whose names begin with `lost`, and `nofeeder`,
+   `leftpage`, `leftkilled`), and each copy must be caught. docs/proof.md lists them. The other
+   conditions have no such copy.
+4. It is **proven again when what it rests on changes**: after an update of macOS, or a change of
+   `lzrprf` or of the `selftest` beside it, no page is shown before the probes were made again `[C11]`.
+
+A run that held is evidence for the probes it names. It is not a proof that no other probe exists.
+
+`selftest` reads this README when it stands beside it, and fails when:
+
+- the marks cited here are not exactly the 26 marks in `lzrprf`;
+- a part named here (the word `sub` and a name) is not found in `lzrprf`;
+- one of these numbers of `lzrprf` is not stated here, in these words on one line:
+  - 30 seconds for a fetch and for a page;
+  - 6 MB for an answer, 12 MB for a list;
+  - 50000 lines, 2000 boxes, 20000 characters in a block;
+  - 30 characters in a row that hang on the one before them;
+  - 1000 characters with no white space;
+  - 10 minutes for a question nobody answers;
+  - 8 addresses of one name;
+  - at most 16 profiles, each name at most 32 characters long.
+
+That is a check of names and numbers, not of sentences. It does not read the files under docs/. An
+installed copy of `selftest` has no README beside it and skips this check.
+
+## Capabilities
+
+Besides fetching and showing pages, lzrprf can do the things below. Each starts only after the act
+named, and CAPABILITIES.md gives the subs and the `selftest` runs for each.
+
+| power | marks | where it runs | the act that starts it |
+| --- | --- | --- | --- |
+| The tool: reads processes and launchd jobs; switches off a job or ends a process of the person's own | `[C20]` | outside every container | open the tool for a look; tick a row and confirm for a change |
+| The installer of a newer release | `[C4]` `[C5]` `[C25]` | outside every container | a yes to looking for releases, then Install it |
+| The Tor client | `[C17]` | its own container | Tor on |
+| The bookmark reader | `[C15]` | its own container | open the import wizard; choose a browser |
+| The picture decoder, the system's `sips` | `[C21]` | its own container | a page with an AVIF, HEIC or HEIF picture |
+| The stream converter, the system's `avconvert` | `[C24]` | its own container | a click on a video that is an MPEG-TS stream with sound |
+| The sound process, the system's `osascript` (core-lzrbrwsr-sound) | `[C3]` `[C12]` `[C22]` | its own container, the one that may reach the system's sound | a click or a key in a page kept running, which then plays a sound, or your click on a video's `Sound off` |
+
+## How to verify a release
+
+From release 76 on, a release is installed only when its manifest carries two signatures `[C25]`: the
+release key's (Ed25519, namespace `lzrbrwsr-release`, held on the project's server) and an approval
+key's (ECDSA P-256, namespace `lzrbrwsr-approval`: the owner's, held in the Secure Enclave of his phone, or,
+while `approval-keys.pub` lists it and before its `valid-until` day, the agent approval key held on the server). The
+release key's fingerprint is `SHA256:iN/qb7iC/v07aNa/RWpqgm8kchzJ9CDId4YlK7KoMlE`. The checks, in short:
+
+```
+ssh-keygen -lf release-key.pub
+ssh-keygen -Y verify -f allowed-release  -I lzrbrwsr-release  -n lzrbrwsr-release  -s release.manifest.sig      < release.manifest
+ssh-keygen -Y verify -f allowed-approval -I lzrbrwsr-approval -n lzrbrwsr-approval -s release.manifest.approval < release.manifest
+shasum -a 256 install.sh lzrbrwsr-macos-arm64.tar.gz release.txt
+```
+
+VERIFY.md shows how to write the two allowed-signers files, what each command must print, and the
+checks of the manifest's form and dates. `approval-keys.pub` holds no key yet, so today every release is
+refused until the owner's approval key is written there and into `lzrprf`.
+
+## The conditions
+
+The table is the conditions of `lzrprf`, in the words of its first lines, with the subs that hold each
+and how `selftest` probes it.
+
+| mark | the condition | where in `lzrprf` | how `selftest` probes it |
+| --- | --- | --- | --- |
+| `[C1]` | The application is started in one place only, and only inside the page container. | `sub laid_out`, through `sub contain` | Reads the text: the program is started on one line. A copy that starts it uncontained is stopped by `[C3]`. |
+| `[C2]` | At every start lzrprf tries, inside that same container, what the container must refuse. Nothing starts unless all of it was refused and the same tries worked outside. | `sub holds` | A copy whose container refuses nothing: nothing is started. |
+| `[C3]` | No process is handed a byte of what was fetched, nor the connection to a site, before macOS itself says that this process is contained. Before that, of what you asked for each knows the address alone: the application in one variable, `curl` among its fixed switches. | `sub inside`, asked in `sub laid_out` and `sub fetch` | Copies without `[C1]` and `[C2]`: the system says "not contained", and the answer, or the connection, is withheld. The one exception is the system's decoder `[C21]`, which reads its file from its start: it is started by `sandbox-exec`, which starts nothing when its container cannot be made; macOS is asked about each run while it runs, and nothing it wrote is read unless macOS said it was contained. The tries at each start are made in the decoder's container too `[C2]`. |
+| `[C4]` | A request is made only for an address that came from the window's bar or was typed into its own bookmark modal, at once or kept as the home page or a bookmark, or that a page redirected to and you then said yes to in lzrprf's modal (once a visit, to the same address with `www.` put in front of its host or taken off, without a question, written in the log first); for a picture the page laid out from such an address names, at most twenty-four, on that page's host, on a name under it (as `img.example.com` is for a page of `example.com` or `www.example.com`; `sub under`) or on at most eight other sites, each address checked as a typed one is, written in the log before its host is looked up, sent as the fixed request of its address alone, and never inside your own network (`sub pictured`); for a style sheet it names on that same host, at most eight (`sub sheeted`); for a video it names, one file when you click its place in the window, held to the checks of its pictures and looked up again at each click (`sub videoed`, `[C22]`); or for one of three fixed addresses of the release file after you said yes: a report, after you pressed "Send" for it, the look for a newer release at each start after a yes you gave once for exactly that address, kept in `~/.lzrprf/look` until you delete it (`sub newer`), and the installer, in its one or two places, after "Install it" (`sub installed`); beside each installer place of a newer release that look found, its signed manifest, signature and approval are fetched first (`sub release_signed`, `[C25]`). A support request you send from the cogwheel's menu, and the reading of its answer when you press "Read the answer", go to the one support address the release file names in its line `support https://...`, and to no other place: never a host the window or a page names. That line counts only as lzrprf would fetch it as a typed address, with a plain path and no query, since the request's reference is put after it to read the answer (`sub support_address`); an incognito window sends neither (`sub support_sent`, `sub support_read`). A page kept running with its tab is the one other way to a request, within `[C19]`. Connect for a provider in a profile's Profiles list (Google, Apple or Meta) opens that provider's own fixed sign-in page, and a redirect from a host of a provider you connected or are connecting to another host of that same family is followed without a question, written down first, at most 8 a visit; a redirect out of the family is asked about as every other. | `sub behind`, `sub go`, `sub fixed`, `sub support_address`, `sub support_sent`, `sub support_read` | The test site's own record: each address as often as it was asked for, and nothing else, with tabs, a tab reopened, the window of a tab pulled out, the home page, bookmarks, redirects and the installer among the runs; a support request and the reading of its answer are counted apart. Runs `support`, `supporthost`, `supportquery`, `supportnone` and `supportincog`: a line from the window that names another place is not taken, and the one request goes to the host the release file names; a support address with a query, or none at all, sends nothing; all runs together send four requests and read two answers, none from the incognito window. Reads the text: a request has six roads and no seventh, and `sub fixed` is called six times: four behind a yes (a report, the look for a newer release, the signed manifest of a newer release, the installer after "Install it") and twice for the support request and its answer. |
+| `[C5]` | Nothing is looked up or fetched before its line is in the log: in the memory of the process behind the window, and on the disk too when you chose to keep a log. No answer is shown whose line could not be recorded. | `sub visit`, `sub fixed`, `sub record` | A kept log that cannot be written: nothing is fetched. For every request the site received in a run that keeps a log, full or hosts only, the line was on the disk first. In a run that keeps nothing, the Log button shows the lines afterwards; that each was in memory before its request is read in `sub record`, not probed: no test looks into that memory while a request is open. That the lookup comes after the line is read in `sub visit`, not probed: the test's site is on this computer. |
+| `[C6]` | One place connects to a site directly, and it connects to a numeric address that was checked and written down. The one other connection to the outside goes to the Tor client on this computer's loopback, only while Tor is on `[C17]`. | `sub reach`, `sub tor_reach` | Reads the text: three `connect` lines, this one, the one to the Tor client on the loopback, and a try against lzrprf's own listener on this computer. A listener the hostile application knows hears from it only through lzrprf's hands. |
+| `[C7]` | What a site is sent is made from the address alone, with one fixed browser name, `User-Agent: LZRBRWSR`, and, only on the request of a page you visit, one fixed line of the kinds of answer it takes, `Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8`: the same request from every computer, byte for byte, nothing kept from an earlier request. A page kept running adds to it only what `[C19]` lets it. A support request adds only its body, as JSON with its `Content-Type` and `Content-Length`: your words with the release number under them, the picture of the window when you ticked it, and your licence code when one is kept. Reading its answer adds only the key the support address handed out for that request, in a line `Authorization` that `curl` reads on its input, so that no list of processes shows it. The request is what goes inside the encryption (HTTP); how TLS, TCP and IP are spoken around it is the system's `curl` and network, and can differ from one computer to another. The one exception is a provider you connected in a profile's window: a request to a host of that provider's own family (google.com, youtube.com and gmail.com for Google; apple.com and icloud.com for Apple; facebook.com, messenger.com and instagram.com for Meta), as the request of a page you visit or of a page kept running of that same family, carries the cookies that family set since you pressed Connect, matched by host and path, on curl's input and never on a command line; no request of another site's page carries them, no value is logged, and an incognito window or Tor carries none. A second exception is a compatibility identity, the closed part's decision (SYSTEM.md D18): where the application says a request is to be sent as a mainstream browser, by the word safari on a page's request or for the hosts it names to lzrprf once a window, that request carries Safari's User-Agent, Accept, Accept-Language and Sec-Fetch-* lines in Safari's order in place of the fixed ones; lzrprf holds the one fixed set of lines for that word and no list of sites of its own, a word it holds no set for ends the page, and through Tor none is ever sent. | `sub request`, `sub fetch`, `sub support_sent`, `sub support_read` | Compares `lzrprf request` with the bytes the test site received, and finds `User-Agent: LZRBRWSR` exactly once in every request and no other header than the five fixed lines, and the line `Accept` on the request of a page you visit (typed, a redirect said yes to, the home page, a bookmark) and on no other (a picture, a style sheet, the release file, what a page kept running asks for). The site sets a cookie; it never comes back. Run `support`: the request is the five fixed lines with the type and the length of its body, and the body is one field, the words with `Release 3` under them; with a code kept and the picture ticked (`supportfull`) it holds the code and the picture too, and nothing more; the answer is read by a GET with the five lines and `Authorization` as the one more. Runs `identity`, `identitylive`, `identitytor` and `identitybad`: a stand-in family host is sent Safari's lines on the page you visit and on its page's requests, another host the fixed request, Tor neither, and a page asking for an identity lzrprf holds no set for is ended. |
+| `[C8]` | A host inside your own network is fetched only after your yes to exactly that, once, and never for a picture or a video: then nothing is asked, and a yes given for a page does not carry over to a video of its host clicked later. | `sub own_network`, `sub pictured`, `sub videoed` | A no: nothing is fetched, and the no is in the log. A picture on a host that leads inside your own network: not fetched, nothing asked, and the log says why. Run `videoown`: a yes given once for the page's host inside your own network is for that page alone, and a video of that host clicked afterwards is refused without a question. |
+| `[C9]` | Every line the application writes is checked, and a list with anything but the five kinds of line (from release 22 on, or the lines of a laid page, laid at the width its `=view` frame asked for), or with more than the window is given to set, is not drawn at all. The page's title, a line `=title` right after `=page` of at most 200 characters with every control and format character taken out, is shown in its tab and nowhere else. A laid page may also hold tiles: `K<n>,<x>,<y>,<w>,<h>` gives tile n (0 to 31, each once) at a corner of the grid of 256, exactly as wide and high as the page leaves there (256 at most), with one line `n<base64>` for each row: red, green and blue, a byte each and no alpha, since a tile is opaque, so a row is exactly 4 characters of base64 a pixel with no `=`, and its length and its alphabet are its whole check (from release 31 on; a picture keeps its rows `m` with how opaque), or a bare `n`, the row above it in the same tile again, taken only below a row of that tile that was checked (from release 83 on), and `J<n>,<x>,<y>` places a tile given above again where it is cut the same; at most 32 tiles and 1024 places, outside the 262144 pixels of the pictures, which is why a list may hold 12 MB. A laid page may also hold `V<x>,<y>,<w>,<h>,<k>`, at most 8, the place of video k of the page's `=videos` line: the window draws a play mark of its own over what was drawn there before (its poster, fetched as a picture), and nothing of the video is fetched until you click that place (`[C22]`). | `sub checked`, `sub laid` | Hostile lists (a script, lzrprf's own words to the window, too large, a block that holds too much, not text, a thing the page is said to be made of in a wrong form or place): none is drawn. The fullest list of such things that is allowed is passed on, and the real window's pane is read. The most lines, the most boxes and a block that is exactly full are passed on; a row of hanging characters and a word with no white space come out changed at the 31st and after the 1000th; the heaviest pages the limits allow are drawn by the real window and timed. Laid pages broken in eleven ways (out of the page, a number in a second form, too narrow, too many rectangles, mixed with a flowing page either way, a row of a picture missing or too long, not base64 or base64 in a second form, too many pixels), and tiles broken in twenty-six ways (wider or narrower than their cut, a row 4 characters too long or too short or missing, a row `m` as a picture's, a row with `=` or `==` at its end or with `-` or `_` in it, a row `n` under a picture or under no tile, a bare `n` as a tile's first row, as a picture's row or under no tile, numbered 32, 01 or twice, placed before they are given, off the grid or out of the page, placed where they are cut otherwise, 33 tiles or 1025 places): none is drawn. A laid page that is fit, tiles too, is passed on as it is, and in its text a control character is replaced, not refused. |
+| `[C10]` | The window's process has no network of its own, writes no file, starts no other program (the one program its container lets it start is `/usr/bin/osascript`, the program it is, and that stays in the same container), opens nothing through the system, commands no other program, sends no signal to another process, and reads nothing under `/Users` or on another disk but your settings, fonts, keyboard layouts and input methods. Before the window takes an address or shows a fetched page, macOS is asked about eight operations of that process (connecting out, creating a file, starting a second process, reaching a system service when none is named, opening something through the system, commanding another program, writing your settings, sending a signal), and each must be refused; the rest of the container's text is not asked about, and `selftest` makes its own tries from the real window, starting another program among them. Until then the window shows only the words of lzrprf and of its `selftest`, and no fetched page. Of the system's services it looks up by name only the 42 its container lists and one local name, the clipboard's (from release 19 on; before that all but one): the 41 a window was seen to ask for, and, since videos are played, the system's video decoder, which decodes the pictures of a video you clicked `[C22]`. That video is the one kind of a site's bytes the window's process reads itself: the system's player there reads its MP4 container and decodes its sound. The question about a system service names none: it says that the container refuses by default, not which names its list lets through. | `$WINDOW_CONTAINER`, `sub inside`, `sub behind` | Runs its own tries inside the window's process, and asks macOS about that process. A copy with one refusal taken out: no page is shown. From the real window it asks for six system services by name: the clipboard, which the container lists, is answered, and the five it does not list are refused; a copy without that refusal is answered as a program outside every container is, and a copy whose list is one name wider is caught by the same try. |
+| `[C11]` | No page is fetched or shown before `selftest` held on this build of macOS with this `lzrprf` and the `selftest` beside it, in its last run there. The window is there earlier, with its bar switched off: it shows lzrprf's own questions and no page. A check the test could not try there is named in its mark, and then no page is fetched or shown before you said yes to starting without exactly those checks. | `sub proven`, `sub mark` | No mark, a mark from another build of macOS, a mark of another `lzrprf`, a mark made by another `selftest`, a mark that names no `selftest`: each time you are asked to test, and after a no nothing is shown, looked up or fetched. A mark that names a check that could not be tried, with no yes or with a yes to other checks: the window names the check and asks, and after Quit nothing is shown, looked up or fetched. A copy that counts such a mark without a yes: its line says it fetched. |
+| `[C12]` | lzrprf writes nothing of what you fetched to the disk unless you chose a kept log (what macOS keeps on its own is under "What is kept"), apart from the one address you made the home page, the bookmarks you made or imported (each a name and an address) and the order of each of their folders (a file `.order` of their names), whether the bookmarks bar is shown, whether pictures from other sites are blocked, whether LZRDFNDR's satellite plays in the home page's minigame (gamehelper), and an installer you chose to run, with what it printed (`install.txt`), a support member licence code you entered (`licence`), the reference and key of the support request you sent last (`support`), never its words, the script permissions you chose to keep (`scripts`: each a site, where the script came from, its SHA-256, its capabilities and the day) `[C26]`, the notes you wrote to programs in the tool's Show all processes (`procnotes`) `[C20]`, and the profiles you made, each a folder of its own under `profiles` with its name and all of the above that belongs to it; a kept log holds hosts only unless you chose full addresses. It is only added to, apart from clearing by your button and the days you chose: in a kept log each of the two says so in its first line, and with nothing kept, clearing removes the log whole and the window's lines say so. The cookies of a provider you connected are kept in that profile's file sso/PROVIDER, readable by you alone, from the moment its session cookie appears (looked for by its name, never its value) until you press Remove; no clearing of history, sessions or the log touches them. | `sub record`, `sub keeping`, `sub choose_keeping`, `sub changed`, `sub clear_log`, `sub expire_log`, `sub licence_set`, `sub licence_removed`, `sub support_sent`, `sub support_forgot` | The window's buttons, pressed in every order the test knows, never leave more kept than before: more is taken from `lzrprf keep` only. A change is a line of the log. With nothing kept, no file holds a path or a query that was typed. Hosts only: no file holds them either. Tens of thousands of lines and none dropped; cleared only after two questions; not while a request is open; old lines taken out at the start of a window, said in the first line. A setting that is no setting keeps nothing. Runs `licencegood`, `licenceremove` and `support`: `licence` holds the code as written and `support` the reference and the key, each readable by you alone (0600), and removing the code removes its file; a refused code (`licencebad`) and a refused request (`supportbusy`) keep nothing; no log holds the words sent, the key or any part of the code. |
+| `[C13]` | The application opens no file for its fonts. lzrprf hands a page run, and never a picture run, eight fonts of the Mac by fixed paths in `/System/Library/Fonts/Supplemental` (Arial and Courier New, each plain, bold, italic and both), as one frame in front of the answer: `=fonts` and the eight lengths on one line, then their bytes. A face goes with length 0 unless it is a plain file and no link, of at most 2 MiB, that begins as a TrueType font; a pipe put in its place is not waited for. They are read once in a window, and the keeper hands them over after the same word of the system as the answer `[C3]`. A site cannot put a frame in front of lzrprf's: what it sends comes after it. | `sub faces`, `sub contained` | The application takes the frame off its input and says the length and SHA-256 of each face: they are the eight files as `selftest` reads them itself. A picture run gets no frame. A site whose answer holds a frame of its own: it arrives after the real one, byte for byte. A copy that reads its fonts from a folder of the test: a link to a font, a file one byte over 2 MiB, a pipe and a file that does not begin as a font each go with length 0, while a font of exactly 2 MiB is handed over whole; the same copy without O_NOFOLLOW hands over the font behind the link, and the test notices. |
+| `[C14]` | A page is laid out at most three times. The first run of a page is given the empty frame `=sheets` after the fonts, and may name up to eight style sheets on the page's own host in a line `=sheets`, checked as the paths of pictures are `[C9]`. lzrprf fetches them `[C4]` `[C5]` and runs the page a second time, with `=sheets`, the length of each and their answers byte for byte in front of the page's answer, each at most 1 MiB or with length 0. A second run that names style sheets again is not shown: the first run's page is, and the bar says the sheets were not used. A second run whose program or container failed shows that fault, as a first run's would, and no page is shown. A second run that is no page (unfit, ended or late) and asked for no address while it was read is followed by a third, given `=sheets` with each named sheet at length 0: no style sheet, and not the frame of a first run, so the application reads it with the network it withholds from a first run that names sheets, and the page's external and module scripts are fetched by that run. Its page is shown when it is a page and names no style sheet; otherwise the first run's is, and the bar says that neither the run with the sheets nor a run without them is a page, and that none of the page's external or module scripts ran in the page shown. A second run that asked for an address (fetched or refused) has no third, since a third would ask again: the first run's page is shown, and the bar and the log say how many addresses it asked for and that none of the page's external or module scripts ran in the page shown. A second run that wrote too much has no third either: the first run's page is shown, the bar gives that fault, and the log adds that it asked for no address. No run of a visit asks again for what an earlier run of it asked. A run laid again, for a new width or a tab chosen again, asks again. A page kept running asks as `[C19]` allows. A visit can take three runs of up to 30 seconds each, 90 seconds besides its fetches, when a late second run that asked for nothing gets a third. There is never a fourth run, and a picture run is given no style sheet. | `sub checked`, `sub sheeted`, `sub visit`, `sub contained` | The application says on each run the length and SHA-256 of each sheet it took off its input: none on the first run, the test site's answers on the second. A sheet whose body begins `=sheets 4` arrives inside its own length. A sheet over 1 MiB, a fetch that failed and a sheet not begun within the clock each go with length 0, the last neither logged nor asked for. Each sheet has two lines in the log and one request, of its own address; no other host is asked. Lines `=sheets` broken in six ways are refused with nothing fetched. A second run that names sheets again: the first run's page, two runs. A second run that is not a page and asked for nothing: a third, given each sheet at length 0; when it is a page it is shown with its title and the external script it fetched, once, before its first list (run `sheetsthird`), and when it is not, the first run's page with its own title, three runs; the log says why the third run was laid and how it ended. A second run that asked for its script and then wrote no page: no third run, the script asked for once, the first run's page and a bar that says so. A second run whose program changed between the runs: the fault of a changed program, one run (`sheetschanged`); one whose container could not be started: that fault, no page and a report offered, one run (`sheetsunstarted`). A third run that names sheets again is not shown. A page that names none: one run. A picture run gets no frame. A copy that shows a second run naming sheets again shows it (`lostsheets`). |
+| `[C15]` | Another browser's bookmarks are read by lzrprf's reader alone, a system perl in a container that lets it read under your home folder these files and nothing else: `Local State` and each profile's `Bookmarks` of Chrome, Edge, Brave and Vivaldi, Firefox's `profiles.ini` and `bookmarkbackups/*.jsonlz4`, Safari's `Bookmarks.plist`; it has no network, writes nothing and starts no program but itself. It looks whether each browser's folder is there when the import wizard opens, and reads a browser's files only after you chose that browser; each a plain file of yours of one name, no link and in no linked folder, of at most 32 MiB; inside a browser's folder it may see no other file. When macOS keeps the reader out of a browser other than Safari, the window's Open panel asks for that browser's own folder, once a browser in an import, and only Allow on that folder has the reader try again; whether macOS then lets it through only a real Mac shows. An HTML bookmarks file you chose is read by lzrprf itself. Nothing in them is fetched, and nothing of them is written but the bookmarks imported `[C12]`. | `$IMPORT_ALLOWED`, `sub import_reader`, `sub import_profiles_of`, `sub import_kept`, `sub import_allowed`, `function allowPanel`, `sub import_files`, `sub import_path`, `sub import_plan`, `sub import_go`, `sub lz4_block`, `sub plist_binary` | Run `importreader`: the reader's own lines and container, read from lzrprf, on a fake home folder: it reads the bookmark files and is refused a profile's `History` and `Login Data`, the list of a profile's folder, Firefox's `places.sqlite`, Safari's `History.db` and a file outside the home folder, though `History` reads outside the container; a link named `Bookmarks` is not followed, a hard link to a file of yours is refused, a file shut by its own permissions is said as denied (EACCES), not as kept out (EPERM), a browser folder linked to another place is said as a link, as is a profile folder linked back inside the browser's own folder, and a file beside the profiles that it does not read it may not even look at. Run `importwhy` says each of these through the wizard in its own sentence with no Open panel; `importcase` finds a folder there already in another case to be the same folder; `importurlcase` keeps two addresses that differ in case alone apart; `importsafarikept` says Safari's bookmarks kept out at once, with no Open panel; `importfolders` makes no empty folder and at most 1000; `importfirefoxhtml` gives a Firefox export the layout of its backup; `importmany` lists 99 profiles of 105 and says 6 more; `importhome` says and logs a home folder path the reader does not take; a crafted binary plist that holds itself ends in under a second. Fixture files of each format under the run's own folder, which a try takes for the home folder: Chrome's JSON with two profiles named in Local State, a Firefox backup whose LZ4 block holds matches, a binary plist made by `plutil`, an HTML export. Each profile chosen is imported at once in its order, the bar into the bookmarks bar after what it held, the other top folders under their own names; a second import adds nothing. Plain http and `javascript:` are skipped and a fifth folder deep is left out, each counted in its own words, as is a bookmark the file holds twice; 1003 bookmarks import the owner's 1000 and say 3 did not fit. A folder macOS keeps out is asked for in the Open panel at its own folder, once an import: an answer nobody asked for and Allow on another folder are refused, Allow on its own folder reads again at once, Cancel says it in one sentence, a panel that could not be shown is a line of the log, closing the wizard drops a panel asked for, a folder whose name has a character past ASCII is refused in a sentence, and nothing is written (runs `importkept`, `importallow`); run `allowpanel` runs the window's side with the panel stood in for: it opens at the folder named, for one folder, its button "Allow", and sends the folder chosen or none; closed, the wizard opens no panel for a late answer. None of these shows what a real Mac does with the panel or with Allow. A link to a bookmarks file is neither offered nor read; a typed path outside the home folder, or climbing out of it, is refused. Nothing imported is fetched or logged. |
+| `[C17]` | Tor carries a Tor window alone, never a window that is not one: the onion of such a window opens a Tor window apart from it, a fresh incognito session of its own [C16] that shares no cookie, cache, storage or kept answer with it, either way. In a Tor window lzrprf starts the client that stands beside the program, named by its SHA-256 in the release file, in a container of its own (its own folder and the network, nothing of yours); the window is sealed (no name is looked up on this computer and no connection goes past Tor) before it browses, and every address is then fetched through Tor, the site's host its SOCKS user so each site has its own circuit; nothing is looked up or fetched directly, also while it connects, when it does not, or after Tor went down. Stop Tor, in the Tor window's own modal while it connects or once it is ready, asks first (all its tabs are closed, Tor is disconnected and the window closed) and closes the whole window, in this order: no new navigation, its pages and their processes ended, its data removed from its folder and its tables in memory, that checked, and only then the client is ended. With Tor on, no cookie of a connected provider is read, kept or sent. | `sub tor_on`, `sub tor_reach`, `sub tor_off`, `sub tor_phase`, `sub tor_session_on`, `sub tor_session_end` | A Tor window: shown before its Tor modal opens; Stop Tor asks first, also while it connects; its end goes closing, ended, wiped, checked, released, its folder is gone, nothing is written to lzrprf's folder and its home page is not opened; Cancel keeps it, and a page after its Tor went down is refused, never fetched directly; the order of the steps by `lzrprf torsteps`; Tor asked for in a window that is not a Tor window starts no client in it. A stand-in client that says the client's own first lines and relays SOCKS5: the window is told each step, then on; the page arrives through it by name with the site as its SOCKS user, its line in the log first; Tor off ends it. A stand-in that cannot connect: nothing reaches the site, the window says why, the client is ended. The container itself, tried with `/bin/cat`: its own folder is read, a file in your home folder is not. |
+| `[C16]` | An incognito window writes nothing that outlives it. Its log, history, tabs and everything it fetched are held in its memory or in one folder of its own, readable by you alone, in your temporary folder, named `lzrprf-i.<process number>.<12 random hex digits>`; of `~/.lzrprf` it reads, and never writes, the self-test's result, the home page, the search address, whether the bar is shown, whether pictures from other sites are blocked, whether LZRDFNDR's satellite plays in the minigame, the bookmarks, the script permissions and the filter lists with your switches of them, and holds in its memory every script permission chosen in it. It belongs to no profile: it is told none, refuses every word of one, and makes no folder of profiles. Opened from a profile's window, it reads these six of that profile's folder instead, and writes there neither; the self-test's result it reads from `~/.lzrprf` and writes nothing of it. The folder is removed however the window ends, and one left by a run whose processes are all gone is removed at the next start. It reads and writes no provider's sign-in, and sends no cookie. | `sub incognito_begun`, `sub swept`, `sub removed`, `sub leave` | Run `incognito`: two pages, a bookmark opened, the star and the import tried; every file of the run's lzrprf folder hashed before and after, byte for byte the same, and the window's folder gone. Runs `incognitokilled` and `incognitoswept`: kill -9 of the sweeper, the process behind the window and lzrprf leaves the folder; the next start removes it. |
+| `[C18]` | A page may keep running with its tab, from release 53 on. An HTML page's answer goes to the application inside the frame `=live LEN`, and after its first list, checked and drawn as any other `[C9]`, the application writes `=ready` and stays in its container with the tab. lzrprf hands it checked input lines: `=click X Y` for a click in the page (in the laid page's points after lzrprf's scrolling), `=key NAME` or `=key NAME shift` for a key, `=text TEXT` (1 to 1024 bytes of UTF-8, no control or format character) only while the page has said `=focus 1`, `=layers` when its tab is shown again (below), and `=scroll X Y`, where the window shows the page from (whole CSS pixels of the laid page, 0 to 200000 each way): the window says it as `page scroll T X Y` for the tab T it shows when the page starts running, after each drawing and as you scroll, at most once a frame (a frame asked for before another tab was chosen says nothing), and lzrprf passes over one for a tab that is not the selected one; each page is handed the first place and then only a place that differs from the last it was handed or told of itself, so it is never handed back its own scroll; while the page has not answered yet only the newest place waits. Every line at most 1040 bytes, checked twice, in the window and in lzrprf. The page answers with `=focus 0` or `=focus 1`, `=go ADDRESS` (a link followed or a GET form sent: a visit like a typed address, with every check of one), `=statement TEXT`, `=scroll X Y` (its script scrolled the page: the window is told `scroll T X Y` just before the drawing of the same answer, says that place back once, and shows the drawing from there; every place the window says before that echo is passed over, since it was said before the window read it; of answers with no drawing only the newest scroll of one turn is told, and only onto a drawing the window shows; a place of the window's that waited for an answer with its own `=scroll` is dropped; when the window stops short of the page's place, at its end, a later scroll of the page past it on that axis is told only up to it, until you scroll elsewhere, click or press a key; a window a pixel from the page's place is where the page is), and `=again`, its lines and `=ready`, checked as a first list and drawn with the pictures already decoded, so nothing is fetched. A `=patch START DROP` drawing replaces a bounded range of lines from the previous snapshot; its expansion is checked in full before any update is shown. Partial input writes are queued in order, bounded by 1 MiB. The release file may declare `home local`: the contained program then owns the local home graphics, without a fetch, and its `=resize W H` input keeps the running scene at the actual local viewport dimensions. Home network requests are refused. The layer-hosting view uses the laid page's top-down coordinates; AppKit manages its root-layer orientation. The first checked local scene is cached as a per-window picture in memory for new-tab previews, with no home assets written into this public program. The first window waits for its complete local scene; the mandatory welcome after install or upgrade, refusals and required questions show before that wait. The welcome must be acknowledged before the keeper can create the home. Tests retain the real startup gate and order an invisible off-screen NSWindow through `windowOrdered`, checking fresh, upgraded and returning profiles. The optional update check follows that scene. The selftest captures that real view to check upright text, top/bottom colours and pointer alignment through resizing and reattachment. Between `=scroll` and `=again` it may write `=layers ITEMS` lines: what of the page the window draws as layers of its own and moves frame by frame without a drawing (an svg its script changes, a box turning or fading for ever by itself), each line at most 65536 bytes of items split by `;` that make a group, a clip, a shape, a text or a particle source under an id of 1 to 9999, move one, fade it, give it another outline, colours, words or rate, or take it away with all it holds. Each item is checked in its one form (every number written one way, at most four decimals, no `-0`; colours `rrggbbaa`; an outline of at most 16 KiB) and against the layers the page made before, at most 4096 layers and 128 particle sources at once; a page's layers have a budget of their own, 512 KiB a second with 2 MiB at once, counted apart from its replenishing drawing budget, and anything else ends the page. The window of the tab shown is told `layers T ITEMS` before the drawing of the same answer and makes them in the laid page's own view, inside the scroll view that cuts them to the page's place, so the bar, the strip, the tabs and every modal stand over them; each line is applied at once with Core Animation's own animations off, and they take no press. A tab not shown is told nothing; once it is shown again its page is handed `=layers` and makes every layer again. The window lets them go with another tab, a new page, and when no page is kept running. After `=layers` it may write its sound: `=sound ID RATE FRAMES FROM TO`, `=samples ID BASE64`, `=play ID AT` and `=hush ID` (docs/how-it-works.md, "Sound of a page kept running"), each checked against the sounds the page made, at most 1024 sounds and 16 MiB of samples in its life, counted apart from its replenishing drawing budget. A play reaches the window only for the tab shown and within five seconds of a click or key lzrprf handed the page, so a page never starts sound by itself; the window is told a sound's samples once, checks them again and plays them from its memory with the system's AVAudioPlayer, writing nothing `[C12]`, and stops and lets every sound go when the layers go. A line before `=again` of the form `=NAME` or `=NAME WORDS` whose name lzrprf does not know is passed over, so an application can add a line before every lzrprf reads it; only such a part of a single line is passed over, and a part of more lines still ends the page. The first 16 such names of one page are written in the log once each, then one line says there were more, and what a page counted goes when it ends; any other line of no form, or a known line out of its form or its place, ends the page and keeps its last drawing. A tab that closes or goes elsewhere sends `=end`; the page is given one second, then it and its keeper are ended, and when lzrprf itself ends the keeper ends the page. At most three pages run at once (the oldest is ended first), each for at most half an hour, with a four-page burst budget replenished by one page per second. | `sub contained`, `sub keeper`, `sub live_kept`, `sub live_input`, `sub live_wrote`, `sub live_scroll_told`, `sub live_answered`, `sub live_unknown`, `sub live_layer`, `sub live_layers_paid`, `sub live_layers_again`, `sub live_sound`, `sub live_sounded`, `sub live_end` | A page whose script changes its text on a click is drawn again after each of two clicks. Text typed before any field has the focus reaches nothing; after `=focus 1` keys and finished text reach the page, and its `=go` is fetched as a typed address with the field in it, written in the log first. A tab that goes elsewhere tells the page `=end` before the site is asked for anything, and no process of it is left. An answer with a line of no kind ends the page: its first drawing stays and the next click reaches nothing. Where the window shows a page reaches it as `=scroll X Y`, the same place once, a place said of another tab and a place past 200000 never; the page's own `=scroll` is told just before its drawing, what the window said before it read that is passed over, and the place said back is not handed to the page; of three scrolls of one turn with no drawing the window is told the newest only; a place said while the page has not answered is handed after an answer with no scroll and dropped for one with its own; a script that scrolls again past where the window stopped short, to one place or walking through others, is told only along the other axis, until a scroll of yours or a click; a page drawn at another height, or a window that changes size, is told its places past the old end again, so a page that keeps to its bottom follows its new bottom; a window two pixels past the place said back has scrolled, and so has one that says where it stopped after the time for that is over; a place and a click said while the page has not answered reach it in that order; an own `=scroll` out of its form ends the page; lines lzrprf does not know are passed over, the first 16 names written in the log once each and then one line for the rest, and the page goes on. A page's scene of layers, each kind of change in two lines and a drawing after them reach the window of the tab shown in that order, and once the tab is shown again after another the page is handed `=layers` and its layers made again reach the window; nine pages with layers out of their form or past their budget (no form, a layer that is not there, one made twice, a number as 1.50 or -0, a source too fast, a layer under a shape, a line too long, more than 2 MiB at once) are each ended with the window told none of them. A sound the page starts with no press before it reaches no window and is said once in the log; after a click a sound's samples reach the window of the tab shown once, then its plays and stops, and after another tab was shown they are sent whole again (`livesound`); eleven pages with sound out of its form or past its budget are each ended with the window told none of it (`livesoundbad`). In lzrprf's real window, silent, a sound is made into the system's players, a loop as a lead and the loop, and a line for another tab, samples of no form and a sound past the bounds are passed over. In lzrprf's real window, off the screen, layers stand inside the scroll view with no view of the window under the page's place, take no press, pass over a line for another tab, go with all they hold, and all go when no page is kept running. The window's own telling, run with no window: at the start and after a drawing, at most once a frame, never an echo, nothing from a frame asked for before another tab was chosen. The window's reader of lzrprf's lines, run with no window: a script's scroll to 500 that came with a drawing that made the page longer leaves the window at 500 and says nothing older. |
+| `[C19]` | A page kept running with its tab, from the moment it is read, may ask lzrprf for an address with GET, HEAD or POST, from release 54 on (while it is read from release 55 on, for the scripts it names by address, within the 30 seconds a page has to be read), one at a time and at most 600 times in its life. The application writes `=fetch METHOD LEN TYPE URL` and the body; each is checked as an address typed into the bar is (https only), written in the log first `[C5]` with the page it came from, and fetched through the one place that connects `[C6]`, carrying the fixed request of `[C7]` with nothing added but, for a POST, at most 64 KiB of the page's body and one of three types, and for another host the page's own `Origin`. A host inside your own network is refused without a question. The page is handed back `=fetched STATUS LEN LEN`: the status, six headers (the content type and the five of CORS) and the body, and nothing else. | `sub live_asked`, `sub live_fetched`, `sub live_parts`, `sub live_replied`, `sub fetch` | A page's script asks the test site for a path on its own host and draws the answer: the site is asked once, with the fixed request bytes, written in the log before the line that connects, and the page is handed only the content type of the answer's headers. A request to another host is written down with the page's host, fails there, and the page draws its error. A page that names `/s.js` asks for it before its first list: the site is asked once, it is written in the log before the line that connects, and the first list drawn carries what the script changed. |
+| `[C20]` | The application's tool, opened by its icon in the bottom bar and never in an incognito window. lzrprf reads this computer's processes and launchd jobs with the system's own programs (`ps`, `launchctl`, `plutil`, `codesign`) and hands what it saw to the application in its container, which has no network and no file, so nothing of it leaves this computer. A look changes nothing. lzrprf changes something only for a row you ticked and then confirmed, where each change is said in lzrprf's own words and written in the log first: a launchd job of your account is switched off, a process of yours is asked to end; never a job or a process of the system or of Apple, never lzrprf's own, never with a password. The jobs you switched off are kept in `~/.lzrprf/quieted`, looked at again at each start and every five minutes while a window is open, switched off again when something switched them on, and switched on again when you say so. A button above the list copies the title and the description of each row you ticked to the clipboard, under one sentence saying where they were found, so you can paste them where you like; it takes a press only while a row is ticked, and Show all processes, at the bottom left of the list, adds every process with its share of a processor, its memory, what it is (the application's word, or else the manual page of its program on this Mac) and a note you write to its program, kept in `~/.lzrprf/procnotes`; nothing of it is sent anywhere, and its Copy info copies what lzrprf gathered of one process. Nothing else of the tool is written to the clipboard. | `sub tool_shown`, `sub tool_look`, `sub tool_checked`, `sub tool_may`, `sub tool_done`, `sub tool_watch` | Runs `tool`, `toolbad` and `toolwatch`, with stand-ins for what the system's programs say, so no real job and no real process is touched: the application is handed the processes, the jobs, the open apps and who signed their programs; of the changes it names, only a process of yours outside the system and a job of your account that is not Apple's can be ticked; a process of root, a job of the system, of Apple or one lzrprf never saw cannot. What was ticked is changed and nothing else, each change after its log line, and a process that is no longer the one listed is left alone. An answer with one line out of form shows nothing. A job switched off that is loaded again at a start is switched off again and the window told. In the real window, with its one clipboard write replaced by the test's own, `toolcopy`: the copy button takes no press with no row ticked, writes exactly the sentence and the two ticked rows on one press, and writes nothing without a press. `toolall`: every process is told with what it uses, its group, what it is and its manual page, and a note is kept in procnotes after its log line; in the real window `toolall` also shows the button, the grouped list, one Copy info write and a note sent with its control characters taken out. |
+| `[C21]` | A picture the application cannot decode, an AVIF, HEIC or HEIF file it hands back whole after a line `S<length>`, is decoded by the system's own `sips` in the decoder container: a folder of its own that lzrprf makes for each picture and removes after, where it reads one file, the picture, and writes one, a PNG of at most 1024 pixels a side, and a folder within for its own temporary file; no network, no other file of yours, at most 30 seconds of processor time and 10 seconds in all for each of its two runs (one writes the PNG; a second, only when a side of that PNG is over 1024, makes it smaller). It may look up one service of the system by name, its video decoder (`com.apple.coremedia.videodecoder`), and open connections of one class to a driver, the graphics surfaces (`IOSurfaceRootUserClient`): `sips` opens that class itself and decodes nothing without it (tried on 2026-11-21 with the body fix in), and nothing else of IOKit is named. The program the container starts is the system's perl, which waits for one byte from lzrprf, sent once macOS said the process is contained, and then becomes `sips`, the one other program it may start; each picture's run is a process group of its own, so a run lzrprf ends takes its `sips` with it. Who chooses the bytes: the site. lzrprf hands `sips` the body `curl` fetched, taken from the answer as lzrprf takes any (whole, or in chunks that are all there), and only when the application handed back that same file; the application chooses no byte of it. Be clear what that means: the decoding itself is done there, by the operating system, outside every container of lzrprf and beyond its limits, in Apple's own sandbox for that service, and a flaw in Apple's decoder is a flaw lzrprf cannot contain. The PNG goes to the application as a picture's answer, so what the window is given is still pixels lzrprf checked `[C9]`. The application still prefers a picture it decodes itself when the page offers one. | `sub system_decoded`, `sub decoding`, `sub pictured` | Run `picturesavif`: an AVIF and a HEIC picture `selftest` makes with `sips` from a PNG of one colour are drawn in that colour; a file that is neither stays a grey box; the log says which the operating system decoded, and no folder of the decoder is left. A copy whose decoder container may read every file and reach the network (`lostdecoder`) is caught by the tries at the start, made in that container, and nothing is started. Runs `pictureslarge` and `largeunstated`: an AVIF of 3000 by 2000 is made smaller on the first run from the size it states, and on a second run when that size is not read; a file the application changed by one byte is not given to the system. `bigpng`: a PNG over the bound is not read. `decoderkilled`: a run ended while it decodes leaves no folder, and a window's start removes those of runs whose process is gone. The text of the decoder container is read: one service, one class of driver connection. |
+| `[C22]` | A video is fetched only when you click its place in the window: an MP4 file or an HLS stream the page names on its `=videos` line, held to the checks of a picture on another site `[C4]` `[C5]` `[C8]`, fetched once and whole by the fixed request of a picture, with no `Range` `[C7]`, at most 64 MB (64 MiB) in 120 seconds, and handed to the window in base64. The window holds it in its memory, at most two videos at once (a third clicked ends the first), and gives it to the system's player (AVFoundation) through a loader of its own on an address of its own (`lzrvideo://`), at most 4 MiB at a time, so the player reaches no network and reads no file. While it loads, a click on its box stops it (`video stop`, heard by the fetch itself). Be clear what that means. The system's player runs in the window's own process: it reads the MP4 container there and decodes the sound (AAC) there, in the window's container, and hands only the pictures' bitstream to the system's video decoder service, the one name the window's container gains for it, which decodes them outside every container of lzrprf, in Apple's own sandbox for that service. So, as for no picture, the window's process reads bytes a site chose, with Apple's code: a flaw in that code which a site's file reaches hands the site the window's process, and with it everything lzrprf trusts the window to say: the address you type, your answers to its questions, your choices in its menus. A flaw in Apple's decoder service is one lzrprf cannot contain either. This is the price of playing a video in this release; playing it in a helper of its own, with only pictures reaching the window, is the way out. Nothing of a video reaches the application. An HLS stream (`.m3u8`, or a playlist whatever its address) is followed by lzrprf itself: the playlist is fetched as the video is, at most 256 KiB; every address it names must be https on the playlist's own site, or the stream is refused before more of it is fetched; of a playlist of qualities (at most 32) one is chosen up front, the middle of those at or under 2.5 Mbit/s, else the lowest; at most 1024 segments are fetched, each written in the log first, within the same 64 MiB in 120 seconds, the playlists counted in, and joined into one file, MPEG-TS or fragmented MP4, which the window plays as it plays an MP4. A stream locked by a key or by DRM (an `EXT-X-KEY` whose METHOD is not NONE, FairPlay among them) is refused, and the bottom bar says so. An MPEG-TS stream with sound is made into an MP4 first, outside the window `[C24]`, so the window's container gains nothing for it. A playlist's address that is refused is said by its scheme and host alone, in the box and in the log `[C12]`. | `sub videoed`, `$WINDOW_CONTAINER`, `function videoTold`, `function videoStarted` | Run `videoplay`: an MP4 is fetched only when clicked, once, by a picture's request, and handed over exactly; a file that is not an MP4, an address the page's text does not name and a number with no video are each one line for the box; a video never clicked is never asked for. `videolarge`: a file over the cap is not handed over. `videoplays`: the window's own video code, run with no window in the window's container, plays the clip to its end, and `novideodecoder` shows that without the one name it is not decoded. `hlsplay`: of an HLS stream one quality is chosen and only it fetched, each address once and logged first, its segments handed over joined; a playlist naming another site or http, one too large, one locked and one too long are each refused before more is fetched. `hlsincog`: nothing written. `hlsaway`: a copy without the site check asks the other site. `hlsplays`: the window's own code plays a joined MPEG-TS stream of pictures alone in the window's container. `hlssoundts`: one with sound does not play there, so it is made into an MP4 first `[C24]`. `hlsmore`: playlists made to be slow, naming a key on another site or by http, and too large by their type alone. |
+| `[C23]` | No address on the list of child sexual abuse material and other illegal content is looked up, fetched, shown, kept or written. The list is the file `blocklist` beside lzrprf, digests only, read once at the start of a window and matched on this computer alone. Every address is held to it before anything else is done with it: what is typed or searched for, a bookmark, the home page, every hop of a redirect, a picture, a style sheet, a video, what a page kept running asks for, the fixed addresses of the release file, with Tor on as with Tor off; and once more where a name is looked up, where `curl` is started and where Tor is asked to connect. A list that is missing, damaged, or another file than the application's release file names stops every page. No setting, variable or button turns it off. | `sub listed` and `sub url_form`, asked in `sub visit`, `sub typed`, `sub pictured`, `sub sheeted`, `sub videoed`, `sub live_fetched`, `sub fixed`, `sub address`, `sub find`, `sub lookup`, `sub fetch`, `sub tor_where`, `sub tor_reach`; `sub list_read`, asked in `sub behind` | Makes a list of its own of fake names (a fake onion address, `listed.test`, addresses of the test site) beside an unchanged copy: typed in many spellings, searched for, redirected to, as pictures and videos of a page, with Tor on, asked of `lzrprf address` in every other spelling of a listed address (`%70`, `/./`, `//`, `/x/../`, a trailing `/` or `;x`, a deeper path, the query reordered) and of `lzrprf lookup`; a list that is another file, unnamed, missing, damaged or out of order; and reads every file, line and connection of those runs for any of the fake names in plain. A copy whose matching says no to everything is seen fetching a listed address. |
+| `[C24]` | An MPEG-TS stream with sound that lzrprf joined for a video you clicked `[C22]` is made into an MP4 by the system's own `/usr/bin/avconvert`, its pictures and sound copied as they came and not decoded (`PresetPassthrough`), so the window plays it as it plays any MP4 and its container gains nothing: the window's player reads the sound of an MPEG-TS stream only with the system's register of sound decoders, a name the window's container does not list (without it such a stream fails with AVFoundation error -11800, measured 2026-11-21). avconvert runs in the converter container: a folder of its own that lzrprf makes for each stream and removes after, in incognito too, where it reads one file, the stream, writes one, the MP4, and a folder within for its own copy; no network, no other file of yours, at most 30 seconds of processor time and 30 seconds in all, files of at most 96 MiB. It may look up two services by name, the register of sound decoders (`com.apple.audio.AudioComponentRegistrar`) and the read-only map of file types (`com.apple.lsd.mapdb`): without the first it cannot read the stream's sound, without the second it knows no kind of file to write. It starts only once the system said it is contained (the waiting perl of `[C21]`). Be clear what that means: avconvert reads bytes a site chose, outside the window and its trust, and a flaw it has that a stream reaches is held by that container and its limits alone. | `$CONVERTER`, `sub converting`, `sub system_converted`, `sub ts_sounds`, `sub plain_read` | Run `hlsmore`: a stream with sound comes to the window as an MP4, which the window's own code then plays to its end with both tracks in the window's container, and no folder of the converter is left. `hlsincog`: the same in an incognito window, and nothing of it is written. `hlssoundts`: an MPEG-TS stream with sound does not play in the window's container. And the converter container as lzrprf builds it (its own `sub converting`, run by selftest), tried from inside: the network, a file beside the stream and a file written beside the MP4 or its folder are refused while the stream, the MP4 and `TMP` are its own; asked by its number, the system lets its two names through and refuses the clipboard's, the decoder's and the network; outside, the same tries all work. lzrprf's own `sub plain_read` reads no pipe, link or second name put where the MP4 goes. |
+| `[C25]` | An update is offered, and its installer run, only for a release whose manifest is signed with the release key written in lzrprf: checked by macOS's own `ssh-keygen` in the verifier container, of the published number, newer than yours, not expired, and naming the installer by the SHA-256 it must have. There is no way around a refusal. | `sub release_signed`, `sub manifest_read`, `sub signature_holds`, `sub release_key`, `sub approval_keys`, `sub installed`, `$VERIFIER` | `selftest` makes keys of its own (an Ed25519 release key and a P-256 approval key), signs a manifest of release 7 with them, and serves it beside each installer of its site: runs `upyes`, `uptwo`, `uptwobad`, `upquote`, `updiffer`, `uplate` fetch the manifest, its signature and its approval before the installer; `upnosame`: a release file that names no place for a signed manifest is not offered and nothing is fetched. The installer's refusals (a missing signature or approval, a stranger's key, an approval of other bytes, either signature in the other's place, no approval key, two places that differ, an expired or changed manifest) are tried by the maker's own package test, which is not published here. |
+| `[C26]` | No script runs that you have not allowed. lzrprf holds the only policy and the only store of script permissions, tells each page run which scripts of its site run (`=permits`), answers at once what a page asks besides (`=permit`, deny for what no rule allows) and puts that to you once the page is drawn: Deny Once, the answer when nobody answers and kept for this visit only, Deny Always, a deny rule kept in LZRDFNDR scripts so it is not asked again, Allow Once or Always Allow, after which the page is loaded again; each script named by its file (host and path, no query) or as an inline script, with its size and its known tracker, and its source shown under the words as text that never runs, copied only on a press. A site whose scripts are not allowed has its script elements, handler attributes, `javascript:` addresses and `srcdoc` taken out of its page and frames, and none of its script files fetched; script bytes a rule denies are not handed over. A POST to another host than the page's is asked for on its own, and refused while a page is read. | `sub permit_decided`, `sub permit_page`, `sub live_permitted`, `sub permits_asked`, `sub live_fetched` | Hostile pages that ask `=permit` and report the `=permits` frame they were given; a page with scripts, handlers, `javascript:` and `srcdoc` that reports what reached it; a scripts file written by Always Allow, absent after Allow Once and Deny Once, deny rules after Deny Always with no second question; names that show the path, not a count; a code block that shows the source and never runs it, its copy written only on a press with the clipboard write replaced; On Websites grouped by site with each decision; not read and not written over when malformed; a script file refused by a Deny rule; a POST to another host, refused and allowed; an incognito window that writes no scripts file; a copy whose policy allows everything fails. |
+| `[C27]` | No request a filter list blocks is looked up or fetched, and no filter list decides whether a script runs. The lists are uBlock Origin's uAssets lists, kept as their makers wrote them under their own licence, and lzrprf's own reviewed exceptions, read only while the release's signed manifest names each by its SHA-256 and its approval and signature hold `[C26]`; anything else, and nothing is filtered, and Filters says why. lzrprf holds no code of uBlock Origin: it reads the network rules and exceptions docs/filters.md lists and counts every other line without running it. Pictures, style sheets, video and the requests of a page kept running are held to the lists after `[C23]` and before `[C26]`. An exception only means not blocked; a line that looks like a permission is refused. A list switched off and a host let through on a site are kept in filterlayers and revoked in Filters. | `sub filters`, `sub filter_line`, `sub filtered`, `sub filter_said`, `sub live_fetched`, `sub pictured` | A fixture list blocks by type, by third party and by `$domain=`, and an exception unblocks one request; scriptlets, cosmetic rules and permission-like lines are counted and never run; a list of exceptions and allow-like lines lets no script run; a changed list is refused whole and the script rules stay as they were; a copy where an exception lets a script run is caught; the real lists are loaded and timed. |
+| `[C28]` | Before any page, picture, style sheet, video, stream part or script request is looked up or fetched, lzrprf asks the application to judge the address in its own sealed page-container run. Only a complete, well-formed verdict from a successfully ended run allows it. Missing, malformed, unfit, failed or blocked verdicts send nothing to that site. A run takes at most 64 addresses; up to 2048 verdicts are cached in memory for this window and UTC day alone. A page the application's content shield, LZRDFNDR, blocks is not drawn and none of it runs. The application writes one line, `=flagged`, with its confidence, list, category and host and path, checked here to its form; the window shows a red page with two buttons, Close the Tab (the first, and the answer when the time is over) and Report False Positive Anonymously, and neither shows the page. lzrprf holds none of the shield's lists. A report is shown whole before it is sent, holds the category, the list, the confidence and the host and path and nothing else, is sent only on Send to the release file's flagreport address, through Tor when Tor is on and not at all when Tor is on and not connected, and the tab closes either way. | `sub shield_asked`, `sub shield_said`, `sub flagged_by`, `sub flag_shown`, `sub flag_door`, `sub flag_report`, `$FLAGGED` | Runs `shieldnormal`, `shieldtop`, `shieldbad`, `shieldshort`, `shieldunfit`, `shieldexit`, `shieldhang` and `shieldlive` prove the pre-fetch allow, block and failure paths against the lookup trace and the test site's own record. Runs `flagged`, `flagbad`, `flagnone`, `flagcancel`, `flagreport`, `flagtor`, `flagtordown`: a hostile page that writes `=flagged` is not drawn and its words never reach the window; a malformed line is refused; the report sent is exactly the four fields; Cancel sends nothing; through Tor it goes by the stand-in client, and with Tor down nothing is sent. |
+| `[C29]` | A terminal (LZRTRMNL) starts only on a press of the local home's terminal icon, within a second of that press, and never in an incognito or Tor window. lzrprf opens the system's pseudo-terminal and starts your login shell (one `/etc/shells` lists) as you, with a short list of variables and no descriptor of lzrprf's. The screen is drawn by `core-lzrbrwsr-trmnl` in `$TRMNL_CONTAINER`, which may read only its own program, the system's library cache and the root folder, maps no file as code, and holds no descriptor of the terminal. Only your keys are written to the shell, each named key in one fixed form; of what the container says, only the answers a program asked its terminal for, once per question, in their one form. Every line it draws is checked as a laid page's line is. What you paste is written as text with no control character but tabs and line ends, bracketed when the shell asked for it (mode 2004); the window reads the clipboard only on your paste and writes it only on your copy, with the selected text the container handed over, each row checked as text. A title a program sets (OSC 0 or 2) is the tab's title as plain text; OSC 52 is passed over, so no program writes the clipboard. | `sub trmnl_opened`, `sub trmnl_started`, `sub trmnl_shell`, `sub trmnl_input`, `sub trmnl_viewed`, `sub trmnl_pasted`, `sub trmnl_copied`, `sub trmnl_titled`, `sub trmnl_replied`, `sub trmnl_wrote`, `sub trmnl_read`, `sub trmnl_block`, `sub trmnl_end`, `$TRMNL_CONTAINER`, `$TRMNL_LIMITS` | No `selftest` run yet (it is past its line budget and is split first). Measured headless against the joined parts on macOS 27.2 (`managed-projects/lzrbrwsr/architecture/lzrtrmnl.md`): the container holds descriptors 0 to 2 alone, the shell holds the terminal alone, an answer nobody asked for is not written, and closing the tab ends both. |
+
+## The claims, one by one
+
+The full text of each claim, as a chain of what would have to happen for it to be false and the
+condition that stops each step, is in docs/claims.md. Each heading below gives the claim and where it
+is held.
+
+### The closed application runs inside the container, or not at all
+
+One line starts the application, in `sub laid_out`, through `sub contain` `[C1]`. The container is
+tried from inside at every start `[C2]`, and macOS is asked whether each process is contained before
+it is handed a byte `[C3]`.
+
+### No request you did not ask for
+
+A request to a site goes only through `sub fetch`, from the roads listed in `[C4]`, and its line is in
+the log first `[C5]`. lzrprf makes the one connection, to a numeric address it wrote down `[C6]`.
+
+### It can read a few facts about your computer, and has no way to deliver them
+
+The page container lets the application read the system's own folders and some facts of the system.
+It has no network, no file to write, no second process and no system service, and every line it writes
+is checked `[C9]`. docs/claims.md lists what it can read.
+
+### The application is given no way to keep anything between pages or to send anything
+
+The application is started fresh for each answer and writes no file. What a site, the resolver,
+GitHub and the maker's server still see is listed in docs/claims.md and under "Who answers a request
+of the release" below.
+
+### It cannot reach other applications, and can load the computer only within its limits
+
+The page and fetch containers refuse signals, system services, other programs and writing. Each
+contained program runs under limits of processor time, memory, files and processes set before it
+starts (`$PAGE_LIMITS`, `$FETCH_LIMITS`, set by `sub limited`).
+
+### It cannot read or change your files
+
+The page and fetch containers may read the system's own folders and the application's own folder,
+and write nothing. `selftest` tries to read a file it put in the home folder by several paths, and to
+change the log, the setting of what is kept and `lzrprf` itself.
+
+## What is kept
+
+The principle: every outgoing network request must be observable by you, but no browsing activity
+should be permanently retained without your explicit consent. Every line of the log is kept in the
+memory of the process behind the window (`sub record`), and on the disk only when the person chose to
+keep a log (`sub keeping`) `[C12]`.
+
+| mode | what stays on this computer |
+| --- | --- |
+| `nothing`, when nobody chose | nothing lzrprf writes: no file of lzrprf's holds an address you typed |
+| `hosts` | the log, each address cut to its host |
+| `all` | the log, every address in full |
+
+With `nothing`, lzrprf writes nothing of what was fetched to the disk on purpose. Memory can still
+reach the system's swap, a crash report of that process, the resolver's cache of names, a snapshot of
+the disk or a backup: those are macOS's, outside lzrprf. docs/kept.md has the full description,
+including the files `~/.lzrprf` holds by the person's choice.
+
+## Who answers a request of the release
+
+- **The site, `lzrbrwsr.com`.** It serves the installer and the download. While the maker's own server
+  is down, the maker can point the name at a copy held by a hosting company (Vercel). The header
+  `X-Served-By` of every answer says which one answered, `box` or `copy`.
+- **A report** goes to `origin.lzrbrwsr.com`, which names the maker's own server only, after the person
+  pressed Send for it. It is `GET /report?fault=WORD&release=NUMBER&macos=BUILD`. What that server keeps
+  cannot be checked from the Mac. The maker's word, the same as on the site's privacy page
+  (https://lzrbrwsr.com/privacy.html): the server sees the internet address and the moment, as any
+  server does, and keeps neither; it keeps one line with the day and those three values. Everyone on
+  the same update of macOS has the same build. A rare build, such as a test build, narrows down who
+  could have sent a report. The question shows the build before the person chooses.
+- **GitHub**, once the person said yes to looking for newer releases, is asked for the file `latest` at
+  each start. For a newer release, the signed manifest, its signature and its approval are fetched
+  beside each installer place, on GitHub and on the site `[C25]`.
+
+docs/faults.md and docs/claims.md have the full text.
+
+## The installer
+
+`install.sh` in this repository is the installer that https://lzrbrwsr.com/install.sh serves. It runs
+from a file and never from a pipe:
+
+    curl -q -fsSO https://lzrbrwsr.com/install.sh &&
+    curl -q -fsS https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/install.sh | cmp - install.sh &&
+    sh install.sh
+
+The first line saves the installer from the site. The second compares it byte for byte with
+`install.sh` in this repository and prints the first difference, if any. The third runs only when the
+two are the same. This shows that both places serve the same installer. It does not show that the
+installer is good; it is plain text to be read.
+
+From release 76 on the installer also fetches the signed manifest from both places and refuses the
+release unless both signatures hold and every file's SHA-256 is the one the manifest names (VERIFY.md).
+Up to release 75 nothing is signed with a key.
+
+It takes no attribute off any file. The download is packed without attributes of its own, in a fixed
+order, with a fixed time and no owner, so the same files give the same bytes. The program carries an
+ad-hoc signature with no identity in it, which Apple silicon requires before it runs native code. It
+is not signed with an Apple developer identity and it is not notarized. docs/installer.md says what
+stands where notarization would stand, what the two places are worth, and how to repack the download
+and compare.
+
+## When the container cannot be made
+
+The containers are macOS sandbox profiles, started by `/usr/bin/sandbox-exec`. Where a profile no
+longer holds on a build of macOS, the window says so and the program is not started. Where the command
+itself is gone, no window opens. There is no second road that runs it without the container in lzrprf
+itself. docs/limits.md lists every limit of what this repository shows, including a start of the
+program by another hand.
+
+## The release file
+
+The application carries a plain file, `LZRBRWSR.app/Contents/Resources/release`, read by `sub beside`
+and `sub paired`. It names the release, where the newest number and the installer are published, the
+report address, the files in the program's folder with their SHA-256, and the SHA-256 of the `lzrprf`
+and `blocklist` the release installs. The installer compares the file byte for byte with the text
+written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
+record:
+
+    release 83
+    home local
+    new New: LZRTRMNL, a terminal tab from the home page, runs your login shell, drawn by a sealed helper, with scrollback, select, copy, paste and program titles; not in incognito or Tor
+    new LZRDFNDR: Show all processes lists every process with its CPU, memory and, where known, what it is; its panel opens at once, and the minigame sentry is set in its Other tab
+    new Faster: an article opens in less than half the time, new and closed tabs open and close almost at once, typing on big pages is quicker, and windows resize smoothly
+    new Sign-in pages: on Google the email field is as wide as in Chrome and Next responds; the Apple sign-in page now loads, with more of the page parts sign-in pages use
+    new Tor opens its window first and shows its real progress; Stop Tor asks first and shows each step. A video plays its sound when you click Sound off; the minigame has a Quit button
+    new Behind the scenes: tests run on copies that never touch your files, new engine parts land only when graded against Chrome, and the self-test is steadier
+    newest https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/latest
+    installer https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/install.sh
+    same https://lzrbrwsr.com/install.sh
+    report https://origin.lzrbrwsr.com/report
+    file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
+    file lzrbrwsr-bin 07c8739c8ca8ee97c9e0d5bd8f07e527cebdbe0fb269ffb3fb5271ab69d019ae
+    file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
+    file core-lzrbrwsr-trmnl 9e968dc5b94cd8b5247150a44eef1060a2c4707b22a65b4c597b63f7e2514064
+    lzrprf a6080ebec2eb055c0bd37e63c40fd8511cbc5aa0555a922ed1e2270b4b421d06
+    blocklist 8bd7fe0cb692805f5124fa09584611eab3e56a919a07f0bd9792ef5af3631416
+
+docs/updates.md says what each line does.
+
+## Where each statement is checked
+
+The long descriptions moved from this README to docs/ in release 76. Each file starts with a statement
+index: every paragraph with the subs it names, the marks it cites and the `selftest` runs it names.
+Comments in the code that cite an old README section name still find it here:
+
+| old README section | now |
+| --- | --- |
+| What "proof" means here | docs/proof.md (summary above) |
+| How it works | docs/how-it-works.md |
+| Script permissions (now LZRDFNDR scripts) | docs/script-permissions.md |
+| The conditions | above |
+| The claims, one by one | docs/claims.md (summary above) |
+| Tabs, the home page, bookmarks, search, the lock, redirects | docs/window.md |
+| What is kept | docs/kept.md (summary above) |
+| An incognito window | docs/incognito.md |
+| Profiles | docs/profiles.md |
+| Which choices cost you, and where they are made | docs/choices.md |
+| A newer release | docs/updates.md |
+| When a page cannot be shown | docs/faults.md |
+| The list of addresses lzrprf never opens, The digests | docs/blocklist.md |
+| What it does not prove | docs/limits.md |
+| Use | docs/use.md |
+| The installer, Two places, and exactly what they are worth | docs/installer.md (summary above) |
+| Check it yourself | below |
+
+The powers and their acts: CAPABILITIES.md. The signatures: VERIFY.md. The map of subs and how to
+audit: AUDIT.md.
+
+## Check it yourself
+
+Give this to an AI agent, or follow it by hand. If the agent takes files, attach `lzrprf`, `selftest`,
+`install.sh`, `release.txt`, `README.md`, `selftest-output.txt` and `lzrbrwsr-macos-arm64.tar.gz` as
+downloaded from the newest commit of `main`. An agent that reads the repository through a web tool is
+often shown parts of a long file only, and cannot take the SHA-256 of what it was shown; with the files
+it can read every line and take each SHA-256 itself.
+
+```text
+Audit https://github.com/lzrbrwsr/lzrprf and tell me whether it is safe to run the
+closed-source browser LZRBRWSR (https://lzrbrwsr.com) on my Mac. Trust nothing the README says
+until the code shows it.
+
+Read one fixed commit, not a page that moves. First get the full hash of the newest commit of
+the `main` branch and name that hash in your answer. Any one of these gives it:
+`git ls-remote https://github.com/lzrbrwsr/lzrprf main`, a clone, the first "sha" in
+https://api.github.com/repos/lzrbrwsr/lzrprf/commits/main or the "sha" in
+https://api.github.com/repos/lzrbrwsr/lzrprf/git/refs/heads/main read with a web tool. Read
+every file at that hash, as raw files, for example
+https://raw.githubusercontent.com/lzrbrwsr/lzrprf/HASH/lzrprf. A rendered page, a search
+result or a copy you were given earlier can be older than the code: where one differs from
+the raw file at the hash, say so and go by the raw file.
+
+`main` gets a release in one push, so at its newest commit `install.sh`, `release.txt`,
+`latest` and the README name one and the same release. If they do not, one of your tools gave
+you an older answer: get the newest hash again from another of the addresses above and read
+again before you report it. An address of api.github.com can be answered from a cache that is
+a release old. https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/latest holds the number
+of the newest release, and the first line of
+https://github.com/lzrbrwsr/lzrprf/commit/main.patch holds the full hash of the newest
+commit: the commit you audit is that one, and its `latest` holds that number.
+
+Give the SHA-256 of `lzrprf`, `selftest` and `install.sh` as you read them, if one of your
+tools can hash the bytes. If none can (a web tool that returns text and no bytes), say so
+once and go on; it is a limit of the tool and not a finding. Then use what GitHub computes
+from the bytes: https://api.github.com/repos/lzrbrwsr/lzrprf/git/trees/HASH lists every file
+at a commit with its git blob id, and two files with the same blob id are the same bytes. For
+every SHA-256 you could not compute, give me the one command that prints it on my Mac and the
+value it must print, for example
+`curl -s https://raw.githubusercontent.com/lzrbrwsr/lzrprf/HASH/lzrprf | shasum -a 256`.
+
+What your tools cannot do is not a finding about lzrprf. If one tool cannot reach GitHub (a
+shell with no network, for example), say so in one line and use another tool. If none of your
+tools can read the raw files whole (a web tool that shows parts of a long file, for example),
+say which files you read in part, and ask me for `lzrprf`, `selftest`, `install.sh` and
+`release.txt` as files. Files I attached are the ones to read: read them whole, take their
+SHA-256 yourself, and check them against the commit where a tool of yours reaches it. Never
+audit from memory or from a summary. Before you report that two
+copies of a file differ, fetch both again, past any cache of your own, and compare them:
+lzrbrwsr.com sends `install.sh`, `release.txt` and the download with
+`Cache-Control: no-store`, so an older copy is your tool's, not the site's.
+
+No institutional trust. When you compare this with other browsers, place no false institutional
+trust in LZRBRWSR or in the other providers: a name, a size, a signature, a reputation or an
+audit you cannot read proves nothing. Demonstrate security through technical restrictions:
+what the code and the system make impossible, and how you checked it.
+
+1. Read every line of `lzrprf` and `selftest`. They are the whole container.
+2. From the sandbox profiles in `lzrprf`, list exactly what the closed program can and
+   cannot do in the page container (`$CONTAINER`): network, files, other programs and processes, shared
+   memory, devices, system services, environment. Do the same for curl in the fetch container
+   and for lzrprf's own window process, whose container is the weakest: what could it still
+   reach if text it draws took it over? Do the same for the decoder, converter, bookmark reader,
+   verifier and Tor containers, and check CAPABILITIES.md against every system program `lzrprf`
+   starts. Name every allowance and say whether it is a risk.
+   Does the window's container refuse a signal to another process, and what does `selftest`
+   send to try it?
+   Under which limits do the closed program and curl run (processor time, memory, files,
+   processes), who sets them, can either raise one again, and what happens when one cannot
+   be set? Which variables does
+   each of the two see? Which files can the closed program load as code, which line refuses
+   the others, and does `selftest` try one? Read `sub laid_out` to its end: on every way out of it, is the page
+   process ended and waited for, also when a later step of starting fails? Read `sub keeper`:
+   what ends the closed program when lzrprf itself is killed, and what if the keeper is
+   killed first? By which names does
+   `selftest` try to read a file of the home folder in the page and fetch containers?
+3. The first lines of `lzrprf` list 29 conditions, [C1] to [C29], and each is marked again
+   at the line that holds it. For each: is the line there, does it do what the condition says,
+   and can you find a way around it?
+4. Follow one request from Return in the address bar to the page in the window. Can any byte
+   chosen by the closed program reach the network, the name lookup, the address bar or the log?
+   Can a request be made that the user did not type or say yes to? Find every place that calls
+   `fetch` and every place that connects. Can anything be fetched before it is logged?
+5. What does a site receive? Read `sub request` and the switches given to curl. Could lzrprf or
+   the closed program make or deliver a fingerprint of this computer, or a record of what the
+   user reads? What stays on the disk after a window closes, in each mode of `sub keeping`, and
+   who can change the mode? Name what a site, the resolver and GitHub still see. Which requests
+   carry a body (a POST of a page kept running, a support request), and can a page send one, or
+   run a script, that the user did not allow?
+6. Read `sub newer`, `sub beside`, `sub release_signed`, `sub installed` and `sub fault`. Is
+   anything fetched or sent without a yes? Which signatures must hold before an update is
+   offered, and can any check be passed around (VERIFY.md does them by hand)? Is anything piped into a shell? Can lzrprf replace itself or the
+   program? What exactly does a report hold, where does it go, and can the closed program
+   choose any part of it? What does lzrprf do at its start when the app beside it names
+   another lzrprf than the one that runs, or names none (does it start at all?), and when
+   the launcher or the program is another file than the app's `release` file names: by what
+   is that measured, when is it looked at, and what is it worth against whoever can change
+   both? Is every file in the program's folder named, and is the program checked again before
+   every page, before the site is asked and before it is started (`sub program_same`: is a file
+   that was written, replaced or moved since its sum was read always read whole again)? With which
+   variables does `sub installed` run the installer, what reaches the window of what it
+   prints (`sub install_line`), and does its fetch follow a redirect?
+7. Read `install.sh` and `release.txt`. Confirm that the installer refuses to run from a pipe,
+   asks before it runs, takes no test setting from the shell unless every file comes from this
+   computer, fetches lzrprf from this repository at one fixed commit, that the
+   SHA-256 values it carries match `lzrprf` and `selftest` at that commit and the download
+   `lzrbrwsr-macos-arm64.tar.gz` here, that it fetches the download from two places and stops
+   unless they are the same file, that it refuses a release whose manifest is not signed with the
+   release key and approved with an approval key, that it runs `selftest` before installing anything, never
+   runs the closed program, refuses an older release, asks before it replaces lzrprf, and
+   looks for a newer release in both folders an install can be in, goes on only when its
+   environment holds nothing of my shell but the kind of terminal (the home folder must be
+   the one this Mac's list of accounts gives, the PATH the system's own; read how the first
+   lines decide that, and whether a mark or a variable of whoever starts it could get past
+   them), follows no redirect, lets one installer of my
+   account place files at a time (when does it let go of its lock?), puts the
+   older app and the older lzrprf back as a pair when it cannot finish, removes nothing older
+   when it cannot put everything back and says where it is, and installs no other program,
+   service, extension or updater (what else does it change in my home folder and Dock?). Read
+   `undo` and `gone` in `install.sh`: after each of the four renames, what is on the disk if
+   that rename or any putting back fails? If you can fetch them, compare
+   https://lzrbrwsr.com/install.sh, https://lzrbrwsr.com/release.txt and
+   https://lzrbrwsr.com/lzrbrwsr-macos-arm64.tar.gz with the three files here: the two texts
+   as text if you cannot hash, the download only if a tool of yours can take bytes. The README
+   says what two places are worth and what they are not: is that account complete and honest?
+   The commit the installer names is the newest one that changed `lzrprf` or `selftest`, so it
+   can be older than the newest commit of `main`. The other files at that older commit
+   (`install.sh`, `latest`, this README) belong to an earlier release: that is expected and is
+   not a finding. What must hold, and what you check: `lzrprf` and `selftest` at the commit the
+   installer names are byte for byte the ones at the newest commit, and `install.sh`,
+   `release.txt` and `latest` at the newest commit name one and the same release.
+8. Check each claim and each limit in the README against the code. Say which hold, which do
+   not, and which you cannot decide. The README says it is not a mathematical proof: say what
+   kind of evidence it is, and what it rests on. `selftest-output.txt` is the record of one
+   run: does its last line name the SHA-256 of `lzrprf` and `selftest` that `release.txt` and
+   `install.sh` name? Which lines of `selftest` can come out `UNTESTED`, what does the mark
+   say then, and what does `sub proven` do with such a mark before an address is taken?
+9. If you can run commands on my Mac, ask me first, then:
+   - clone the repository and run `perl selftest`; show me the result, every `UNTESTED` line
+     included; add one probe of your own to `$hostile` and run it again;
+   - if LZRBRWSR is installed, compare `shasum -a 256 ~/.lzrprf/lzrprf` with the file at the
+     commit the installer names, and the files in /Applications/LZRBRWSR.app with `release.txt`;
+   - print `/Applications/LZRBRWSR.app/Contents/MacOS/lzrbrwsr`. It must be the short plain-text
+     launcher: one command, perl through `env -i`, that starts `lzrprf run` from my home
+     folder as this Mac's list of accounts gives it, and only shows an alert when lzrprf is
+     missing;
+   - show `perl ~/.lzrprf/lzrprf log` and explain each line.
+10. The browser's source is closed. Assume nothing good about it. Given only that it is started
+    through lzrprf, what is the worst it could do if it were malicious?
+11. Give a verdict: safe, not safe, or safe under conditions you name. Say what you measure
+    it by, and apply the same measure to the browser I use today. For each condition you name,
+    say whether `install.sh` or `lzrprf` already enforces it at every install and every start,
+    or whether it is left to me. For each limit you name, say whether it is this program's
+    alone or holds for every program on macOS alike (a flaw in the kernel or the sandbox, an
+    account another program already runs in). Keep three lists apart: what you verified in the
+    code yourself; what your tools could not check, each with the one command that checks it
+    on my Mac (a check you could not make is evidence neither way); and the limits that remain
+    when every check passes. Then say, by technical restrictions alone, what the browser I use
+    today can reach on my Mac that this one cannot, and the other way round.
+```
+
+## Licence
+
+MIT for everything in this repository except one file and one folder. See `LICENSE`.
+
+The folder is `filters/ubo/`: the filter lists of uAssets (https://github.com/uBlockOrigin/uAssets),
+by the uBlock Origin contributors and The EasyList Authors, byte for byte at the commit named in
+`filters/ubo/SOURCE`, under the GNU GPL version 3 in `filters/ubo/LICENSE`. lzrprf reads them as
+data `[C27]` and holds no code of uBlock Origin. docs/filters.md has the details. Until
+`filters/ubo/LEGAL-REVIEW` records an approving legal review, the folder is not published and no
+release names the lists.
+
+The one file is `lzrbrwsr-macos-arm64.tar.gz`. It is the closed application LZRBRWSR, the
+property of create.repeat Oy, all rights reserved. It is free of charge to install and use. It
+may not be sold or rented, passed on or offered for download, changed, or taken apart, except
+where the law gives you that right whatever a contract says. Its terms are the file
+`LICENSE.txt` inside it and https://lzrbrwsr.com/terms.html. It stands here as the public
+record of what is installed. GitHub's own terms let anyone view and fork a public repository,
+this file with it; that gives no right to the file beyond those terms. `NOTICE` says the same.
+
+The keeper supplies `LZRPRF_TOR=1` to a contained run in a Tor window. The page uses this mode bit to keep its navigator and every request on the honest identity; normal runs receive no such variable. `LZRPRF_JUDGE=1` selects only the address-verdict run, with no page bytes. Neither flag grants another system capability.

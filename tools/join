@@ -1,0 +1,77 @@
+#!/usr/bin/perl
+# Joins the parts of lzrprf. In git the source of lzrprf is the folder src/: one file a part, named
+# NN-name.pl, each an exact slice of the shipped file, so joining them in the order of their names gives
+# lzrprf byte for byte. Nothing is added between two parts and nothing is taken away. The file lzrprf
+# stays in git too: it is what the installer fetches by commit and SHA-256, and what selftest probes.
+#
+#   perl tools/join                     writes lzrprf from src/*.pl (a new file beside it, then renamed
+#                                       over it, mode 755)
+#   perl tools/join --check             says whether joining src/*.pl gives lzrprf; when it does not,
+#                                       names the first part and line where they part, and exits 1
+#   perl tools/join --check DIR FILE    the same for another folder of parts and another file (selftest
+#                                       uses it on a copy of the parts with one byte changed)
+#
+# It reads src/ and lzrprf from the folder above tools/. A change to lzrprf is made in its part, then
+# "perl tools/join", then "perl selftest".
+use strict;
+use warnings;
+use Digest::SHA;
+use File::Basename qw(basename dirname);
+
+my $check = @ARGV && $ARGV[0] eq '--check' ? shift @ARGV : undef;
+my $root = dirname(dirname(__FILE__ =~ m{/} ? __FILE__ : "./$0"));
+$root = '.' unless -d "$root/src";
+my ($dir, $file) = @ARGV == 2 ? @ARGV : ("$root/src", "$root/lzrprf");
+die "usage: perl tools/join [--check [DIR FILE]]\n" if @ARGV && (@ARGV != 2 || !$check);
+
+opendir my $folder, $dir or die "join: cannot read $dir: $!\n";
+my @parts = sort grep { /\A[0-9]{2}-[a-z0-9-]+\.pl\z/ } readdir $folder;
+closedir $folder;
+die "join: $dir holds no part (NN-name.pl)\n" unless @parts;
+my @bytes = map { slurp("$dir/$_") } @parts;
+for my $i (0 .. $#parts) {
+    next if $bytes[$i] =~ /\n\z/;
+    die "join: $dir/$parts[$i] does not end with a line end, so its last line would run into the next part\n" if !$check || $i < $#parts;
+}
+my $joined = join '', @bytes;
+
+unless ($check) {
+    my $new = "$file.join-$$";
+    open my $out, '>:raw', $new or die "join: cannot write $new: $!\n";
+    print $out $joined;
+    close $out or die "join: cannot write $new: $!\n";
+    chmod 0755, $new or die "join: cannot make $new runnable: $!\n";
+    rename $new, $file or die "join: cannot put $new in the place of $file: $!\n";
+    printf "join: wrote %s from %d parts of %s, SHA-256 %s\n", $file, scalar(@parts), $dir, Digest::SHA::sha256_hex($joined);
+    exit 0;
+}
+
+my $shipped = slurp($file);
+if ($joined eq $shipped) {
+    printf "join: %s is the join of the %d parts of %s, SHA-256 %s\n", $file, scalar(@parts), $dir, Digest::SHA::sha256_hex($shipped);
+    exit 0;
+}
+my ($at, $line) = (0, 1);    # where the part being compared begins in the shipped file: a byte offset, a line number
+for my $i (0 .. $#parts) {
+    my $part = $bytes[$i];
+    my $there = substr $shipped, $at, length $part;
+    if ($there ne $part) {
+        my @mine = split /(?<=\n)/, $part;
+        my @theirs = split /(?<=\n)/, $there;
+        my $n = 0;
+        $n++ while $n < @mine && $n < @theirs && $mine[$n] eq $theirs[$n];
+        if ($n >= @theirs) {
+            printf "join: %s goes on after the end of %s, from its line %d\n", "$dir/$parts[$i]", $file, $n + 1;
+        }
+        else {
+            printf "join: %s differs from %s at its line %d, which is line %d of %s\n", "$dir/$parts[$i]", $file, $n + 1, $line + $n, $file;
+        }
+        exit 1;
+    }
+    $at += length $part;
+    $line += $part =~ tr/\n//;
+}
+printf "join: %s goes on after the last part, %s, from its line %d\n", $file, "$dir/$parts[-1]", $line;
+exit 1;
+
+sub slurp { open my $in, '<:raw', $_[0] or die "join: cannot read $_[0]: $!\n"; local $/; return scalar(<$in>) // '' }

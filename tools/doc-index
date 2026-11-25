@@ -1,0 +1,64 @@
+#!/usr/bin/perl
+# Prints, or writes into a document, the statement index of a file under docs/: one row for each
+# paragraph, list item or table row of the document's body, with the subs it names ("sub NAME"), the
+# condition marks it cites ([C1] to [C27]) and the selftest runs it names (a word in backticks that
+# is a key of %about in selftest). A row with "-" in a column cites nothing of that kind: the
+# statement is then for the reader to check against the code, and no run of selftest is named for it.
+#
+#   perl tools/doc-index docs/kept.md            prints the index
+#   perl tools/doc-index --write docs/*.md       replaces the text between the lines
+#                                                "<!-- index begin -->" and "<!-- index end -->"
+#   perl tools/doc-index --check docs/*.md       fails when a sub or a run named is not in lzrprf or
+#                                                selftest, or when an index is not what it would write
+#
+# It reads lzrprf and selftest from the folder above tools/.
+use strict;
+use warnings;
+use File::Basename qw(dirname);
+
+my $mode = @ARGV && $ARGV[0] =~ /\A--(write|check)\z/ ? (shift(@ARGV), $1)[1] : 'print';
+my $root = dirname(dirname(__FILE__ =~ m{/} ? __FILE__ : "./$0"));
+$root = '.' unless -f "$root/lzrprf";
+my $src = slurp("$root/lzrprf");
+my %sub = map { $_ => 1 } $src =~ /^sub (\w+)/mg;
+my $test = slurp("$root/selftest");
+my ($about) = $test =~ /^my %about = \((.*?)^\);/ms or die "doc-index: no %about in selftest\n";
+my %run = map { $_ => 1 } $about =~ /^\s+(\w+) => q/mg;
+my $failed = 0;
+
+for my $file (@ARGV) {
+    my $text = slurp($file);
+    my ($body) = $text =~ /<!-- index end -->\n(.*)\z/s;
+    $body //= $text;
+    my @rows;
+    my $fence = 0;
+    for my $block (split /\n(?:\s*\n)+|\n(?=\s*(?:[-*] |\d+\. |\| ))/, $body) {
+        my $in = $fence;
+        $fence = !$fence for $block =~ /^```/mg;
+        next if $in || $block =~ /\A```/ || $block =~ /\A {4}/;    # code, fenced or indented
+        next if $block =~ /\A\s*(?:#|\|\s*-)/;    # a heading, or a table's rule
+        my $plain = $block =~ s/\s+/ /gr;
+        $plain =~ s/\A\s+//;
+        next unless length $plain && $plain !~ /\A```/;
+        my (%seen, @subs, @marks, @runs);
+        for my $name ($block =~ /\bsub (\w+)/g) {
+            if (!$sub{$name}) { warn "doc-index: $file: no sub $name in lzrprf\n"; $failed = 1; next }
+            push @subs, $name unless $seen{"s$name"}++;
+        }
+        push @marks, grep { !$seen{"m$_"}++ } $block =~ /\[(C\d+)\]/g;
+        push @runs, grep { $run{$_} && !$seen{"r$_"}++ } $block =~ /`(\w+)`/g;
+        my @words = grep { length } split / /, $plain =~ s/[|`*]//gr;
+        my $words = join ' ', @words > 8 ? @words[0 .. 7] : @words;
+        push @rows, sprintf '| %s ... | %s | %s | %s |', $words, (@subs ? join(', ', map { "`$_`" } @subs) : '-'),
+            (@marks ? join(' ', @marks) : '-'), (@runs ? join(', ', map { "`$_`" } @runs) : '-');
+    }
+    my $index = join "\n", '| statement begins | subs | marks | selftest runs |', '| --- | --- | --- | --- |', @rows;
+    if ($mode eq 'print') { print "$index\n"; next }
+    my $new = $text =~ s/(<!-- index begin -->\n).*?(<!-- index end -->)/$1$index\n$2/sr;
+    if ($new eq $text && $text !~ /<!-- index begin -->/) { warn "doc-index: $file has no index lines\n"; $failed = 1; next }
+    if ($mode eq 'write') { open my $out, '>', $file or die "doc-index: cannot write $file: $!\n"; print $out $new; close $out or die }
+    elsif ($new ne $text) { warn "doc-index: $file: the index is not what doc-index writes\n"; $failed = 1 }
+}
+exit $failed;
+
+sub slurp { open my $in, '<', $_[0] or die "doc-index: cannot read $_[0]: $!\n"; local $/; return scalar <$in> }

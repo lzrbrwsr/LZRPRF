@@ -1,0 +1,76 @@
+#!/usr/bin/perl
+# Prints the map of subs of lzrprf, by part: lzrprf is joined from the parts in src/ (tools/join), and
+# each part is one row of its own, then one row for each top-level "sub NAME" in it. A row gives the
+# part, the line in the part, the name, and the condition marks ([C1] to [C27]) written from there to
+# the next top-level sub or to the end of the part, in the order met. The part's own row, named "-",
+# stands at its line 1 and gives the marks written in the part before its first sub. So every mark in
+# lzrprf is on one row of the map, the row of the part and the sub it is written in.
+# The map is generated, never written by hand: the docs cite subs by name only, and the map in AUDIT.md is
+# this output, written there by --write and compared with it by selftest. Line numbers are counted inside
+# each part, so a change to one part moves no line of the map in any other part.
+#
+#   perl tools/sub-map            reads src/ beside tools/ (or lzrprf there, as one part, when there is no src/)
+#   perl tools/sub-map DIR        reads the parts in DIR, every NN-name.pl in the order of their names
+#   perl tools/sub-map FILE       reads FILE as one part
+#   perl tools/sub-map --joined [DIR|FILE]
+#                                 adds a fifth column: the line in the joined file, for reading lzrprf
+#                                 itself; it is never written into AUDIT.md
+#   perl tools/sub-map --count [DIR|FILE]
+#                                 prints only how many subs and parts, and how many of the subs carry a mark
+#   perl tools/sub-map --write AUDIT.md [DIR|FILE]
+#                                 writes the map between the lines "<!-- sub-map begin -->" and
+#                                 "<!-- sub-map end -->" of AUDIT.md, as a block of code
+#
+# Output: PART<TAB>LINE<TAB>NAME<TAB>MARKS, MARKS a space-separated list or "-" for none.
+use strict;
+use warnings;
+use File::Basename qw(basename dirname);
+
+my $count = @ARGV && $ARGV[0] eq '--count' ? shift @ARGV : undef;
+my $joined = @ARGV && $ARGV[0] eq '--joined' ? shift @ARGV : undef;
+my $write = @ARGV > 1 && $ARGV[0] eq '--write' ? (shift(@ARGV), shift(@ARGV))[1] : undef;
+my $root = dirname(dirname(__FILE__ =~ m{/} ? __FILE__ : "./$0"));
+$root = '.' unless -e "$root/src" || -e "$root/lzrprf";
+my $from = shift(@ARGV) // (-d "$root/src" ? "$root/src" : "$root/lzrprf");
+my @files;
+if (-d $from) {
+    opendir my $dir, $from or die "sub-map: cannot read $from: $!\n";
+    @files = map { "$from/$_" } sort grep { /\A[0-9]{2}-[a-z0-9-]+\.pl\z/ } readdir $dir;
+    closedir $dir;
+    die "sub-map: $from holds no part (NN-name.pl)\n" unless @files;
+}
+else { @files = ($from) }
+my (@rows, $at);    # $at: the lines of the parts before this one, for --joined
+for my $file (@files) {
+    my $part = basename($file);
+    open my $in, '<', $file or die "sub-map: cannot read $file: $!\n";
+    my $current = { part => $part, line => 1, name => '-', marks => [], seen => {}, joined => ($at // 0) + 1 };
+    push @rows, $current;
+    while (my $line = <$in>) {
+        if ($line =~ /\Asub (\w+)/) {
+            $current = { part => $part, line => $., name => $1, marks => [], seen => {}, joined => ($at // 0) + $. };
+            push @rows, $current;
+        }
+        while ($line =~ /\[(C\d+)\]/g) {
+            push @{ $current->{marks} }, $1 unless $current->{seen}{$1}++;
+        }
+    }
+    $at = ($at // 0) + $.;
+    close $in;
+}
+my $subs = grep { $_->{name} ne '-' } @rows;
+die "sub-map: no sub found in $from\n" unless $subs;
+if ($count) {
+    my $marked = grep { $_->{name} ne '-' && @{ $_->{marks} } } @rows;
+    print "$subs subs in ", scalar(@files), ' part', (@files == 1 ? '' : 's'), ", $marked with a mark\n";
+    exit 0;
+}
+my $map = join '', map { join("\t", $_->{part}, $_->{line}, $_->{name}, @{ $_->{marks} } ? join(' ', @{ $_->{marks} }) : '-', $joined && !defined $write ? $_->{joined} : ()) . "\n" } @rows;
+unless (defined $write) { print $map; exit 0 }
+open my $doc, '<', $write or die "sub-map: cannot read $write: $!\n";
+my $text = do { local $/; <$doc> };
+close $doc;
+$text =~ s/^(<!-- sub-map begin -->\n).*?^(<!-- sub-map end -->)$/$1\x60\x60\x60\n$map\x60\x60\x60\n$2/ms or die "sub-map: $write has no lines <!-- sub-map begin --> and <!-- sub-map end -->\n";
+open my $out, '>', $write or die "sub-map: cannot write $write: $!\n";
+print $out $text;
+close $out or die "sub-map: cannot write $write: $!\n";

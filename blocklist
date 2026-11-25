@@ -1,0 +1,8 @@
+lzrprf blocklist 2 form 2
+# The addresses lzrprf never opens, as digests only: README.md, "The list of addresses lzrprf never opens".
+# onion-md5: the MD5 of an onion address, "<56 characters>.onion", as Ahmia publishes its list (https://ahmia.fi/blacklist/). Empty in this file until its licence for shipping is settled.
+# host-sha256, url-sha256 and query-sha256: the SHA-256 of a host, of "host/path?query", and of "host/path" of each address with a query, for the IWF URL List (https://www.iwf.org.uk). Empty until lzrprf may carry it.
+onion-md5 0
+host-sha256 0
+url-sha256 0
+query-sha256 0

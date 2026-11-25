@@ -1,0 +1,480 @@
+// The window, continued from 28-window.pl (split there at 800+ lines, HC-0843): LZRDFNDR's Show all
+// processes, then the window's start (function run).
+//
+// Show all processes, the button at the bottom left of On Your Computer (HC-0843). A press asks lzrprf
+// for "tool all": the same look and list as Recognition, and after the rows one "tool proc" line for every
+// process of the computer (sub tool_procs), fifteen fields parted by tabs: PID, CPU %, memory in KiB,
+// group, title, what it is, where that was read, your note, parent PID, user, started, program, command
+// line, who signed it, its launchd job. The list then shows them under the rows, grouped (core processes
+// first, by their names core-<realm>-<purpose>), each with its title, PID, CPU, memory, description and
+// note in columns, and two controls: Copy info, which writes everything gathered of the process to the
+// clipboard (through clipboardWrite, the window's one write) so it can be pasted to an agent, and the
+// Notes cell, which opens a field over itself; Return keeps the note ("tool note PROGRAM<tab>TEXT",
+// kept by lzrprf for every process of that program). The panel widens to PROCS_WIDE while they show.
+// Nothing here changes a process: ending one stays a ticked row of the list above, confirmed.
+// SYNC: 14-tool.pl (sub tool_procs, sub tool_note), ../lzrbrwsr/architecture/lzrdfndr.md §11, docs/window.md
+var toolAll = false, toolAllButton = null, procNoteField = null, procEditing = null, PROCS_WIDE = 1120, PROCS_ROW = 40;    // DECLARED(wide enough for seven columns with a description of two lines; a row as tall as two lines of 11 points)
+var PROC_GROUPS = [['core', 'Core processes'], ['lzrbrwsr', 'LZRBRWSR and lzrprf'], ['yours', 'Your apps and programs'], ['macos', 'macOS'], ['others', 'Other users']];
+var PROC_FIELDS = ['pid', 'cpu', 'mem', 'group', 'title', 'about', 'source', 'note', 'ppid', 'user', 'began', 'path', 'args', 'signed', 'job'];
+// The controls of a row, drawn right to left from the row's end. HC-0845 (LZRPRF wraps a process in its
+// container, closes it and keeps it closed) adds its own here, beside Copy info: [words, width, what a press does].
+var PROC_ACTIONS = [['Copy info', 74, procCopied]];
+var PROC_COPY_LEAD = 'This process was found by LZRDFNDR in LZRBRWSR (Show all processes). Please help me understand what it is and whether I should keep it, close it, or keep it closed:';
+function procsTold(word, more) {    // "tool proc ..." between "tool begin" and "tool end", and "tool noted kept|failed" after a note
+    if (word == 'noted') { if (tool) { tool.said = more == 'kept' ? 'Note kept.' : 'The note could not be written.'; toolChanged(); } return; }
+    var f = more.split('\t');
+    if (!toolIn || f.length != PROC_FIELDS.length || !/^\d{1,7}$/.test(f[0])) return;
+    var one = {};
+    PROC_FIELDS.forEach(function (name, k) { one[name] = f[k]; });
+    one.pid = +one.pid; one.cpu = one.cpu == '-' ? -1 : +one.cpu || 0; one.mem = one.mem == '-' ? -1 : +one.mem || 0;
+    (toolIn.procs = toolIn.procs || []).push(one);
+}
+function procsShown() { return !!tool && toolAll && toolTab == 'computer' && !tool.confirm && !!tool.procs && tool.procs.length > 0; }
+function procsPressed() {    // the button: on, lzrprf is asked for every process; off, the list shows the found apps only and asks nothing
+    if (!tool || tool.busy || tool.confirm || !modalOpen || modalKind != 'tool' || toolTab != 'computer') return;
+    toolAll = !toolAll; procNoteHidden();
+    TOOL_WIDE = toolAll ? PROCS_WIDE : 800;
+    if (toolAll) { tool.busy = 'Reading every process of this computer'; say('tool all'); }
+    placeModal(); toolChanged(); toolView.scrollPoint($.NSMakePoint(0, 0));
+}
+function procsEnabled() {    // the button, on On Your Computer only, not on the question; its words say what a press does
+    if (!toolAllButton) return;
+    toolAllButton.hidden = !tool || !!tool.confirm || !modalOpen || modalKind != 'tool' || toolTab != 'computer';
+    toolAllButton.enabled = !!tool && !tool.busy;
+    toolAllButton.title = $(toolAll ? 'Show found apps only' : 'Show all processes');
+    if (toolAllButton.hidden) procNoteHidden();
+}
+function procsPlaced(M, w) {    // bottom left, left of the panel's own buttons; on the row above, right of the copy button, when they leave no room
+    if (!toolAllButton) return;
+    var left = panelButtons.length ? panelButtons[0].frame.origin.x : M + w - 26, wide = 180;
+    toolAllButton.frame = left - 10 - (M + 26) >= wide ? $.NSMakeRect(M + 26, M + 18, wide, 32) : $.NSMakeRect(M + 26 + Math.min(w - 52, 380) + 10, M + 62, wide, 32);
+}
+function procOrder(a, b) { return b.cpu - a.cpu || b.mem - a.mem || a.pid - b.pid; }
+function procsLaid(items, y, w) {    // under the rows: the words, the heading of the columns, and each group with its processes
+    if (!procsShown()) { if (toolAll && tool && !tool.busy && toolTab == 'computer' && !tool.confirm) { items.push({ text: 'No process was listed: lzrprf could not read them, or the application did not answer.', font: sans(12.5), colour: GREY, y: y + 8, h: 18 }); y += 34; } return y; }
+    var words = 'Every process of this computer: ' + tool.procs.length + '. CPU is its share of one processor now and Memory what it holds in memory. A description comes from LZRDFNDR’s table, a core process’s name, or the manual page of its program on this Mac; nothing of this list leaves the computer. Copy info copies everything gathered of a process, to paste to an agent; click a Notes cell to write a note.';
+    items.push({ text: words, font: sans(12.5), colour: WHITE, y: y + 10, h: 50 }); y += 66;
+    items.push({ procs: 'head', y: y, h: 22 }); y += 26;
+    PROC_GROUPS.forEach(function (group) {
+        var ones = tool.procs.filter(function (one) { return one.group == group[0]; }).sort(procOrder);
+        if (!ones.length) return;
+        items.push({ text: group[1] + ' (' + ones.length + ')', font: sans(14, true), colour: group[0] == 'core' ? GREEN : WHITE, y: y + 6, h: 20 }); y += 30;
+        ones.forEach(function (one) { items.push({ proc: one, y: y, h: PROCS_ROW }); y += PROCS_ROW + 4; });
+    });
+    return y + 4;
+}
+function procColumns(w) {    // where each column begins and how wide it is: the description takes what the others leave
+    var at = 10, cols = {};
+    [['title', 190], ['pid', 54], ['cpu', 54], ['mem', 74], ['about', 0], ['note', 170]].forEach(function (col) { cols[col[0]] = { x: at, w: col[1] }; at += col[1] + 10; });
+    var actions = PROC_ACTIONS.reduce(function (sum, act) { return sum + act[1] + 8; }, 6), rest = w - at - actions - 6;
+    cols.about.w = Math.max(80, rest); cols.note.x += cols.about.w; cols.actions = { x: w - actions, w: actions };
+    return cols;
+}
+function procPills(one, w) { var x = w - 10; return PROC_ACTIONS.map(function (act) { x -= act[1]; var pill = { act: act, x: x, y: one.y + 8, w: act[1], h: 24 }; x -= 8; return pill; }); }
+function procMemory(kib) { return kib < 0 ? '-' : kib >= 1048576 ? (kib / 1048576).toFixed(1) + ' GB' : kib >= 1024 ? (kib / 1024).toFixed(1) + ' MB' : kib + ' KB'; }
+function paintProc(one, w) {
+    var cols = procColumns(w), cut = function (font, colour) { return inked(font, colour, true); };
+    if (one.procs == 'head') {
+        [['title', 'Title'], ['pid', 'PID'], ['cpu', 'CPU'], ['mem', 'Memory'], ['about', 'Description'], ['note', 'Notes']].forEach(function (col) { $(col[1]).drawInRectWithAttributes($.NSMakeRect(cols[col[0]].x, one.y + 3, cols[col[0]].w, 16), cut(sans(11, true), GREY)); });
+        return;
+    }
+    var p = one.proc, card = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1.5, one.y + 0.5, w - 3, one.h - 1), 8, 8);
+    FILL.setFill; card.fill; stroked(card, p.group == 'core' ? DIM : LINE, 1);
+    var tx = cols.title.x;
+    if (p.group == 'core') { var tag = styled('CORE', inked(sans(9, true), GREEN)); tag.drawAtPoint($.NSMakePoint(tx, one.y + 4)); }
+    $(p.title).drawInRectWithAttributes($.NSMakeRect(tx, one.y + (p.group == 'core' ? 15 : 5), cols.title.w, 17), cut(sans(12.5, true), WHITE));
+    $(p.user).drawInRectWithAttributes($.NSMakeRect(tx, one.y + 22, cols.title.w, 15), cut(sans(10.5), DIM));
+    $(String(p.pid)).drawInRectWithAttributes($.NSMakeRect(cols.pid.x, one.y + 6, cols.pid.w, 16), cut(mono(11), GREY));
+    $(p.cpu < 0 ? '-' : p.cpu.toFixed(1) + '%').drawInRectWithAttributes($.NSMakeRect(cols.cpu.x, one.y + 6, cols.cpu.w, 16), cut(mono(11), p.cpu >= 50 ? YELLOW : GREY));
+    $(procMemory(p.mem)).drawInRectWithAttributes($.NSMakeRect(cols.mem.x, one.y + 6, cols.mem.w, 16), cut(mono(11), GREY));
+    styled(p.about || 'No description known yet: Copy info gives what an agent needs to look it up.', inked(sans(11), p.about ? GREY : DIM)).drawInRect($.NSMakeRect(cols.about.x, one.y + 4, cols.about.w, one.h - 6));
+    if (procEditing !== p) styled(p.note || 'Add a note', inked(sans(11), p.note ? WHITE : DIM)).drawInRect($.NSMakeRect(cols.note.x, one.y + 4, cols.note.w, one.h - 6));
+    procPills(one, w).forEach(function (pill) {
+        var box = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(pill.x, pill.y, pill.w, pill.h), 8, 8);
+        stroked(box, p.copied && pill.act[2] == procCopied ? GREEN : ICON, 1);
+        var label = styled(p.copied && pill.act[2] == procCopied ? 'Copied' : pill.act[0], inked(sans(11), WHITE));
+        label.drawAtPoint($.NSMakePoint(pill.x + (pill.w - label.size.width) / 2, pill.y + 4));
+    });
+}
+function procClicked(at, items) {    // a pill of a row, or its Notes cell; true when the click was the process list's
+    procNoteHidden();
+    var w = toolLaid().wide, cols = procColumns(w);
+    for (var k = 0; k < items.length; k++) {
+        var one = items[k];
+        if (!one.proc || at.y < one.y || at.y >= one.y + one.h) continue;
+        var hit = procPills(one, w).filter(function (pill) { return at.x >= pill.x && at.x <= pill.x + pill.w && at.y >= pill.y && at.y <= pill.y + pill.h; })[0];
+        if (hit) { hit.act[2](one.proc); return true; }
+        if (at.x >= cols.note.x && at.x <= cols.note.x + cols.note.w) { procNoteOpened(one, cols); return true; }
+        return true;
+    }
+    return false;
+}
+function procCopyText(p) {    // everything gathered of one process, one fact to a line
+    var name = p.path.replace(/^.*\//, ''), names = [name].concat(p.signed ? [p.signed.split(' ').slice(1).join(' ')] : [], p.job ? [p.job.split(' ').slice(1).join(' ')] : []).filter(function (one, k, all) { return one && one != '-' && all.indexOf(one) == k; });
+    return [PROC_COPY_LEAD, 'Title: ' + p.title, 'Process id (PID): ' + p.pid, 'Parent process id: ' + p.ppid, 'User: ' + p.user, 'Started: ' + p.began,
+        'CPU: ' + (p.cpu < 0 ? 'not read' : p.cpu.toFixed(1) + '% of one processor'), 'Memory: ' + procMemory(p.mem), 'Program: ' + p.path, 'Command line: ' + (p.args || '-'),
+        'Signed by: ' + (p.signed ? 'team ' + p.signed.replace(' ', ', identifier ') : 'not read'), 'Launchd job: ' + (p.job || 'none seen'), 'Group: ' + (PROC_GROUPS.filter(function (g) { return g[0] == p.group; })[0] || ['', p.group])[1],
+        'Description: ' + (p.about ? p.about + ' (from ' + p.source + ')' : 'none known on this computer'), 'My note: ' + (p.note || '-'), 'Names to look it up by: ' + names.join(', ')].join('\n');
+}
+function procCopied(p) {
+    if (!tool || tool.busy || !procsShown()) return;
+    var ok = clipboardWrite(procCopyText(p));
+    tool.procs.forEach(function (one) { one.copied = false; });
+    p.copied = ok; tool.said = ok ? 'Copied the information of ' + p.title + ' (PID ' + p.pid + ') to the clipboard.' : 'The clipboard did not take it.';
+    toolChanged();
+}
+function procNoteOpened(one, cols) {    // a field over the Notes cell, in the list itself; Return keeps it, a press elsewhere leaves it unkept
+    procNoteHidden();
+    procEditing = one.proc;
+    procNoteField.frame = $.NSMakeRect(cols.note.x - 2, one.y + 6, cols.note.w + 4, 26);
+    procNoteField.stringValue = $(one.proc.note || '');
+    procNoteField.hidden = false;
+    win.makeFirstResponder(procNoteField);
+    toolView.needsDisplay = true;
+}
+function procNoteHidden() { if (!procNoteField || procNoteField.hidden) return; procNoteField.hidden = true; procEditing = null; if (toolView) toolView.needsDisplay = true; }
+function procNoted() {    // Return in the field: the note, kept by lzrprf for every process of the same program
+    var p = procEditing;
+    if (!p || !tool) return procNoteHidden();
+    var text = procNoteField.stringValue.js.replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/^\s+|\s+$/g, '').slice(0, 500);
+    tool.procs.forEach(function (one) { if (one.path == p.path) one.note = text; });
+    say('tool note ' + p.path + '\t' + text);
+    procNoteHidden(); toolChanged();
+}
+function procsMade() {    // the button and the field, made once with the panel
+    toolAllButton = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 180, 32));
+    toolAllButton.title = $('Show all processes'); toolAllButton.bezelStyle = 1; toolAllButton.font = sans(13); toolAllButton.target = hand; toolAllButton.action = 'toolAll:'; toolAllButton.hidden = true;
+    panel.addSubview(toolAllButton);
+    procNoteField = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 170, 26));
+    procNoteField.font = sans(11.5); procNoteField.cell.usesSingleLineMode = true; procNoteField.cell.scrollable = true; procNoteField.placeholderString = $('A note, then Return');
+    procNoteField.target = hand; procNoteField.action = 'procNote:'; procNoteField.hidden = true;
+    toolView.addSubview(procNoteField);
+}
+
+function run(argv) {
+    NAME = argv[0] || NAME;
+    TORWINDOW = argv[1] == 'tor';
+    INCOGNITO = argv[1] == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
+    if (INCOGNITO) $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSQuitAlwaysKeepsWindows: false, ApplePersistenceIgnoreState: true }));    // in memory only: macOS is asked to keep no window of it to restore (and this container lets it write no file anyway)
+    $.NSProcessInfo.processInfo.processName = $(NAME);
+    app = $.NSApplication.sharedApplication;
+    app.setActivationPolicy(kind());
+    app.applicationIconImage = icon(256);
+    hand = $.LzrprfHand.alloc.init;
+    app.delegate = hand;
+    canvas = $.LzrprfLaid.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640));
+    win = $.NSWindow.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(0, 0, 1000, 760), 15 | 32768, 2, false);    // titled, closable, minimisable, resizable, its content under the title bar
+    win.title = $(INCOGNITO ? NAME + ' Incognito' : NAME);
+    if (INCOGNITO) win.restorable = false;
+    win.titleVisibility = 1;
+    win.titlebarAppearsTransparent = true;
+    [0, 1, 2].forEach(function (k) { var one = win.standardWindowButton(k); if (one && !one.isNil()) one.hidden = true; });    // the strip draws the three dots itself (paintTabs)
+    win.opaque = false;
+    win.hasShadow = true;    // the system's own shadow, drawn outside the window and taking no press: the frame's glow falls inward now
+    win.releasedWhenClosed = false;
+    win.minSize = $.NSMakeSize(560, 360);
+    opened(argv[2] || 'none');
+    win.delegate = hand;
+    laser();
+    win.appearance = $.NSAppearance.appearanceNamed($('NSAppearanceNameDarkAqua'));
+    win.backgroundColor = $.NSColor.clearColor;
+    frameView = $.LzrprfFrame.alloc.initWithFrame($.NSMakeRect(0, 0, 1000, 760));
+    win.contentView = frameView;
+    root = $.NSView.alloc.initWithFrame($.NSMakeRect(17, 17, 966, 726));
+    win.contentView.addSubview(root);
+    tabsView = $.LzrprfTabs.alloc.initWithFrame($.NSMakeRect(0, 0, 960, TABS_HIGH));
+    root.addSubview(tabsView);
+    belt = $.LzrprfBelt.alloc.initWithFrame($.NSMakeRect(0, 0, 960, BAR_ROW));    // under the bar and the cogwheel: what they do not take, it takes
+    root.addSubview(belt);
+    bar = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 24));
+    bar.placeholderAttributedString = styled('Search or enter a website', inked(sans(14), GREY));
+    bar.font = sans(14);
+    bar.textColor = WHITE;
+    bar.bordered = false;
+    bar.bezeled = false;
+    bar.drawsBackground = false;
+    bar.focusRingType = 1;    // none: the pill around it glows instead (paintBelt)
+    bar.delegate = hand;
+    bar.cell.allowsUndo = true;    // Cmd-Z and Cmd-Shift-Z undo and redo typing step by step (the Edit menu)
+    bar.cell.usesSingleLineMode = true;
+    bar.cell.scrollable = true;
+    bar.target = hand;
+    bar.action = 'go:';
+    bar.enabled = false;
+    bar.autoresizingMask = 2 | 8;
+    root.addSubview(bar);
+    star = $.LzrprfStar.alloc.initWithFrame($.NSMakeRect(0, 0, 30, 30));
+    if (INCOGNITO) star.toolTip = $(UNKEPT_TIP);
+    root.addSubview(star);
+    cog = $.LzrprfCog.alloc.initWithFrame($.NSMakeRect(0, 0, 30, 30));
+    root.addSubview(cog);
+    faces = $.LzrprfFaces.alloc.initWithFrame($.NSMakeRect(0, 0, 30, 30));    // the Profiles icon: hidden until lzrprf tells the profiles, and in an incognito window always
+    faces.hidden = true;
+    root.addSubview(faces);
+    marksView = $.LzrprfMarks.alloc.initWithFrame($.NSMakeRect(0, 0, 960, MARKS_ROW));
+    marksView.hidden = true;
+    root.addSubview(marksView);
+    [tabsView, belt, cog, faces, star, marksView].forEach(tracked);
+    stripBack = $.LzrprfBack.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 30));
+    root.addSubview(stripBack);
+    words = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 24));
+    words.editable = false;
+    words.selectable = true;
+    words.bordered = false;
+    words.drawsBackground = false;
+    words.font = sans(11.5);
+    words.textColor = GREY;
+    words.cell.wraps = true;
+    words.stringValue = $('lzrprf is starting ' + NAME + '.');
+    words.autoresizingMask = 2 | 8;
+    root.addSubview(words);
+    first = button('', 'first:');
+    second = button('', 'second:');
+    first.hidden = true;
+    second.hidden = true;
+    scroll = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640));
+    scroll.hasVerticalScroller = true;
+    scroll.autoresizingMask = 2 | 16;
+    page = unchecked($.LzrprfPage.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640)));
+    page.editable = false;
+    page.richText = false;
+    page.automaticLinkDetectionEnabled = false;
+    page.automaticDataDetectionEnabled = false;
+    page.displaysLinkToolTips = false;
+    page.textContainerInset = $.NSMakeSize(14, 12);
+    page.autoresizingMask = 2;
+    page.backgroundColor = $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.043, 0.055, 0.067, 1);    // the glass, a shade under the frame's
+    scroll.backgroundColor = page.backgroundColor;
+    scroll.documentView = page;
+    root.addSubview(scroll);
+    scroll.contentView.postsBoundsChangedNotifications = true;    // each scroll of the page's view, heard (pageScrollMoved)
+    $.NSNotificationCenter.defaultCenter.addObserverSelectorNameObject(hand, 'pageScrolled:', $.NSViewBoundsDidChangeNotification, scroll.contentView);
+    findBox = $.LzrprfFind.alloc.initWithFrame($.NSMakeRect(0, 0, FIND_WIDE, FIND_HIGH));    // Find's bar, over the page's top right corner
+    findBox.hidden = true;
+    findField = $.NSTextField.alloc.initWithFrame($.NSMakeRect(14, 8, 160, 20));
+    findField.placeholderAttributedString = styled('Find in page', inked(sans(13), GREY));
+    findField.font = sans(13);
+    findField.textColor = WHITE;
+    findField.bordered = false;
+    findField.bezeled = false;
+    findField.drawsBackground = false;
+    findField.focusRingType = 1;
+    findField.delegate = hand;
+    findField.cell.usesSingleLineMode = true;
+    findField.cell.scrollable = true;
+    findBox.addSubview(findField);
+    root.addSubview(findBox);
+    under = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 190));    // in the modal of what the page is made of (techToggled)
+    under.hasVerticalScroller = true;
+    under.borderType = 0;
+    under.drawsBackground = false;
+    made = unchecked($.LzrprfPage.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 190)));
+    made.editable = false;
+    made.richText = false;
+    made.automaticLinkDetectionEnabled = false;
+    made.automaticDataDetectionEnabled = false;
+    made.displaysLinkToolTips = false;
+    made.textContainerInset = $.NSMakeSize(0, 2);
+    made.drawsBackground = false;
+    under.documentView = made;
+    logs = $.LzrprfLogIcon.alloc.initWithFrame($.NSMakeRect(0, 0, 26, 24));    // the log: never shown (it is Show log in the cogwheel's menu); kept for whether the log may be opened now
+    techs = $.LzrprfTechIcon.alloc.initWithFrame($.NSMakeRect(0, 0, 26, 24));    // what the page is made of: never shown (it is the last row of the lock's panel)
+    [[logs, 'log:', 'Log'], [techs, 'techs:', 'What this page is made of']].forEach(function (one) { one[0].bordered = false; one[0].title = $(''); one[0].toolTip = $(one[2]); one[0].target = hand; one[0].action = one[1]; root.addSubview(one[0]); tracked(one[0]); });
+    logs.enabled = false;
+    logs.hidden = true;
+    techs.hidden = true;
+    torIcon = $.LzrprfTorIcon.alloc.initWithFrame($.NSMakeRect(0, 0, 26, 24));    // Tor, right of the application's tool, in the bar's row: grey while off, blue while on
+    torIcon.bordered = false; torIcon.title = $(''); torIcon.toolTip = $('Tor: off'); torIcon.target = hand; torIcon.action = 'tor:'; root.addSubview(torIcon); tracked(torIcon);
+    toolIcon = $.LzrprfToolIcon.alloc.initWithFrame($.NSMakeRect(0, 0, 26, 24));    // the application's tool, LZRDFNDR, just right of the bar
+    toolIcon.bordered = false; toolIcon.title = $(''); toolIcon.toolTip = $("The application's tool"); toolIcon.target = hand; toolIcon.action = 'tool:'; root.addSubview(toolIcon); tracked(toolIcon);
+    homeView = $.LzrprfHome.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 600));
+    root.addSubview(homeView);
+    listScroll = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 600));
+    listScroll.hasVerticalScroller = true;
+    listScroll.drawsBackground = false;
+    listScroll.hidden = true;
+    listView = $.LzrprfList.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 600));
+    listScroll.documentView = listView;
+    root.addSubview(listScroll);
+    [homeView, listView].forEach(tracked);
+    secureBox = $.LzrprfSecure.alloc.initWithFrame($.NSMakeRect(0, 0, 560, 300));
+    secureBox.hidden = true;
+    secureScroll = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 520, 260));
+    secureScroll.hasVerticalScroller = true;
+    secureScroll.drawsBackground = false;
+    secureText = unchecked($.LzrprfPage.alloc.initWithFrame($.NSMakeRect(0, 0, 520, 260)));
+    secureText.editable = false;
+    secureText.richText = false;
+    secureText.drawsBackground = false;
+    secureText.automaticLinkDetectionEnabled = false;
+    secureText.automaticDataDetectionEnabled = false;
+    secureText.textContainerInset = $.NSMakeSize(0, 0);
+    secureScroll.documentView = secureText;
+    secureBox.addSubview(secureScroll);
+    secureTech = button('What this page is made of', 'techs:');    // the lock's panel's last row
+    secureTech.autoresizingMask = 0;
+    secureBox.addSubview(secureTech);
+    noteView = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 10));    // the note under the bar (function noteShown)
+    noteView.editable = false; noteView.selectable = false; noteView.bordered = false; noteView.drawsBackground = false;
+    noteView.font = sans(9); noteView.textColor = GREY; noteView.alignment = 1; noteView.hidden = true;
+    noteView.cell.lineBreakMode = 4;    // one line, cut in its middle if it is long
+    root.addSubview(noteView);
+    root.addSubview(secureBox);
+    suggestBox = $.LzrprfSuggest.alloc.initWithFrame($.NSMakeRect(0, 0, 600, 200));
+    suggestBox.hidden = true;
+    root.addSubview(suggestBox);
+    tracked(suggestBox);
+    cogCatch = $.LzrprfCatch.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 720));
+    cogCatch.hidden = true;
+    root.addSubview(cogCatch);
+    cogBox = $.LzrprfCogMenu.alloc.initWithFrame($.NSMakeRect(0, 0, 260, 208));
+    cogBox.hidden = true;
+    root.addSubview(cogBox);
+    tracked(cogBox);
+    veil = $.LzrprfVeil.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 720));    // last, so it is over everything
+    veil.hidden = true;
+    panel = $.LzrprfPanel.alloc.initWithFrame($.NSMakeRect(0, 0, 600, 300));
+    veil.addSubview(panel);
+    modalKeys = $.LzrprfKeys.alloc.initWithFrame($.NSMakeRect(0, 0, 0, 0));
+    veil.addSubview(modalKeys);
+    panelTitle = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 28));
+    panelSub = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 40));
+    [panelTitle, panelSub].forEach(function (one) { one.editable = false; one.selectable = true; one.bordered = false; one.drawsBackground = false; one.cell.wraps = true; panel.addSubview(one); });
+    panelTitle.font = sans(18, true);
+    panelSub.font = sans(13);
+    panelSub.textColor = WHITE;
+    form = $.NSView.alloc.initWithFrame($.NSMakeRect(0, 0, 500, 150));
+    form.hidden = true;
+    panel.addSubview(form);
+    function label(words) { var one = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 84, 20)); one.editable = false; one.selectable = false; one.bordered = false; one.drawsBackground = false; one.font = sans(12.5); one.textColor = GREY; one.stringValue = $(words); form.addSubview(one); return one; }
+    function field() { var one = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 300, 26)); one.font = sans(13); one.cell.allowsUndo = true; one.cell.usesSingleLineMode = true; one.cell.scrollable = true; form.addSubview(one); return one; }
+    nameLabel = label('Name'); nameField = field();
+    addressLabel = label('Address'); addressField = field();
+    folderLabelView = label('Folder');
+    folderPop = $.NSPopUpButton.alloc.initWithFramePullsDown($.NSMakeRect(0, 0, 260, 26), false);
+    folderPop.font = sans(12.5);
+    folderPop.target = hand;
+    folderPop.action = 'folderChosen:';
+    form.addSubview(folderPop);
+    newFolderField = field();
+    newFolderField.placeholderString = $('New folder: a name, or names joined by /');
+    newFolderField.hidden = true;
+    engineField = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 400, 26));
+    engineField.font = sans(13);
+    engineField.cell.usesSingleLineMode = true;
+    engineField.cell.scrollable = true;
+    engineField.placeholderString = $('https://search.example.com/search?q=%s');
+    engineField.hidden = true;
+    panel.addSubview(engineField);
+    licenceField = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 400, 26));    // Enter licence code: its one field
+    licenceField.font = sans(13);
+    licenceField.cell.usesSingleLineMode = true;
+    licenceField.cell.scrollable = true;
+    licenceField.placeholderString = $('XXXXX-XXXXX-XXXXX-...');
+    licenceField.hidden = true;
+    panel.addSubview(licenceField);
+    profileField = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 400, 26));    // New profile, Rename: its one field
+    profileField.font = sans(13);
+    profileField.cell.usesSingleLineMode = true;
+    profileField.cell.scrollable = true;
+    profileField.placeholderString = $('A name, at most 32 characters');
+    profileField.hidden = true;
+    panel.addSubview(profileField);
+    supportScroll = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 580, 200));    // Support request: the box for your words
+    supportScroll.hasVerticalScroller = true;
+    supportScroll.borderType = 1;
+    supportText = unchecked($.LzrprfPage.alloc.initWithFrame($.NSMakeRect(0, 0, 580, 200)));
+    supportText.editable = true;
+    supportText.richText = false;
+    supportText.font = sans(13);
+    supportText.textColor = WHITE;
+    supportText.insertionPointColor = WHITE;
+    supportText.backgroundColor = DARK;
+    supportText.textContainerInset = $.NSMakeSize(6, 6);
+    supportText.autoresizingMask = 2;
+    supportScroll.documentView = supportText;
+    supportScroll.hidden = true;
+    panel.addSubview(supportScroll);
+    supportTick = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 580, 22));    // the picture of the window, off until ticked
+    supportTick.setButtonType(3);    // a box to tick
+    supportTick.font = sans(12.5);
+    supportTick.state = 0;
+    supportTick.target = hand;
+    supportTick.action = 'supportTicked:';
+    supportTick.hidden = true;
+    panel.addSubview(supportTick);
+    supportPreview = $.NSImageView.alloc.initWithFrame($.NSMakeRect(0, 0, 200, 112));    // that picture, small, while it is ticked
+    supportPreview.imageScaling = 3;    // made smaller or larger to fit, its shape kept
+    supportPreview.imageFrameStyle = 0;
+    supportPreview.hidden = true;
+    panel.addSubview(supportPreview);
+    wizardView = $.LzrprfWizard.alloc.initWithFrame($.NSMakeRect(0, 0, 600, 260));
+    wizardView.hidden = true;
+    panel.addSubview(wizardView);
+    torView = $.LzrprfTorBeam.alloc.initWithFrame($.NSMakeRect(0, 0, 580, 190));
+    torView.hidden = true;
+    panel.addSubview(torView);
+    toolScroll = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 700, 400));    // the list of the application's tool, in the modal
+    toolScroll.hasVerticalScroller = true;
+    toolScroll.borderType = 0;
+    toolScroll.drawsBackground = false;
+    toolView = $.LzrprfTool.alloc.initWithFrame($.NSMakeRect(0, 0, 700, 400));
+    toolScroll.documentView = toolView;
+    toolScroll.hidden = true;
+    panel.addSubview(toolScroll);
+    toolCopy = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 380, 32));    // the tool's copy button, above its list
+    toolCopy.title = $(TOOL_COPY_WORDS);
+    toolCopy.bezelStyle = 1;
+    toolCopy.font = sans(13);
+    toolCopy.target = hand;
+    toolCopy.action = 'toolCopy:';
+    toolCopy.enabled = false;
+    toolCopy.hidden = true;
+    panel.addSubview(toolCopy);
+    procsMade();    // Show all processes and its Notes field (HC-0843), once toolView is made
+    toolTabs = ['On Your Computer', 'On Websites', 'Redirects', 'Other'].map(function (words, k) {    // the panel's three tabs, under its title
+        var one = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 170, 28));
+        one.title = $(words); one.bezelStyle = 1; one.font = sans(13, true); one.tag = k; one.target = hand; one.action = 'toolTab:'; one.hidden = true;
+        panel.addSubview(one);
+        return one;
+    });
+    permitCopy = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 150, 32));    // the copy button of the question about scripts
+    permitCopy.title = $(PERMIT_COPY_WORDS); permitCopy.bezelStyle = 1; permitCopy.font = sans(13); permitCopy.target = hand; permitCopy.action = 'permitCopy:'; permitCopy.hidden = true;
+    panel.addSubview(permitCopy);
+    tracked(wizardView);
+    pathField = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 400, 26));
+    pathField.font = sans(13);
+    pathField.cell.usesSingleLineMode = true;
+    pathField.cell.scrollable = true;
+    pathField.placeholderString = $('Or type its path: ~/Downloads/bookmarks.html');
+    pathField.hidden = true;
+    panel.addSubview(pathField);
+    panelScroll = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 600, 300));
+    panelScroll.hasVerticalScroller = true;
+    panelScroll.borderType = 0;
+    panelText = unchecked($.LzrprfPage.alloc.initWithFrame($.NSMakeRect(0, 0, 600, 300)));
+    panelText.editable = false;
+    panelText.richText = false;
+    panelText.automaticLinkDetectionEnabled = false;
+    panelText.automaticDataDetectionEnabled = false;
+    panelText.backgroundColor = DARK;
+    panelText.textContainerInset = $.NSMakeSize(10, 8);
+    panelText.autoresizingMask = 2;
+    panelScroll.documentView = panelText;
+    panel.addSubview(panelScroll);
+    under.hidden = true;
+    panel.addSubview(under);    // the list of what the page is made of, shown in the modal (techToggled)
+    root.addSubview(veil);
+    listed([]);
+    menus();
+    place();
+    $.NSNotificationCenter.defaultCenter.addObserverSelectorNameObject(hand, 'heard:', $.NSFileHandleDataAvailableNotification, from);
+    from.waitForDataInBackgroundAndNotify;
+    shown();
+    say('ready');
+    view();    // after "ready", which lzrprf hears first: the size the first page is laid out at
+    app.run;
+}
+END
+}
+

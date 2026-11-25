@@ -1,0 +1,6 @@
+# lzrprf approval keys: the keys whose signature approves a LZRBRWSR release, besides the release key's.
+# One OpenSSH public key per line. The first is made in the Secure Enclave of the owner's phone by the core app,
+# opens only to his Face ID and never leaves the phone. A release is installed only when one of these keys and the
+# release key (release-key.pub) both signed its manifest. Until a key is written here, no release is signed.
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBIWKMATpVOLaAKtBC4cBWQYxOMaESOFLQrgngQ8BuBU7xm5z4JEA+a9JMkTi0dSj7FVpQZ2HhViKWh+FOcp0DVU= henry-phone
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBC8gYmKCyxfiGXwWmeZZDRY2wyW1MbVBRkaDEKff8qS13flShTkVHiRkKkCCPIwmayFMNVQ9JeMqnOx5nIb1yJM= lzrbrwsr-agent valid-until 2027-02-28

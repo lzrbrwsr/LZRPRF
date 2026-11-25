@@ -1,0 +1,219 @@
+#!/usr/bin/perl
+# ubo-update: the uAssets filter lists in filters/ubo, at one commit of their repository.
+#
+#   perl tools/ubo-update --fetch                  fetches exactly the files SOURCE names, of the commit it
+#                                                  names, into filters/ubo: each into a new empty folder, each
+#                                                  held to its SHA-256 in SOURCE, and nothing is placed unless
+#                                                  every one matches; files already there and matching are kept,
+#                                                  so a second run fetches nothing
+#   perl tools/ubo-update --check                  each file filters/ubo/SOURCE names has its SHA-256 there,
+#                                                  and the folder holds nothing else but SOURCE, LEGAL-REVIEW
+#                                                  and .gitignore
+#   perl tools/ubo-update [--commit HEX]           fetches the lists of that commit (the newest when none is
+#                                                  named) into a new empty folder and writes there, for review,
+#                                                  the difference of each file from filters/ubo and the counts
+#                                                  lzrprf reads in both; filters/ubo is not changed
+#   perl tools/ubo-update --commit HEX --write     the same, then the fetched files replace those of filters/ubo
+#                                                  and SOURCE is written anew; review the diff before a commit
+#
+# What is fetched is data: it is written to its own new folder, compared and counted by lzrprf's reader of
+# filter lists, and never run. Each file is fetched by curl, plain HTTPS, from raw.githubusercontent.com at
+# the commit named, so every file is of the same commit. The files kept, and where each is in the
+# repository, are the list @FILES below and the lines of SOURCE; nothing else of uAssets is fetched.
+#
+# The maker's repository keeps of filters/ubo only SOURCE, LICENSE and the legal review: the lists are third
+# party data, kept out of it by filters/ubo/.gitignore, and --fetch brings them back by commit and sum, as
+# the release does after the legal review. lzrprf's public repository carries them as fetched.
+#
+# SYNC: docs/filters.md (where the lists come from) · lzrprf (sub filters, sub filters_dir) · the release's
+# legal review gate
+# TRIAD(tests: selftest (the filter runs), docs: docs/filters.md)
+# LOG-FORMAT-EXEMPT(prints its findings to the terminal of the person updating; writes only filters/ubo with --write)
+use strict;
+use warnings;
+use Digest::SHA qw(sha256_hex);
+use File::Basename qw(dirname);
+use File::Temp qw(tempdir);
+
+my $REPO = 'https://github.com/uBlockOrigin/uAssets';
+my $RAW = 'https://raw.githubusercontent.com/uBlockOrigin/uAssets';
+my @FILES = (    # the name kept in filters/ubo, and the file's path in uAssets
+    ['filters.txt', 'filters/filters.txt'],
+    (map { ["filters-$_.txt", "filters/filters-$_.txt"] } 2020 .. 2026),
+    (map { ["$_.txt", "filters/$_.txt"] } qw(badware privacy resource-abuse unbreak quick-fixes)),
+    ['easylist.txt', 'thirdparties/easylist/easylist.txt'],
+    ['LICENSE', 'LICENSE'],
+);
+my $MOST = 4 * 1024 * 1024;    # as lzrprf reads a list at most
+
+my $root = dirname(dirname(__FILE__ =~ m{/} ? __FILE__ : "./$0"));
+$root = '.' unless -f "$root/lzrprf";
+my $kept = "$root/filters/ubo";
+
+my %opt;
+while (@ARGV) {
+    my $arg = shift @ARGV;
+    if ($arg eq '--commit') { $opt{commit} = shift(@ARGV) // die "ubo-update: --commit needs a commit\n" }
+    elsif ($arg =~ /\A--(check|write|fetch)\z/) { $opt{$1} = 1 }
+    else { die "ubo-update: $arg is not an option\n" }
+}
+die "ubo-update: a commit is 40 hexadecimal digits\n" if defined $opt{commit} && $opt{commit} !~ /\A[0-9a-f]{40}\z/;
+die "ubo-update: --write needs --commit, the commit you reviewed\n" if $opt{write} && !$opt{commit};
+die "ubo-update: --fetch takes no other option: it fetches what SOURCE names\n" if $opt{fetch} && (keys %opt) > 1;
+exit(checked() ? 0 : 1) if $opt{check};
+exit(fetched_named() ? 0 : 1) if $opt{fetch};
+
+my $commit = $opt{commit} // newest();
+my $work = tempdir('ubo-update.XXXXXXXX', TMPDIR => 1);
+my $new = "$work/new";
+mkdir $new or die "ubo-update: $new cannot be made: $!\n";
+print "fetching uAssets at $commit into $new\n";
+for my $file (@FILES) { fetched("$RAW/$commit/$file->[1]", "$new/$file->[0]") }
+my $date = committed($commit);
+my $review = reviewed($new, $work);
+print $review;
+write_file("$work/review.txt", $review);
+my $source = source_of($commit, $date, $new);
+write_file("$work/SOURCE", $source);
+print "the review is in $work: review.txt, one NAME.diff for each file that changed, and the SOURCE it would write\n";
+if ($opt{write}) {
+    for my $file (@FILES) { write_file("$kept/$file->[0]", slurp("$new/$file->[0]")) }
+    write_file("$kept/SOURCE", $source);
+    print "filters/ubo now holds uAssets at $commit; read the diff and the counts before a commit\n";
+}
+exit 0;
+
+sub slurp { my ($file) = @_; open(my $in, '<:raw', $file) or die "ubo-update: $file cannot be read: $!\n"; local $/; my $t = <$in> // ''; close $in; return $t }
+
+sub write_file { my ($file, $text) = @_; open(my $out, '>:raw', $file) or die "ubo-update: $file cannot be written: $!\n"; print $out $text; close $out or die "ubo-update: $file cannot be written: $!\n"; return }
+
+sub said_by {    # what a program prints, the program started from a list and never by a shell
+    my @argv = @_;
+    open(my $in, '-|', @argv) or die "ubo-update: $argv[0] could not be started: $!\n";
+    my $said = do { local $/; <$in> } // '';
+    close $in;
+    return ($said, $? >> 8);
+}
+
+sub newest {    # the commit uAssets' default branch is at now
+    my ($said, $code) = said_by('git', 'ls-remote', '--', $REPO, 'HEAD');
+    my ($commit) = $said =~ /\A([0-9a-f]{40})\tHEAD$/m or die "ubo-update: git ls-remote did not name the newest commit (exit $code)\n";
+    return $commit;
+}
+
+sub fetched {    # one file by curl into its place, or the run ends
+    my ($url, $file) = @_;
+    my ($said, $code) = said_by('curl', '-q', '-sS', '--fail', '--proto', '=https', '--max-time', '60', '--max-filesize', $MOST, '-o', $file, '-w', '%{http_code}', '--', $url);
+    die "ubo-update: $url was not fetched (curl exit $code, status $said)\n" if $code || $said ne '200';
+    return;
+}
+
+sub committed {    # the day and time of the commit, as GitHub says it, or "unknown"
+    my ($commit) = @_;
+    my ($said) = said_by('curl', '-q', '-sS', '--proto', '=https', '--max-time', '30', '-H', 'Accept: application/vnd.github+json', '--', "https://api.github.com/repos/uBlockOrigin/uAssets/commits/$commit");
+    my ($date) = $said =~ /"committer"\s*:\s*\{[^{}]*?"date"\s*:\s*"([0-9T:Z+-]{20,25})"/;
+    return $date // 'unknown';
+}
+
+sub counts {    # what lzrprf reads in the lists of a folder, by kind: "KIND=N ..."
+    my ($dir) = @_;
+    my ($said, $code) = said_by($^X, "$root/lzrprf", 'filters', $dir, 'example.test', 'script', 'https://example.test/');
+    my ($counts) = $said =~ /^counts (.*)$/m or die "ubo-update: lzrprf did not read the lists in $dir (exit $code)\n";
+    return { map { split /=/, $_, 2 } split / /, $counts };
+}
+
+sub reviewed {    # the difference of each file and the counts, old and new, as text; a NAME.diff for each file that changed
+    my ($dir, $work) = @_;
+    my @lines;
+    for my $file (@FILES) {
+        my ($name) = @$file;
+        my ($old, $new) = ("$kept/$name", "$dir/$name");
+        if (!-f $old) { push @lines, "$name: new, " . lines_of(slurp($new)) . ' lines'; next }
+        my ($diff) = said_by('diff', '-u', '--', $old, $new);
+        if ($diff eq '') { push @lines, "$name: the same"; next }
+        write_file("$work/$name.diff", $diff);
+        my ($plus, $minus) = (0, 0);
+        for (split /\n/, $diff) { next if /\A(?:\+\+\+|---) /; $plus++ if /\A\+/; $minus++ if /\A-/ }
+        push @lines, "$name: $plus lines added, $minus taken away (see $name.diff)";
+    }
+    my ($was, $is) = (counts($kept), counts($dir));
+    my %kinds = map { $_ => 1 } keys %$was, keys %$is;
+    push @lines, '', 'lines by the kind lzrprf reads them as, kept now and fetched:';
+    push @lines, sprintf('  %-12s %7d %7d', $_, $was->{$_} // 0, $is->{$_} // 0) for sort keys %kinds;
+    return join("\n", @lines) . "\n";
+}
+
+sub lines_of { my ($text) = @_; return scalar(() = $text =~ /\n/g) }
+
+sub source_of {    # the text of SOURCE for the files of a folder
+    my ($commit, $date, $dir) = @_;
+    my @lines = ('uAssets filter lists kept in lzrprf, byte for byte as their repository holds them at one commit.',
+        'lzrprf reads them as data and holds no code of uBlock Origin: docs/filters.md. Written by tools/ubo-update.',
+        "repository $REPO", "commit $commit", "committed $date",
+        'licence GPL-3.0, the file LICENSE beside this one (easylist.txt: GPL-3.0 or CC BY-SA 3.0, as EasyList offers it)',
+        'attribution the uBlock Origin contributors, makers of uAssets; The EasyList Authors, makers of easylist.txt',
+        'form file NAME PATH-IN-THE-REPOSITORY SHA-256');
+    push @lines, "file $_->[0] $_->[1] " . sha256_hex(slurp("$dir/$_->[0]")) for @FILES;
+    return join("\n", @lines) . "\n";
+}
+
+sub named_files {    # the commit SOURCE names and its files, each [NAME, PATH, SHA-256], or the run ends
+    my $source = slurp("$kept/SOURCE");
+    my ($commit) = $source =~ /^commit ([0-9a-f]{40})$/m or die "ubo-update: filters/ubo/SOURCE names no commit\n";
+    my @files;
+    for my $line (split /\n/, $source) {
+        next unless $line =~ /\Afile /;
+        my ($name, $path, $sum) = $line =~ m{\Afile ([A-Za-z0-9][A-Za-z0-9._-]{0,63}) ([A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*) ([0-9a-f]{64})\z}
+            or die "ubo-update: a line of filters/ubo/SOURCE is not of the form file NAME PATH SHA-256: $line\n";
+        die "ubo-update: filters/ubo/SOURCE names a path with \"..\": $path\n" if $path =~ m{(?:\A|/)\.\.(?:/|\z)};
+        push @files, [$name, $path, $sum];
+    }
+    die "ubo-update: filters/ubo/SOURCE names no file\n" unless @files;
+    return ($commit, @files);
+}
+
+sub fetched_named {    # the files SOURCE names into filters/ubo, each held to its sum; nothing placed unless all match
+    my ($commit, @files) = named_files();
+    my @wanted = grep { !-f "$kept/$_->[0]" || sha256_hex(slurp("$kept/$_->[0]")) ne $_->[2] } @files;
+    if (!@wanted) { print 'filters/ubo holds the ' . scalar(@files) . " files SOURCE names, each by its SHA-256: nothing to fetch\n"; return 1 }
+    my $work = tempdir('ubo-fetch.XXXXXXXX', TMPDIR => 1, CLEANUP => 1);    # a new empty folder; what comes is data, never run
+    print 'fetching ' . scalar(@wanted) . ' of the ' . scalar(@files) . " files SOURCE names, uAssets at $commit\n";
+    my @wrong;
+    for my $file (@wanted) {
+        my ($name, $path, $sum) = @$file;
+        fetched("$RAW/$commit/$path", "$work/$name");
+        my $got = sha256_hex(slurp("$work/$name"));
+        push @wrong, "$name (SOURCE names $sum, fetched $got)" if $got ne $sum;
+    }
+    if (@wrong) { warn "ubo-update: nothing was placed in filters/ubo: not the file SOURCE names: " . join('; ', @wrong) . "\n"; return 0 }
+    for my $file (@wanted) {    # each written beside its place and renamed into it, so no half file is ever there
+        my $name = $file->[0];
+        write_file("$kept/$name.new", slurp("$work/$name"));
+        rename("$kept/$name.new", "$kept/$name") or die "ubo-update: filters/ubo/$name cannot be placed: $!\n";
+    }
+    print 'filters/ubo now holds the ' . scalar(@files) . " files SOURCE names, uAssets at $commit\n";
+    return 1;
+}
+
+sub checked {    # SOURCE names every file of filters/ubo by its SHA-256, and nothing more is there
+    my $source = slurp("$kept/SOURCE");
+    my $ok = 1;
+    my %named;
+    $source =~ /^commit [0-9a-f]{40}$/m or ($ok = 0, warn "ubo-update: SOURCE names no commit\n");
+    for my $line (split /\n/, $source) {
+        my ($name, $path, $sum) = $line =~ /\Afile ([A-Za-z0-9][A-Za-z0-9._-]*) (\S+) ([0-9a-f]{64})\z/ or next;
+        $named{$name} = 1;
+        if (!-f "$kept/$name") { warn "ubo-update: SOURCE names $name, which is not in filters/ubo\n"; $ok = 0; next }
+        next if sha256_hex(slurp("$kept/$name")) eq $sum;
+        warn "ubo-update: filters/ubo/$name is not the file SOURCE names\n";
+        $ok = 0;
+    }
+    opendir(my $in, $kept) or die "ubo-update: $kept cannot be read\n";
+    for my $name (sort grep { !/\A\.\.?\z/ } readdir $in) {
+        next if $named{$name} || $name eq 'SOURCE' || $name eq 'LEGAL-REVIEW' || $name eq '.gitignore';
+        warn "ubo-update: filters/ubo/$name is not named in SOURCE\n";
+        $ok = 0;
+    }
+    print $ok ? 'filters/ubo holds ' . scalar(keys %named) . " files, each the one SOURCE names\n" : "filters/ubo is not what SOURCE names\n";
+    return $ok;
+}
