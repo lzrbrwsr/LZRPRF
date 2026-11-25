@@ -161,14 +161,17 @@ esac
 set --
 umask 022
 BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
-SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main}}"
+# The second place of every download is the site's copy at Vercel: the production server publishes both in seconds, where
+# GitHub's raw files can lag five minutes behind a release (its cache), and an install in that time would find two places
+# that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
+SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="15bb9411a0eee05231038020537dc063d322f6ceb67e0a0762e5aed6112f1bb5"
-RELEASE="125"
-LZRPRF_COMMIT="d76fd960fc058d1513537169445172f24b2db667"
+SHA256="8a6157959dc6ad2f1adcf0f5c2a52fd5d54d72ceace988e5621595bab17bcdbc"
+RELEASE="127"
+LZRPRF_COMMIT="48f74888d4a71fa4c485e2a5e08774f88102514a"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="4b92374093f19762837398af8f4bc50700931a0ab3a01ee52d5670ef66c4084a"
-SELFTEST_SHA256="4a0fa5e224990d2f1d76a0a5d09a87f1b957d5316b2a83077b984e6cca8a770d"
+LZRPRF_SHA256="f0ada5c0960032454f770793961f8b423c8ce07a4f5e8f00b06f0307c28ae62e"
+SELFTEST_SHA256="b9749d8b7eb08e219f19f05486751c97ef799641a94fd18af14513a4749b4b66"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
 BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
 # RELEASE_KEY: the public half of the release key; a release is installed only when its manifest is signed with it
@@ -645,7 +648,7 @@ step "release $RELEASE is signed with the release key ($(printf '%s\n' "$key" | 
 rulesum="$(named permit-rules)"
 if [ -n "$rulesum" ]; then
 	fetch "$BASE/permit-rules" "$tmp/permit-rules" || stop "could not download the curated script rules of this release."
-	fetch "$SECOND/permit-rules" "$tmp/permit-rules.2" || stop "could not download the second copy of the curated script rules, from lzrprf's public repository."
+	fetch "$SECOND/permit-rules" "$tmp/permit-rules.2" || stop "could not download the second copy of the curated script rules, from the site's second copy, at Vercel."
 	cmp -s "$tmp/permit-rules" "$tmp/permit-rules.2" || stop "the two places hold different curated script rules. Either a newer release was just published (get the installer again), or one of the two places was changed."
 	[ "$(sum "$tmp/permit-rules")" = "$rulesum" ] || stop "the curated script rules are not the file the signed manifest names."
 	step "the curated script rules are the file the signed manifest names, the same in both places"
@@ -658,7 +661,7 @@ fi
 filterfiles="$(awk '$1 == "file" && ($2 ~ /^ubo-[a-z0-9][a-z0-9.-]*\.txt$/ || $2 == "ubo-SOURCE" || $2 == "filters-local.txt") { print $2 }' "$tmp/manifest.1")"
 for part in $filterfiles; do
 	fetch "$BASE/$part" "$tmp/$part" || stop "could not download the filter list $part of this release."
-	fetch "$SECOND/$part" "$tmp/$part.2" || stop "could not download the second copy of the filter list $part, from lzrprf's public repository."
+	fetch "$SECOND/$part" "$tmp/$part.2" || stop "could not download the second copy of the filter list $part, from the site's second copy, at Vercel."
 	cmp -s "$tmp/$part" "$tmp/$part.2" || stop "the two places hold different copies of the filter list $part. Either a newer release was just published (get the installer again), or one of the two places was changed."
 	[ "$(sum "$tmp/$part")" = "$(named "$part")" ] || stop "the filter list $part is not the file the signed manifest names."
 done
@@ -675,12 +678,12 @@ get "$LZRPRF_BASE/selftest" selftest "$SELFTEST_SHA256" "lzrprf's self-test"
 get "$LZRPRF_BASE/blocklist" blocklist "$BLOCKLIST_SHA256" "lzrprf's list of the addresses it never opens"
 step "lzrprf downloaded, and it is the published one (commit $(printf %.12s "$LZRPRF_COMMIT"))"
 get "$BASE/$FILE" "$FILE" "$SHA256" "the download"
-# The same download once more, from a second place: lzrprf's public repository, where every
-# release's download is on record with its date. Both must be the file this installer names.
+# The same download once more, from a second place: the site's copy at Vercel, which the production server
+# publishes beside the site; every release's download is also on record in lzrprf's public repository. Both must be the file this installer names.
 # One changed place cannot pass: the site's copy is held to the checksum above, and so is this one.
-fetch "$SECOND/$FILE" "$tmp/second" || stop "could not download the second copy of LZRBRWSR, from lzrprf's public repository."
+fetch "$SECOND/$FILE" "$tmp/second" || stop "could not download the second copy of LZRBRWSR, from the site's second copy, at Vercel."
 if ! cmp -s "$tmp/$FILE" "$tmp/second"; then
-	stop "lzrprf's public repository holds another download than the site. Either a newer release was just published (get the installer again), or one of the two places was changed."
+	stop "the site's second copy, at Vercel, holds another download than the site. Either a newer release was just published (get the installer again), or one of the two places was changed."
 fi
 rm -f "$tmp/second"
 step "LZRBRWSR downloaded from two places: both are the same file, and it matches its checksum"
@@ -784,18 +787,18 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 125
+release 127
 home local
-new The address bar selects the whole address on the first click, ready to copy, and blocking a script keeps the page showing instead of turning it white.
-newest https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/latest
-installer https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/install.sh
-same https://lzrbrwsr.com/install.sh
+new A promotion now reaches browsers in seconds, and the script question no longer stops you switching or closing tabs.
+newest https://lzrbrwsr.com/latest
+installer https://lzrbrwsr.com/install.sh
+same https://lzrbrwsr.vercel.app/install.sh
 report https://origin.lzrbrwsr.com/report
 file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-file lzrbrwsr-bin 456018f598ad8ff537c75e3b1ca59ff996e71ef1ec8497c9be5c406f36b9348e
+file lzrbrwsr-bin da765c41090070eedfadb3939c550ecaece9146077cbfc41f66508eba5cc5678
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-lzrprf 4b92374093f19762837398af8f4bc50700931a0ab3a01ee52d5670ef66c4084a
+lzrprf f0ada5c0960032454f770793961f8b423c8ce07a4f5e8f00b06f0307c28ae62e
 blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."

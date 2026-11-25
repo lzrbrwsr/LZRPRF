@@ -97,7 +97,7 @@ sub pixels {                            # what a picture run wrote: [wide, high,
     return unless $wrote =~ s/\n\z//;
     my ($head, @rows) = split /\n/, $wrote, -1;
     my ($w, $h) = ($head // '') =~ /^P$N,$N$/ or return;
-    return unless $w >= 1 && $h >= 1 && $w <= 1024 && $h <= 1024 && $w * $h <= $PICTURE_PIXELS && @rows == $h;
+    return unless $w >= 1 && $h >= 1 && $w <= $DECODED_SIDE && $h <= $DECODED_SIDE && $w * $h <= $PICTURE_PIXELS && @rows == $h;
     return if grep { !/^p[0-9a-f]+$/ || length != 8 * $w + 1 } @rows;
     return [$w, $h, map { encode_base64(pack('H*', substr($_, 1)), '') } @rows];
 }

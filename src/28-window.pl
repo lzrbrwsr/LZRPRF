@@ -3320,7 +3320,7 @@ function permitCodeText(scripts) {    // the code block: each script under a lin
 }
 function permitTold(rest) {
     asked++;
-    var parts = rest.split('\t'), number = asked;
+    var parts = rest.split('\t'), number = permitAsked = asked;
     permitShown = permitScripts;
     permitScripts = [];
     modal('LZRDFNDR scripts', parts[1] || '', parts.slice(2).map(function (title, i) { return [title, function () { closeModal(); say('button ' + number + ' ' + (i + 1)); }]; }), permitShown.length ? 'permit' : 'tall');
@@ -4098,7 +4098,7 @@ ObjC.registerSubclass({ name: 'LzrprfBack', superclass: 'NSView', methods: {
 // The veil under the modal takes every click and scroll, so nothing under it is reached.
 ObjC.registerSubclass({ name: 'LzrprfVeil', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('veil', function () { (modalOpen && modalKind == 'flag' ? $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.72, 0.04, 0.04, 1) : $.NSColor.colorWithWhiteAlpha(0, 0.62)).setFill; $.NSRectFillUsingOperation(dirty, 2); }); } },
-    'mouseDown:': { implementation: function (event) { } },
+    'mouseDown:': { implementation: function (event) { veilPressed(event); } },    // the tab strip still takes a press under the question about scripts (veilPressed, 28-window1-tabs.pl)
     'rightMouseDown:': { implementation: function (event) { } },
     'scrollWheel:': { implementation: function (event) { } }
 } });

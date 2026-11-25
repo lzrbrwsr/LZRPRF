@@ -183,10 +183,10 @@ my $PICTURES = 24;                        # DECLARED(lzrbrwsr src/page/pictures.
 my $PICTURE_SITES = 8;                    # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURE_SITES, the same number): the most other sites, neither the page's host nor a name under it (sub under), that are asked for one page's pictures; a picture on one more is not fetched, and the log says why
 my $PICTURES_AT_ONCE = 8;                 # DECLARED: the most pictures of one page fetched and decoded side by side, the owner's order of 2026-11-21: 24 one after the other took over 4 seconds; 8 since 2026-11-24, when hs.fi's 24 AVIF pictures took 2.4 s at 4 (scripts/load-timeline.pl)
 my $PICTURE_SECONDS = 20;                 # one clock for all of a page's pictures: a picture not begun by then stays a grey box
-my $PICTURE_PIXELS = 200_000;             # the most pixels in one fetched picture
+my $PICTURE_PIXELS = 800_000;             # the most pixels in one fetched picture: four times 200,000 since retina pictures, sharp at two device pixels a point
 my $SIPS = '/usr/bin/sips';               # [C21] the system's own; it decodes for lzrprf what the application cannot (AVIF, HEIC, HEIF), lzrprf holds no code for it
 my $DECODE_SECONDS = 10;                  # DECLARED([C21] the most one run of the system's decoder may take in all: a picture of 1024 pixels a side takes it under one second)
-my $DECODED_SIDE = 1024;                  # DECLARED([C21] the longest side of the PNG the system's decoder writes: lzrbrwsr src/page/picture_container.rs PICTURE_SIDE, the most the application draws)
+my $DECODED_SIDE = 2048;                  # DECLARED([C21] the longest side of the PNG the system's decoder writes: lzrbrwsr src/page/picture_container.rs PICTURE_SIDE, the most the application draws)
 my $VIDEOS = 8;                           # DECLARED(lzrbrwsr src/page/pictures.rs MOST_VIDEOS, the same number): the most MP4 files one page may name on its =videos line, and the most places of a video (V) of a laid page
 my $VIDEO_BYTES = 64 * 1024 * 1024;       # DECLARED([C22] the most of one video that is fetched and handed to the window: a minute of 1080p H.264 at 8 Mbit/s, or two of 720p at 4, is 60 MB, the length of a news site's clip; the window holds a whole file in its memory while it plays, and at most two (VIDEO_HELD), so videos take at most twice this of your memory, and it hands the system's player at most 4 MiB of one at a time)
 my $VIDEO_SECONDS = 120;                  # DECLARED([C22] the most one video's request may take: 64 MiB in 120 seconds asks for 4.5 Mbit/s, which a home connection gives)
@@ -2891,7 +2891,7 @@ sub redirects_decide {                    # [C4] a decision changed in LZRDFNDR'
 #
 #   P<w>,<h>      then exactly h lines p<hex>, 8 times w lowercase hex characters each:
 #                 red, green, blue and how opaque, a byte each, not multiplied by it;
-#                 1 to 1024 wide and high, 200,000 pixels at most; or P0,0 for none
+#                 1 to 2048 wide and high, 800,000 pixels at most; or P0,0 for none
 #
 # Anything else is no picture, and so is a picture not begun within one clock
 # of $PICTURE_SECONDS for them all. Each place I becomes, for the window, an M
@@ -3245,10 +3245,10 @@ sub fit_crop {
 # AVIF or HEIF, as the application judged it, judged again here. In a folder
 # of its own, readable by you alone and removed after, the file is written,
 # and the system's own sips runs in the decoder container to write it as a
-# PNG: told to make it at most 1024 pixels a side when the file says it is
+# PNG: told to make it at most $DECODED_SIDE pixels a side when the file says it is
 # larger (sub stated_size; sips -Z makes a small picture larger too, so it is
 # told only then), and once more on the PNG when a side of it is still over
-# 1024 (a file that said too little). In its container sips ends at once when
+# $DECODED_SIDE (a file that said too little). In its container sips ends at once when
 # asked the size of an AVIF, so the size is read here. A PNG is taken only
 # when the system said, before sips started ($GATE), that it ran contained,
 # and only when out.png is a plain file with no other name. Returns the PNG,
@@ -5386,7 +5386,7 @@ sub pixels {                            # what a picture run wrote: [wide, high,
     return unless $wrote =~ s/\n\z//;
     my ($head, @rows) = split /\n/, $wrote, -1;
     my ($w, $h) = ($head // '') =~ /^P$N,$N$/ or return;
-    return unless $w >= 1 && $h >= 1 && $w <= 1024 && $h <= 1024 && $w * $h <= $PICTURE_PIXELS && @rows == $h;
+    return unless $w >= 1 && $h >= 1 && $w <= $DECODED_SIDE && $h <= $DECODED_SIDE && $w * $h <= $PICTURE_PIXELS && @rows == $h;
     return if grep { !/^p[0-9a-f]+$/ || length != 8 * $w + 1 } @rows;
     return [$w, $h, map { encode_base64(pack('H*', substr($_, 1)), '') } @rows];
 }
@@ -18279,7 +18279,7 @@ function permitCodeText(scripts) {    // the code block: each script under a lin
 }
 function permitTold(rest) {
     asked++;
-    var parts = rest.split('\t'), number = asked;
+    var parts = rest.split('\t'), number = permitAsked = asked;
     permitShown = permitScripts;
     permitScripts = [];
     modal('LZRDFNDR scripts', parts[1] || '', parts.slice(2).map(function (title, i) { return [title, function () { closeModal(); say('button ' + number + ' ' + (i + 1)); }]; }), permitShown.length ? 'permit' : 'tall');
@@ -19057,7 +19057,7 @@ ObjC.registerSubclass({ name: 'LzrprfBack', superclass: 'NSView', methods: {
 // The veil under the modal takes every click and scroll, so nothing under it is reached.
 ObjC.registerSubclass({ name: 'LzrprfVeil', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('veil', function () { (modalOpen && modalKind == 'flag' ? $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.72, 0.04, 0.04, 1) : $.NSColor.colorWithWhiteAlpha(0, 0.62)).setFill; $.NSRectFillUsingOperation(dirty, 2); }); } },
-    'mouseDown:': { implementation: function (event) { } },
+    'mouseDown:': { implementation: function (event) { veilPressed(event); } },    // the tab strip still takes a press under the question about scripts (veilPressed, 28-window1-tabs.pl)
     'rightMouseDown:': { implementation: function (event) { } },
     'scrollWheel:': { implementation: function (event) { } }
 } });
@@ -19429,6 +19429,18 @@ ObjC.registerSubclass({ name: 'LzrprfCover', superclass: 'NSView', methods: clic
     'rightMouseDown:': { implementation: function (event) { coverPressed(event, true); } },
     'mouseDown:': { implementation: function (event) { pressSeen(event); coverPressed(event); } }
 }) });
+// The question about scripts never holds the page (sub permit_button), and it does not hold the tabs either (Henry, 2026-11-25):
+// a press on the strip under its veil is its default answer, Deny Once, as when nobody answers, and then the press the strip
+// takes as any other: a tab chosen, closed, made or dragged. Every other modal keeps its veil whole.
+var permitAsked = 0;    // the number of the question about scripts last shown (permitTold)
+function veilPressed(event) {
+    if (!modalOpen || (modalKind != 'permit' && modalKind != 'tall') || permitAsked != asked || !tabsView) return;
+    var at = tabsView.convertPointFromView(event.locationInWindow, null), size = tabsView.bounds.size;
+    if (at.x < 0 || at.y < 0 || at.x > size.width || at.y > size.height) return;
+    closeModal();
+    say('button ' + permitAsked + ' 1');
+    tabsView.mouseDown(event);
+}
 // The window, continued from 28-window.pl (split there at 800+ lines, HC-0843): LZRDFNDR's Show all
 // processes, then the window's start (function run).
 //
