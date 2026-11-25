@@ -158,3 +158,24 @@ function veilPressed(event) {
     say('button ' + permitAsked + ' 1');
     tabsView.mouseDown(event);
 }
+// [C26] The question about scripts can be minimized (ticket 1230): Minimize closes it unanswered, so the page and the window go
+// on as with Deny Once, the answer when nobody answers, and the LZRDFNDR icon brings it back while it is still the newest
+// question. A newer question, or the page going on to another, ends it: lzrprf takes no late answer (sub permit_visited).
+var permitLater = null;    // { parts, number, scripts } of the question minimized, or null
+function permitShow(parts, number, scripts) {
+    var choices = parts.slice(2).map(function (title, i) { return [title, function () { permitLater = null; closeModal(); say('button ' + number + ' ' + (i + 1)); }]; });
+    choices.push(['Minimize', function () { permitLater = { parts: parts, number: number, scripts: scripts }; closeModal(); if (toolIcon) toolIcon.needsDisplay = true; }]);
+    modal('LZRDFNDR scripts', parts[1] || '', choices, scripts.length ? 'permit' : 'tall');
+    if (!scripts.length) return;
+    panelText.string = $(permitCodeText(scripts));
+    panelText.font = mono(11.5);
+    panelText.textColor = WHITE;
+    panelText.scrollRangeToVisible($.NSMakeRange(0, 0));
+}
+function permitReopened() {    // true when the LZRDFNDR icon brought a minimized question back
+    if (!permitLater || permitLater.number != asked) { permitLater = null; return false; }
+    var later = permitLater; permitLater = null;
+    permitShown = later.scripts; permitAsked = later.number;
+    permitShow(later.parts, later.number, later.scripts);
+    return true;
+}

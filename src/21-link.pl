@@ -261,12 +261,12 @@ sub link_reaped {                         # [C31] the sender's answer: the comma
 sub link_checked {                        # [C31] a command and its signature: (verb, argument, nonce) when every check holds, else (nothing, why)
     my ($block) = @_;
     my ($command, $signature) = $block =~ /\A([^\n]+)\n(-----BEGIN SSH SIGNATURE-----\n.*)\z/s or return (undef, 'it is not a command and a signature');
-    my ($id, $nonce, $expires, $verb, $arg) = $command =~ /\Alzrbrwsr-debug-link 1 ([0-9a-f]{12}) ([0-9a-f]{16,32}) ([0-9]{10}) (open|reload|measure|snapshot|verbosity|shot|forget)(?: ([\x21-\x7e]{1,2000}))?\z/ or return (undef, 'it is not in the one form a command has');
+    my ($id, $nonce, $expires, $verb, $arg) = $command =~ /\Alzrbrwsr-debug-link 1 ([0-9a-f]{12}) ([0-9a-f]{16,32}) ([0-9]{10}) (open|reload|measure|snapshot|verbosity|shot|forget|press)(?: ([\x21-\x7e]{1,2000}))?\z/ or return (undef, 'it is not in the one form a command has');
     return (undef, 'it names another link') unless $id eq ($LINK{id} // '');
     my $now = time;
     return (undef, 'it expired') if $expires <= $now;
     return (undef, "its expiry is more than $LINK_COMMAND_SECONDS seconds away") if $expires > $now + $LINK_COMMAND_SECONDS;
-    my %arg_ok = (open => qr{\Ahttps://[\x21-\x7e]+\z}, measure => qr{\Ahttps://[\x21-\x7e]+\z}, reload => qr{\A\z}, snapshot => qr{\A\z}, verbosity => qr{\A[012]\z}, shot => qr{\A(?:page|window)(?:,private)?\z}, forget => qr{\Ahttps://[\x21-\x7e]+\z});
+    my %arg_ok = (open => qr{\Ahttps://[\x21-\x7e]+\z}, measure => qr{\Ahttps://[\x21-\x7e]+\z}, reload => qr{\A\z}, snapshot => qr{\A\z}, verbosity => qr{\A[012]\z}, shot => qr{\A(?:page|window)(?:,private)?\z}, forget => qr{\Ahttps://[\x21-\x7e]+\z}, press => qr{\A[0-9]{1,5},[0-9]{1,5}\z});
     return (undef, "its argument is not one $verb takes") unless ($arg // '') =~ $arg_ok{$verb};
     my $seen = link_folder() . '/nonces';
     my @kept;
@@ -290,7 +290,7 @@ sub link_command {                        # [C31] one command: checked, written 
     $LINK{last_command} = time;
     $LINK{next} = 0;
     my $shown = $verb . (length $arg ? ' ' . link_url($arg) : '');
-    $shown = "$verb $arg" if $verb eq 'verbosity' || $verb eq 'shot';
+    $shown = "$verb $arg" if $verb eq 'verbosity' || $verb eq 'shot' || $verb eq 'press';
     noted("the live debug link ran a signed command: $shown");
     link_line('INFO', 'command', "a signed command was run: $shown", verb => $verb, nonce => $nonce, verdict => 'run');
     window("link said $shown");
@@ -330,6 +330,12 @@ sub link_command {                        # [C31] one command: checked, written 
         my $gone = jar_forget($url);
         noted("the live debug link cleared the cookies of $host: $gone");
         return link_line('INFO', 'forget', "the cookies of $host were cleared: $gone", nonce => $nonce, cleared => $gone);
+    }
+    if ($verb eq 'press') {                 # a press and release at X,Y of the page shown (its view's points, as the window sends them), handed straight to the page kept running: it tells a press the page drops from one the window never sent
+        my ($x, $y) = split /,/, $arg;
+        live_input("down $x $y"); live_input("up $x $y");
+        noted("the live debug link pressed the page shown at $x,$y");
+        return link_line('INFO', 'press', "a press and release were handed to the page at $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
     }
     if ($verb eq 'shot') {
         return link_line('WARN', 'command', "a picture was asked again within $LINK_SHOT_SECONDS seconds; none was taken", nonce => $nonce) if time - ($LINK{shot_at} // 0) < $LINK_SHOT_SECONDS;

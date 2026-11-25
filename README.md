@@ -264,18 +264,18 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 128
+    release 129
     home local
-    new Testers can clear one site's cookies from the staging control, so a site greets them as on a first visit.
+    new Buttons on sites such as yle.fi show their label in the middle, and testers can press a page through the staging control.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin 6a7e1ec5489e661b310557fbb778633dc46626b58f2fdc4c5222746c806afd1a
+    file lzrbrwsr-bin bf18d8a30c57d89af5107f4d53cdda6e9d002a8d8f4ceb625719951fb5c6ca7f
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf 480e10add36b017db4c36c04a8f6c7399b3d5eef4493e1e2b56446824aecccff
+    lzrprf ce2ca46e3ac4252ce69c0ed345a3ac5d3cf107c8f33ea9387b5d08981466d48b
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

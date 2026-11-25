@@ -2346,7 +2346,7 @@ function paintIcon(view, glyph, hot, on, lit) {
 // replaces it, so nothing is ticked against an old look; measured, the wait for lzrprf's answer was the lag.
 var gameHelper = false, gameStaged = false, TOOL_READING = 'Reading this computer', tool = null, toolIn = null, toolIcon = null, toolScroll = null, toolView = null, toolCopy = null, toolWaiting = false, toolBack = 0, toolItems = null, TOOL_WIDE = 800, TOOL_HIGH = 660;    // DECLARED(as wide as its three buttons side by side, and as tall as most laptop windows leave)
 function toolPressed(tab) {    // TAB: the tab it opens on, On Your Computer unless named ("other": the minigame's Setup LZRDFNDR)
-    if (modalOpen) { if (modalKind == 'tool') closeModal(); return; }
+    if (modalOpen) { if (modalKind == 'tool') closeModal(); return; } if (permitReopened()) return;    // a minimized question about scripts comes back first (28-window1-tabs.pl)
     techHidden(); secureHidden(); suggestHidden();
     toolWaiting = true; toolBack = 0; toolIcon.needsDisplay = true;
     say('tool open');    // first: lzrprf reads while the panel is made
@@ -3320,15 +3320,8 @@ function permitCodeText(scripts) {    // the code block: each script under a lin
 }
 function permitTold(rest) {
     asked++;
-    var parts = rest.split('\t'), number = permitAsked = asked;
-    permitShown = permitScripts;
+    permitShow(rest.split('\t'), permitAsked = asked, permitShown = permitScripts);    // drawn by permitShow (28-window1-tabs.pl), which also minimizes it
     permitScripts = [];
-    modal('LZRDFNDR scripts', parts[1] || '', parts.slice(2).map(function (title, i) { return [title, function () { closeModal(); say('button ' + number + ' ' + (i + 1)); }]; }), permitShown.length ? 'permit' : 'tall');
-    if (!permitShown.length) return;
-    panelText.string = $(permitCodeText(permitShown));
-    panelText.font = mono(11.5);
-    panelText.textColor = WHITE;
-    panelText.scrollRangeToVisible($.NSMakeRange(0, 0));
 }
 function permitCopied() { if (modalOpen && modalKind == 'permit' && permitShown.length) permitCopy.title = $(clipboardWrite(permitCodeText(permitShown)) ? 'Copied' : 'Not copied'); }
 
