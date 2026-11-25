@@ -264,12 +264,12 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 126
+    release 127
     home local
-    new Links a site follows in its own script now open their page, and pictures are drawn sharp on retina screens.
-    newest https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/latest
-    installer https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/install.sh
-    same https://lzrbrwsr.com/install.sh
+    new A promotion now reaches browsers in seconds, and the script question no longer stops you switching or closing tabs.
+    newest https://lzrbrwsr.com/latest
+    installer https://lzrbrwsr.com/install.sh
+    same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
     file lzrbrwsr-bin da765c41090070eedfadb3939c550ecaece9146077cbfc41f66508eba5cc5678
