@@ -39,6 +39,7 @@
 # settings come from and keeps every rule of its own in its memory only.
 # A rule holds for the kinds of its class (sub permit_kinds); a line of
 # another form, the six fields of before the class among them, is no form.
+my $PERMIT_PENDING;                       # [C26] the question about scripts the window shows and you have not answered: {n, site, url, items, allowed, host}
 sub permit_rules {                        # [C26] the rules: [always|deny, site, class, script origin, sha256, caps, date, "file" or "memory"] each, the file's first; and whether a file is there that was not read
     my @held = map { [@$_] } @PERMIT_HELD;
     my $file = kept_in() . '/scripts';
@@ -620,10 +621,12 @@ sub permit_visited {                      # [C26] a visit begins: what you allow
     $PERMIT_ROUND = defined $PERMIT_RELOAD && $PERMIT_RELOAD eq $url ? $PERMIT_ROUND + 1 : 0;
     undef $PERMIT_RELOAD;
     $PERMIT_ASK = { site => $site, url => $url, items => {}, stripped => 0, refused => 0, boxed => 0 };
+    undef $PERMIT_PENDING;                # a question of the page before that you left unanswered is Deny Once, as it always was; a late answer to it is not taken
 }
 
 sub permits_asked {                       # [C26] once the page is drawn: its scripts no rule allows, and what was taken out of it or refused, put to you, each by its name and with its source: Deny Once, Deny Always, Allow Once, Always Allow. Deny Once is the first button and the answer when nobody answers; Deny Always keeps a deny rule, and a script a deny rule names is never put to you again. Returns true when the page is to be loaded again with what you allowed
     my $ask = $PERMIT_ASK or return 0;
+    return 0 if $PERMIT_PENDING;          # one question at a time: what the page asks meanwhile waits for the answer (sub permits_later)
     return 0 unless ($TABS[$TAB]{url} // '') eq $ask->{url};
     my $site = $ask->{site};
     my ($rules) = permit_rules();
@@ -647,7 +650,25 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
     my $i = 0;
     window(map { my ($name, $where, $bytes, $who) = permit_named($site, @$_[0 .. 2]); my $info = $PERMIT_INFO{"$site $_->[1] $_->[2]"}; my $source = $info ? $info->{source} : '';
         'permitscript ' . join("\t", $i++, $name, $where, $bytes, $who, length $source, MIME::Base64::encode_base64($source, '')) } @items);    # [C26] each script with its source, shown in the question as text that never runs
-    my $press = asked("permit $site\t$words", 'Deny Once', 'Deny Always', 'Allow Once', 'Always Allow');
+    my $state = { site => $site, url => $ask->{url}, items => \@items, allowed => $allowed, host => $host };
+    my @buttons = ('Deny Once', 'Deny Always', 'Allow Once', 'Always Allow');
+    return permit_answered($state, asked("permit $site\t$words", @buttons)) unless $FROM;    # "lzrprf try": the test's answer at once
+    $state->{n} = asked_later("permit $site\t$words", @buttons); $PERMIT_PENDING = $state;    # Henry 2026-11-25: the page goes on while the question stands; its answer comes as any other line (sub permit_button)
+    return 0;
+}
+
+sub permit_button {                       # [C26] the answer to the question about scripts, heard in the main loop; returns the address to load again on an Allow
+    my ($n, $press) = @_;
+    my $state = $PERMIT_PENDING or return;
+    return unless $n == $state->{n};
+    undef $PERMIT_PENDING;
+    return permit_answered($state, $press) && ($TABS[$TAB]{url} // '') eq $state->{url} ? $state->{url} : undef;
+}
+
+sub permit_answered {                     # [C26] what Deny Once, Deny Always, Allow Once and Always Allow do; true when the page is to be loaded again
+    my ($state, $press) = @_;
+    my ($site, $allowed, $host, @items) = (@$state{qw(site allowed host)}, @{ $state->{items} });
+    my $ask = { url => $state->{url} };
     if ($press == 1 || $press == 2) {
         $PERMIT_DENIED{$site}{''} = 1 unless $allowed;    # not asked again on this visit
         $PERMIT_DENIED{$site}{permit_class($_->[0]) . " $_->[1] $_->[2]"} = 1 for @items;

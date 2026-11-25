@@ -10,7 +10,7 @@
 my @VIEW_STEP = (160, 128);
 sub viewing {
     my ($event) = @_;
-    my ($wide, $high) = $event =~ /^view ([1-9][0-9]{0,4}) ([1-9][0-9]{0,4})$/ or return;
+    my ($wide, $high, $scale) = $event =~ /^view ([1-9][0-9]{0,4}) ([1-9][0-9]{0,4})(?: (2))?$/ or return; $VIEW_SCALE = $scale ? 2 : 1;
     @TRMNL_VIEW = ($wide, $high);
     trmnl_relaid($TABS[$TAB]) if $TABS[$TAB]{trmnl};    # [C29] a terminal fills the page as it is, not as a page is laid: its panes laid out again in it
     ($wide, $high) = map { my $step = $VIEW_STEP[$_]; $step * int(($_ ? $high : $wide) / $step + 0.5) } 0, 1;
@@ -37,16 +37,16 @@ sub viewing {
 # that width is not tried again until another is said. The window keeps the
 # place it was read at, as a share of the page's height ("relaid").
 sub relaid {
-    while ($SHOWN && $SHOWN->{wide} != $VIEW[0] && alive()) {
+    while ($SHOWN && ($SHOWN->{wide} != $VIEW[0] || ($SHOWN->{scale} // 1) != $VIEW_SCALE) && alive()) {    # another width, or the same on a screen of another scale
         if ($FROM) {
             my @later;
             while (defined(my $more = hear(0))) { last if $more eq ''; push @later, $more unless viewing($more) }
             push @HELD, @later;
-            last if $SHOWN->{wide} == $VIEW[0];    # the latest size is the width shown already
+            last if $SHOWN->{wide} == $VIEW[0] && ($SHOWN->{scale} // 1) == $VIEW_SCALE;    # the latest size is the width and scale shown already
         }
-        $SHOWN->{wide} = $VIEW[0];
+        $SHOWN->{wide} = $VIEW[0]; $SHOWN->{scale} = $VIEW_SCALE;
         my $kept = live_of($TABS[$TAB]);
-        if ($kept && $kept->{wide} == $VIEW[0] && $kept->{shown}) { window("relaid $TAB", @{ $kept->{shown} }, '.'); $kept->{unsent} = 0; $DRAWN = 1; next }    # the page kept running was laid at this width: its last drawing, as its scripts left it, and nothing is laid out
+        if ($kept && $kept->{wide} == $VIEW[0] && ($kept->{scale} // 1) == $VIEW_SCALE && $kept->{shown}) { window("relaid $TAB", @{ $kept->{shown} }, '.'); $kept->{unsent} = 0; $DRAWN = 1; next }    # the page kept running was laid at this width: its last drawing, as its scripts left it, and nothing is laid out
         $OUTRUN = 1; my @again = laid_out($SHOWN->{url}, $SHOWN->{got}, $SHOWN->{frame}, 1); $OUTRUN = 0;    # a newer size said while it runs ends it ('outrun'), and the newest is laid next
         if (!$again[0] || $SHOWN->{two} && @{ $again[4] }) { live_dropped($again[5]); next }    # not shown: the page as it is shown stays, and so does the run kept running with it
         my ($shown) = pictured($again[0], $again[2], $SHOWN->{host}, undef, undef, $SHOWN->{pictures});
@@ -162,7 +162,7 @@ sub tab_shown {
     return trmnl_shown($tab) if $tab->{trmnl};    # [C29]
     window("address $tab->{url}");
     my $live = live_of($tab);
-    my $list = $live && $live->{shown} && ($live->{home} || $live->{wide} == $VIEW[0]) ? $live->{shown} : $SHOWN && $SHOWN->{list} && $SHOWN->{wide} == $VIEW[0] ? $SHOWN->{list} : undef;
+    my $list = $live && $live->{shown} && ($live->{home} || $live->{wide} == $VIEW[0] && ($live->{scale} // 1) == $VIEW_SCALE) ? $live->{shown} : $SHOWN && $SHOWN->{list} && $SHOWN->{wide} == $VIEW[0] && ($SHOWN->{scale} // 1) == $VIEW_SCALE ? $SHOWN->{list} : undef;
     $DRAWN = 0;
     delete @$live{qw(scroll_sent scroll_echo scroll_echoed scroll_clamp)} if $live;    # the window shows another drawing now: no scroll it was sent for the one before is still owed back, and where it stopped short of one says nothing of this (sub live_input)
     if ($kept && ($SHOWN || $live && $live->{shown})) { live_scroll_told($live); if ($live && $live->{unsent} && $list && $list == $live->{shown}) { window("relaid $TAB", @$list, '.'); $DRAWN = 1 } }    # the window's own drawing stands; a page kept running that drew meanwhile is sent, read where it was, and where its script scrolled it while another tab was shown goes just before

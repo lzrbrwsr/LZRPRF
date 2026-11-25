@@ -128,7 +128,7 @@ my $SENT_BYTES = 64 * 1024;               # the most that is carried from curl t
 my $FIND_SECONDS = 10;                    # the most a name lookup may take
 my $FOUND = 8;                            # the most addresses of one name that are taken: the first eight this computer has a way to
 my $LOOKED = 16;                          # the most addresses of one name that are looked at for that: what the lookup gave beyond them is left out
-my $PAGE_BYTES = 12 * 1024 * 1024;        # the most one page container may write: room for the 32 tiles of a laid page, 32 x 262,656 bytes of base64, about 8.4 MB, and the rest of the page
+my $PAGE_BYTES = 48 * 1024 * 1024;        # the most one page container may write (four times 12 MiB since retina tiles: each has four times the pixels at scale 2): room for the 32 tiles of a laid page, 32 x 262,656 bytes of base64, about 8.4 MB, and the rest of the page
 my $PAGE_SECONDS = 30;                    # a page container is ended after this, whatever it is doing
 my $PAGE_ROOM = 2097152;                 # the address space, in KiB, a page container may take on top of what the shell that starts it holds: 2 GiB. What the application itself holds at its start is not measured
 my $LIVE_SECONDS = 1800;                  # DECLARED(half an hour: a page kept running with its tab, sub live_kept, is ended after this whatever it does, and its last drawing stays; reading a long form takes minutes, not hours)
@@ -175,7 +175,7 @@ my $JOINER = qr/(?!\x{103a})\p{Ccc=9}/;    # a sign that joins the letter after 
 my $HANGS = qr/[\p{M}\p{GCB=Extend}\p{GCB=SpacingMark}\p{GCB=Prepend}\p{GCB=V}\p{GCB=T}]|(?<=\p{GCB=L})\p{GCB=L}|(?<=\p{GCB=Prepend})[^\x{fffd}]|(?<=$JOINER)[^\x{fffd}]|(?<=$JOINER\p{M})[^\x{fffd}]/;    # a character that hangs on the one before it: see "What the window is spared"
 my $SOLID = qr/[^\x{20}\x{1680}\x{2000}-\x{2006}\x{2008}-\x{200a}\x{205f}\x{3000}\x{200b}]/;    # a character where no line may end: all but the spaces that let one end (a no-break space does not)
 my $MADE = 120;                           # the most lines that say what the page is made of
-my %LAID = (R => 20_000, X => 30_000, G => 1000, M => 64, I => 1000, K => 32, J => 1024, V => 8);    # a laid page: the most rectangles, runs of text, grey boxes, pictures, places for a fetched picture, tiles (numbered under K), places of a tile and places of a video
+my %LAID = (R => 20_000, X => 30_000, G => 1000, M => 64, I => 1000, K => 32, J => 1024, Q => 1000, V => 8);    # a laid page: the most rectangles, runs of text, grey boxes, pictures, places for a fetched picture, tiles (numbered under K), places of a tile, places of a video and rounded edges a fetched picture is cut to
 my $RUN_TEXT = 2000;                      # the most characters in one run of text of a laid page
 my $ALL_TEXT = 1_000_000;                 # the most characters in all its runs together
 my $PIXELS = 262_144;                     # the most pixels in all its pictures together: one picture of 512 by 512
@@ -342,10 +342,12 @@ my $WENT = 0;                             # when the visit shown began, on the c
 my $DRAWN = 0;                            # a page was handed to the window, and the window has not said yet that it could not draw it
 my @VIEW_WIDE = (320, 1600);              # the narrowest and the widest a page is laid out: a window's width outside them is taken as the nearer one, and the application refuses a =view frame outside them
 my @VIEW_HIGH = (240, 2160);              # the same for the height of its first screen, which a page's vh is taken from
+my $VIEW_SCALE = 1;                       # device pixels a point of the window's screen, 1 or 2 (a retina screen), as the window last said it: a page's tiles are drawn at it
 my @VIEW = (960, 768);                    # the size of the window's page, in points, as the window last said it and held to those bounds; until it says one, the size every page was laid at before
 my $LAID_WIDE;                            # the width the run being checked was asked to lay its page at: a laid page of any other width is unfit
 my $OUTRUN = 0;                           # a relayout runs (sub relaid): the window is heard while it runs, and a newer width ends it (sub outrun)
 my $SHOWN;                                # the page shown, kept to lay it out again when the window's page changes width: its address, its answer, the frame of style sheets it was laid with, whether that was a second run, its host, its decoded pictures, the width it was laid at
+my $WINDOW_LISTS = 0;                     # how many times the window was handed lines of a page (page, relaid, patch, runs) or its tabs: a list sent earlier is still the one it holds while this stands (sub pictures_pumped)
 my @HELD;                                 # what the window said while lzrprf looked for its latest size, in order: heard before anything new
 my @LATER;                                # Tor turned on or off in the window while a question was open, and the newest place the window showed the page from: heard by the loop of sub behind once the question is answered, so the window's onion never waits for an answer that was dropped
 my $TABS_MOST = 32;                       # the most tabs one window holds: the owner's order of 2026-11-20
@@ -468,7 +470,7 @@ END
 # shell set them and became "env -i", which became sandbox-exec: two
 # programs started for every container, three containers a page. Since then
 # lzrprf sets them itself (sub limited, which says why that is as strong).
-my $PAGE_LIMITS = { bytes => 0, told => [qw(LZRPRF_CONTAINED LZRPRF_SEAL)], set => [qw(LZRPRF_EARLY LZRPRF_TIMES LZRPRF_PICTURE LZRPRF_TOOL LZRPRF_JUDGE LZRPRF_JAR LZRPRF_TOR LZRPRF_HOME)] };    # the bytes one file may hold; the variables told always, and those told only when they hold something
+my $PAGE_LIMITS = { bytes => 0, told => [qw(LZRPRF_CONTAINED LZRPRF_SEAL)], set => [qw(LZRPRF_EARLY LZRPRF_SOON LZRPRF_TIMES LZRPRF_PICTURE LZRPRF_TOOL LZRPRF_JUDGE LZRPRF_JAR LZRPRF_TOR LZRPRF_HOME)] };    # the bytes one file may hold; the variables told always, and those told only when they hold something
 
 # What curl's container is allowed on top of it: one socket file, behind which
 # lzrprf holds the connection to the site, and the list of certificate
@@ -1786,6 +1788,7 @@ sub behind {
         elsif ($event eq 'live') { live_turn(); trmnl_opened() if $TRMNL_OPEN; permits_later(); my $home = live_of($TABS[$TAB]); if ($home_update_due && $home && $home->{home_ready}) { $home_update_due = 0; newer() } $IDLE_WORK //= \&identity_asked if $local_home && $home && $home->{home_ready} }    # a page kept running with its tab answered, or is to end (sub live_answered); [C26] what it asked meanwhile is put to you after
         elsif ($event =~ /^scripts (list|reset|revoke|set)(?: (0|[1-9][0-9]{0,3}))?(?: (always|deny))?$/ && ($1 eq 'revoke' ? defined $2 && !defined $3 : $1 eq 'set' ? defined $2 && defined $3 : !defined $2 && !defined $3)) { scripts_set($1, $2, $3); said_noted() }    # [C26] [C4] LZRDFNDR scripts, from the cogwheel's menu
         elsif ($event =~ /^scripts (e1|curated)(?: (0|[1-9][0-9]{0,3}))? (on|off)$/ && ($1 eq 'curated') == defined $2) { scripts_set($1, $2, $3); said_noted() }    # [C26] the switch of the sandbox (E1), or of one curated rule (E2)
+        elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-4])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
         elsif ($event eq 'scripts sites') { sites_told() }    # [C26] LZRDFNDR's On Websites: the scripts of each site and your decision on each
         elsif ($event =~ /^scripts decide (0|[1-9][0-9]{0,3}) (always|deny|forget)$/) { sites_decide($1, $2); said_noted() }    # [C26] [C4] a decision changed there
         elsif ($event eq 'redirects list') { redirects_told() }    # [C4] LZRDFNDR's Redirects: every redirect put to you and your decision on each
@@ -1804,6 +1807,7 @@ sub behind {
         elsif ($event =~ /^tab out (0|[1-9][0-9]?) (-?[0-9]{1,5} -?[0-9]{1,5} [1-9][0-9]{1,4} [1-9][0-9]{1,4})$/) { tab_out($1, $2); relaid() }    # a tab pulled out of the strip: a window of its own
         elsif ($event =~ /^menu (clear-history|clear-sessions|forget-cookies|home|bookmarks-bar|pictures)$/) { menu($1); said_noted() }
         elsif ($event eq 'menu debug-link') { link_menu(); said_noted() }    # [C31] the live debug link, switched on or off in the cogwheel's menu
+        elsif ($event =~ /^link drew ([0-9]{1,6})$/) { link_drew($1) }    # [C31] how long the window took to draw a list, said only while the link is on
         elsif ($event =~ /^link shot ([0-9a-f]{16,32}) ([A-Za-z0-9+\/]+={0,2})$/) { link_shot($1, $2) }    # [C31] the window's picture of itself, for a signed command that asked for it
         elsif ($event =~ /^game helper (on|off)$/) { game_helper_set($1 eq 'on'); said_noted() }    # H-0071: LZRDFNDR's satellite in the minigame, from the switch in the Other tab of its panel
         elsif ($event =~ /^mark open (0|[1-9][0-9]{0,2})$/) { $MARKS[$1] ? go($MARKS[$1][2], 'you opened a bookmark', $1) : idle('That bookmark is no longer there.') }    # [C4] an address kept from the bar or typed into the window's own modal
@@ -2054,11 +2058,11 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
         if ($OUTRUN && $FROM && vec($ready, fileno $FROM, 1)) { last if $outrun = outrun(); next unless vec($ready, fileno $from_page, 1) }
         $open = sysread($from_page, $wrote, 65536, length $wrote) // $!{EINTR};
         next unless $keep;
-        while ($wrote =~ /\A=(?:fetch|permit|early) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
+        while ($wrote =~ /\A=(?:fetch|permit|early|soon) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
             $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0 };
             $early->{held} = $wrote;
             my $asked = live_asked($early) or last;    # not all there yet
-            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ' || $asked->[0] eq '=early';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
+            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ' || $asked->[0] eq '=early' || substr($asked->[0], 0, 6) eq '=soon ';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
             live_fetched($early, $asked);
             return (undef, 'ended') if $early->{ended};    # a request of no form, or a reply the page did not take: it is ended as a page kept running is (sub live_end)
             ($wrote, $looked) = ($early->{held}, 0);
@@ -2070,7 +2074,7 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
     timed("run-read $$ " . length $wrote) if $TIMED;
     if ($outrun) { kill 'KILL', $feeder, $page; waitpid $_, 0 for $feeder, $page; return (undef, 'outrun') }    # a newer width was said: this run is of no use, and the next is not kept waiting behind it
     if ($ready_at >= 0 && length $wrote <= $PAGE_BYTES) {    # the page is kept running: its first list, and what it wrote after "=ready" is the beginning of its next answer
-        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], until => now() + $LIVE_SECONDS, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
+        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $LIVE_SECONDS, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
     }
     if ($tool && $tool eq 'judge' && !$open && length $wrote <= $PAGE_BYTES) {    # [C28] complete output is not enough: the judge must exit successfully within the same clock
         my $exit;
@@ -2287,8 +2291,10 @@ sub visit {
     timed('laid');
     my $title = $TITLED;                    # the title the run that is shown wrote
     my $first = grep { /^I\d/ } @$lines;    # the page draws pictures: it is shown at once with a grey box in the place of each, and drawn again with them once they came
+    my $sent = $first ? (pictured($lines, $paths, $host, $where, $kept, pictures_so_far($host)))[0] : undef;
+    my $first_mark;                               # the count of lists sent once the first went: the second is a patch of it only while the window still holds it (no list sent in between)
     if ($first) {
-        window("page $TAB", @{ (pictured($lines, $paths, $host, $where, $kept, pictures_so_far($host)))[0] }, '.');    # nothing is fetched for this one: a picture begun ahead and here, or decoded for the page this tab showed before, stands in its place; every other place is grey
+        window("page $TAB", @$sent, '.'); $first_mark = $WINDOW_LISTS;    # nothing is fetched for this one: a picture begun ahead and here, or decoded for the page this tab showed before, stands in its place; every other place is grey
         $DRAWN = 1;
         timed('list');
     }
@@ -2297,9 +2303,9 @@ sub visit {
     window("page $TAB", '.') if !$shown && $first;    # a line of a picture could not be written: the page drawn at once is taken away again, as nothing of this answer would have been shown before
     return live_dropped($live, $UNWRITTEN) unless $shown;
     timed($first ? 'pictured' : 'list');
-    window(($first ? 'relaid' : 'page') . " $TAB", @$shown, '.');    # the tab a list is for is named, so a list that arrives once another tab was chosen in the window goes to that tab's kept drawing; the second drawing keeps the place the page is read at
+    $first ? window_changed(defined $first_mark && $first_mark == $WINDOW_LISTS ? $sent : undef, $shown) : window("page $TAB", @$shown, '.');    # the tab a list is for is named, so a list that arrives once another tab was chosen in the window goes to that tab's kept drawing; the second drawing keeps the place the page is read at
     $DRAWN = 1;
-    $SHOWN = { url => $url, got => $got, frame => $with_sheets, two => $two, host => $host, where => $where, pictures => $decoded, videos => $videos, sites => [grep { elsewhere($_, $host) } @PICTURED], wide => $LAID_WIDE, list => $shown, used => ++$LIST_USED };    # list: what was sent, sent again from here when the tab is chosen again (sub tab_shown)
+    $SHOWN = { url => $url, got => $got, frame => $with_sheets, two => $two, host => $host, where => $where, pictures => $decoded, videos => $videos, sites => [grep { elsewhere($_, $host) } @PICTURED], wide => $LAID_WIDE, scale => $VIEW_SCALE, list => $shown, used => ++$LIST_USED };    # list: what was sent, sent again from here when the tab is chosen again (sub tab_shown)
     lists_bounded();
     live_kept($live, $tab, $lines, $paths, $host, $decoded, $shown, $videos) if $live;    # the page goes on with this tab: clicks and keys in it reach it, and what it draws again is checked as this list was
     live_told();
@@ -2396,7 +2402,7 @@ sub contained {
     $READ_ASKED = 0;                      # this run has asked for nothing yet, whatever way it ends
     return (undef, 'changed') unless program_same();    # read again before every run: the program on the disk is the file this window began with, or nothing is laid out
     $keep = 0 unless defined $sheets;     # a picture run is never kept
-    my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
+    my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]" . ($VIEW_SCALE == 2 ? " 2" : "") . "\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
     $frame .= permit_page($url, \$got) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
     $frame .= jar_frame($url) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
     $frame .= '=live ' . length($got) . "\n" if $keep;
@@ -2436,7 +2442,7 @@ sub contained {
         waitpid $_, 0 for $feeder, $page;
         return (undef, 'unstarted');
     }
-    my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
+    my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
     if ($soon && $keep) { $started->{fed} = $frame . $got if $soon eq 'beside'; return (undef, undef, $started) }
     beside_begun($started, $sheets, $keep, $tool);    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
     return run_read($started, $keep, $sheets, $tool);
@@ -2451,7 +2457,7 @@ sub page_started {
     my $seal = run_seal() // return;      # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
     my $page = fork // return;
     if (!$page) {
-        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
+        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
         chdir '/';
         the_program($answer_out, $to_lzrprf);    # [C1]
     }
@@ -2753,9 +2759,9 @@ sub laid {
     no warnings 'utf8';
     my ($wide, $high) = $lines->[$from] =~ /^L${N}x$N$/ or return;
     return unless defined $LAID_WIDE && $wide == $LAID_WIDE && $high >= 1 && $high <= 200_000;    # laid at the width its =view frame asked for, and at no other
-    my $state = { wide => $wide, high => $high, text => 0, pixels => 0, rows => 0, row_bytes => 0, row_chars => 0, above => 0, count => {}, tile => {} };
+    my $state = { wide => $wide, high => $high, text => 0, pixels => 0, rows => 0, row_bytes => 0, row_chars => 0, above => 0, rounded => 0, count => {}, tile => {} };
     laid_run($lines, $from + 1, $#$lines, $state, $paths, $videos) or return;
-    return if $state->{rows};             # a picture with rows missing
+    return if $state->{rows} || $state->{rounded};    # a picture with rows missing, or a rounded edge with no picture after it
     $LAID_TALLY = $state;                 # what the list holds, for a splice of it checked by itself (sub live_patched)
     utf8::encode($_) for @$lines;
     return ($lines, $hosts, $paths, $said, $sheets, $videos);
@@ -2764,7 +2770,7 @@ sub laid {
 sub laid_run {                            # the lines $first to $last of a laid list, checked in order from where $state says the list stands, and $state brought to after them; X lines are put in their shown form in place
     my ($lines, $first, $last, $state, $paths, $videos) = @_;
     no warnings 'utf8';
-    my ($wide, $high, $text, $pixels, $rows, $row_bytes, $row_chars, $above, $count, $tile) = @$state{qw(wide high text pixels rows row_bytes row_chars above count tile)};    # $row_chars: how long a row of the tile above is, 0 under a picture; $above: whether a row of that tile was checked above the next
+    my ($wide, $high, $text, $pixels, $rows, $row_bytes, $row_chars, $above, $count, $tile, $rounded) = @$state{qw(wide high text pixels rows row_bytes row_chars above count tile rounded)};    # $row_chars: how long a row of the tile above is, 0 under a picture; $above: whether a row of that tile was checked above the next
     my %count = %$count;
     my %tile = %$tile;
     my $inside = sub { my ($x, $y, $w, $h) = @_; return $w >= 1 && $h >= 1 && $x + $w <= $wide && $y + $h <= $high };
@@ -2780,9 +2786,11 @@ sub laid_run {                            # the lines $first to $last of a laid 
             $rows--;
             next;
         }
-        my ($kind) = /^([RXGMIKJV])/ or return;
+        my ($kind) = /^([RXGMIKJVQ])/ or return;
+        return if $rounded && $kind ne 'I'; $rounded = 0;    # a rounded edge Q is said of the fetched picture on the next line, and of nothing else
         return unless ++$count{$kind} <= $LAID{$kind};
         if ($kind eq 'R') { return unless /^R$N,$N,$N,$N,[0-9a-f]{8}$/ && $inside->($1, $2, $3, $4) }
+        elsif ($kind eq 'Q') { return unless /^Q$N,$N,$N,$N((?:,[0-9]{1,5}){8})$/ && $3 >= 1 && $4 >= 1 && $1 + $3 <= 200000 && $2 + $4 <= 200000 && !grep { $_ > 20000 } split /,/, substr($5, 1); $rounded = 1 }    # its rounded edge: a box and the eight radii of its corners, px
         elsif ($kind eq 'G') { return unless /^G$N,$N,$N,$N$/ && $inside->($1, $2, $3, $4) }
         elsif ($kind eq 'V') { return unless /^V$N,$N,$N,$N,$N$/ && $inside->($1, $2, $3, $4) && $5 < @$videos }
         elsif ($kind eq 'I') { return unless /^I$N,$N,$N,$N,$N(?:,([1-4]),$N,$N,$N,$N)?$/ && $inside->($1, $2, $3, $4) && $5 < @$paths && (!defined $6 || 4 == grep { $_ >= 1 && $_ <= 199999 } $7, $8, $9, $10) }    # a fit and a position (sub fit_crop)
@@ -2790,7 +2798,7 @@ sub laid_run {                            # the lines $first to $last of a laid 
             return unless /^M$N,$N,$N,$N,$N,$N(?:,$N,$N,$N,$N)?$/ && $inside->($1, $2, $3, $4) && $5 >= 1 && $5 <= 1024 && $6 >= 1 && $6 <= 1024 && ($pixels += $5 * $6) <= $PIXELS;
             return if defined $7 && ($9 < 1 || $10 < 1 || $7 + $9 > 100 * $5 || $8 + $10 > 100 * $6);    # the part of the picture a fit draws lies in it
             ($rows, $row_bytes, $row_chars) = ($6, $5 * 4, 0);
-        } elsif ($kind eq 'K') { return unless /^K$N,$N,$N,$N,$N$/ && $1 < $LAID{K} && !exists $tile{$1} && ($tile{$1} = $cut->($2, $3)) eq "$4,$5"; ($rows, $row_chars, $above) = ($5, 1 + 4 * $4, 0) }    # a tile is not counted in $PIXELS: 32 at most is its bound
+        } elsif ($kind eq 'K') { return unless /^K$N,$N,$N,$N,$N(,2)?$/ && $1 < $LAID{K} && !exists $tile{$1} && ($tile{$1} = $cut->($2, $3)) eq "$4,$5"; my $s = $6 ? 2 : 1; ($rows, $row_chars, $above) = ($5 * $s, 1 + 4 * $4 * $s, 0) }    # a tile is not counted in $PIXELS: 32 at most is its bound
         elsif ($kind eq 'J') { return unless /^J$N,$N,$N$/ && defined $tile{$1} && $tile{$1} eq $cut->($2, $3) }
         else {
             my ($head, $x, $y, $size, $chars) = /^(X$N,$N,$N,[\@-O],[0-9a-f]{6},)(.{1,$RUN_TEXT})\z/s or return;
@@ -2800,7 +2808,7 @@ sub laid_run {                            # the lines $first to $last of a laid 
             $_ = $head . $chars;
         }
     }
-    @$state{qw(text pixels rows row_bytes row_chars above count tile)} = ($text, $pixels, $rows, $row_bytes, $row_chars, $above, \%count, \%tile);
+    @$state{qw(text pixels rows row_bytes row_chars above count tile rounded)} = ($text, $pixels, $rows, $row_bytes, $row_chars, $above, \%count, \%tile, $rounded);
     return 1;
 }
 
@@ -3011,13 +3019,14 @@ sub pictures_judged {                     # ($lines, $paths, $host): the picture
 }
 
 sub pictures_ahead {
-    my ($lines, $paths, $host) = @_;
+    my ($lines, $paths, $host, $sent) = @_;
     my $page = $AHEAD_PAGE or return;
     return if $PICTURES_AHEAD || $TOR_WANTED || $page->{host} ne $host;
     my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;
     return unless %wanted;
     $PICTURES_AHEAD = pictures_state($paths, \%wanted, $host, @$page{qw(where kept answer)}) or return;
     $PICTURES_AHEAD->{early} = [$lines, $paths, $host];    # the list they are drawn into when they are here (sub pictures_pumped)
+    $PICTURES_AHEAD->{sent} = [$sent, $TAB, $WINDOW_LISTS] if $sent;    # the list the window was just handed, and how to tell that it still holds it
     timed('pictures-ahead ' . scalar @{ $PICTURES_AHEAD->{waiting} }) if $TIMED;
     pictures_begun($PICTURES_AHEAD, 2);
     return;
@@ -3030,7 +3039,8 @@ sub pictures_pumped {                     # the pictures begun ahead: what they 
     pictures_begun($P, 2);
     if ($P->{early} && !%{ $P->{running} } && !@{ $P->{waiting} } && !$P->{lost} && !$P->{shown}++ && %{ $P->{picture} }) {    # all of them here before the page's own list: the early list drawn once more, with them in their places
         my ($shown) = pictured(@{ $P->{early} }, undef, undef, pictures_so_far($P->{host}));
-        window("relaid $TAB", @$shown, '.');
+        my $held = $P->{sent} && $P->{sent}[1] == $TAB && $P->{sent}[2] == $WINDOW_LISTS ? $P->{sent}[0] : undef;    # the window still holds the early list: only the pictures' lines are sent
+        window_changed($held, $shown);
         timed('pictures-early') if $TIMED;
     }
     return;
@@ -3112,6 +3122,7 @@ sub pictured {
         my ($x, $y, $w, $h, $n, @fit) = /^I(\d+),(\d+),(\d+),(\d+),(\d+)(?:,([1-4]),(\d+),(\d+),(\d+),(\d+))?$/ or (push(@shown, $_), next);
         my $one = $picture{ $paths->[$n] };
         if ($one && ($drawn += $one->[0] * $one->[1]) <= $DRAWN_PIXELS) {
+            $one = $picture{ $paths->[$n] } = picture_one($one);
             my @crop = defined $fit[0] ? fit_crop($x, $y, $w, $h, $one->[0], $one->[1], @fit) : ($x, $y, $w, $h);
             next unless @crop;    # the fit leaves nothing of the picture in its box
             push @shown, 'N' . join(',', picture_named($one), @crop[0 .. 3], $one->[0], $one->[1], @crop[4 .. $#crop]);    # by its name: its rows go to the window once (sub named_owed), however many lists place it
@@ -3133,6 +3144,8 @@ sub pictured {
 # laid_run), so a page cannot place a bitmap of another page. The window keeps
 # a bounded number of bitmaps; one it no longer has is asked for with "page
 # refresh", and then every picture of the list is owed again (sub named_again).
+my %NAMED_LIKE;                           # the names of this process by what a picture looks like at a glance (sub picture_like), so a picture decoded again finds the name of the same pixels
+
 sub picture_named {                       # ($one): the name of a decoded picture, made the first time it is placed
     my ($one) = @_;
     if ($NAMED_OWNER != $$) {             # the first name of this process: a start of its own
@@ -3140,18 +3153,40 @@ sub picture_named {                       # ($one): the name of a decoded pictur
         if (open my $random, '<:raw', '/dev/urandom') { read($random, $bytes, 4); close $random }
         $bytes = pack('N', (time() ^ ($$ << 15)) & 0xffffffff) unless length($bytes) == 4;
         ($NAMED_RUN, $NAMED_OWNER, $NAMED_COUNT) = (unpack('H*', $bytes), $$, 0);
-        %NAMED = %NAMED_AT = ();
+        %NAMED = %NAMED_AT = %NAMED_LIKE = ();
     }
     my $known = $NAMED_AT{ 0 + $one };
     return $known->[0] if $known && defined $known->[1] && $known->[1] == $one;
     if (!(++$NAMED_COUNT % 64)) {         # the names of pictures no page keeps any more are let go
         for my $name (grep { !defined $NAMED{$_}[1] } keys %NAMED) { delete $NAMED{$name} }
         for my $at (grep { !defined $NAMED_AT{$_}[1] } keys %NAMED_AT) { delete $NAMED_AT{$at} }
+        for my $like (grep { !$NAMED{ $NAMED_LIKE{$_} } } keys %NAMED_LIKE) { delete $NAMED_LIKE{$like} }
     }
+    my $like = picture_like($one);
     my $entry = [$NAMED_RUN . sprintf('%x', $NAMED_COUNT), $one, 0];
     weaken($entry->[1]);
     $NAMED{ $entry->[0] } = $NAMED_AT{ 0 + $one } = $entry;
+    $NAMED_LIKE{$like} = $entry->[0];
     return $entry->[0];
+}
+
+sub picture_one {                         # ($one): the picture already named that holds the same pixels, when one is still kept; else $one. A page asked again, or the next page of a site, decodes its pictures again: placed as the one the window holds, no row is sent and the second copy is let go
+    my ($one) = @_;
+    return $one if $NAMED_OWNER != $$ || $NAMED_AT{ 0 + $one };
+    my $same = $NAMED{ $NAMED_LIKE{ picture_like($one) } // '' };
+    return $same && defined $same->[1] && picture_same($same->[1], $one) ? $same->[1] : $one;
+}
+
+sub picture_like {                        # ($one): what a decoded picture looks like at a glance: its size, its rows' number and its middle row
+    my ($one) = @_;
+    return join ',', @$one[0, 1], $#$one, $one->[ 2 + int(($#$one - 2) / 2) ] // '';
+}
+
+sub picture_same {                        # ($one, $other): both hold the same size and the same rows, each compared whole
+    my ($one, $other) = @_;
+    return 0 if @$one != @$other;
+    $one->[$_] eq $other->[$_] or return 0 for 0 .. $#$one;
+    return 1;
 }
 
 sub named_owed {                          # (@lines of one list): the rows of each picture it names that the window was not sent yet, as lines to write before it
@@ -3842,7 +3877,7 @@ sub under {
 my @VIEW_STEP = (160, 128);
 sub viewing {
     my ($event) = @_;
-    my ($wide, $high) = $event =~ /^view ([1-9][0-9]{0,4}) ([1-9][0-9]{0,4})$/ or return;
+    my ($wide, $high, $scale) = $event =~ /^view ([1-9][0-9]{0,4}) ([1-9][0-9]{0,4})(?: (2))?$/ or return; $VIEW_SCALE = $scale ? 2 : 1;
     @TRMNL_VIEW = ($wide, $high);
     trmnl_relaid($TABS[$TAB]) if $TABS[$TAB]{trmnl};    # [C29] a terminal fills the page as it is, not as a page is laid: its panes laid out again in it
     ($wide, $high) = map { my $step = $VIEW_STEP[$_]; $step * int(($_ ? $high : $wide) / $step + 0.5) } 0, 1;
@@ -3869,16 +3904,16 @@ sub viewing {
 # that width is not tried again until another is said. The window keeps the
 # place it was read at, as a share of the page's height ("relaid").
 sub relaid {
-    while ($SHOWN && $SHOWN->{wide} != $VIEW[0] && alive()) {
+    while ($SHOWN && ($SHOWN->{wide} != $VIEW[0] || ($SHOWN->{scale} // 1) != $VIEW_SCALE) && alive()) {    # another width, or the same on a screen of another scale
         if ($FROM) {
             my @later;
             while (defined(my $more = hear(0))) { last if $more eq ''; push @later, $more unless viewing($more) }
             push @HELD, @later;
-            last if $SHOWN->{wide} == $VIEW[0];    # the latest size is the width shown already
+            last if $SHOWN->{wide} == $VIEW[0] && ($SHOWN->{scale} // 1) == $VIEW_SCALE;    # the latest size is the width and scale shown already
         }
-        $SHOWN->{wide} = $VIEW[0];
+        $SHOWN->{wide} = $VIEW[0]; $SHOWN->{scale} = $VIEW_SCALE;
         my $kept = live_of($TABS[$TAB]);
-        if ($kept && $kept->{wide} == $VIEW[0] && $kept->{shown}) { window("relaid $TAB", @{ $kept->{shown} }, '.'); $kept->{unsent} = 0; $DRAWN = 1; next }    # the page kept running was laid at this width: its last drawing, as its scripts left it, and nothing is laid out
+        if ($kept && $kept->{wide} == $VIEW[0] && ($kept->{scale} // 1) == $VIEW_SCALE && $kept->{shown}) { window("relaid $TAB", @{ $kept->{shown} }, '.'); $kept->{unsent} = 0; $DRAWN = 1; next }    # the page kept running was laid at this width: its last drawing, as its scripts left it, and nothing is laid out
         $OUTRUN = 1; my @again = laid_out($SHOWN->{url}, $SHOWN->{got}, $SHOWN->{frame}, 1); $OUTRUN = 0;    # a newer size said while it runs ends it ('outrun'), and the newest is laid next
         if (!$again[0] || $SHOWN->{two} && @{ $again[4] }) { live_dropped($again[5]); next }    # not shown: the page as it is shown stays, and so does the run kept running with it
         my ($shown) = pictured($again[0], $again[2], $SHOWN->{host}, undef, undef, $SHOWN->{pictures});
@@ -3994,7 +4029,7 @@ sub tab_shown {
     return trmnl_shown($tab) if $tab->{trmnl};    # [C29]
     window("address $tab->{url}");
     my $live = live_of($tab);
-    my $list = $live && $live->{shown} && ($live->{home} || $live->{wide} == $VIEW[0]) ? $live->{shown} : $SHOWN && $SHOWN->{list} && $SHOWN->{wide} == $VIEW[0] ? $SHOWN->{list} : undef;
+    my $list = $live && $live->{shown} && ($live->{home} || $live->{wide} == $VIEW[0] && ($live->{scale} // 1) == $VIEW_SCALE) ? $live->{shown} : $SHOWN && $SHOWN->{list} && $SHOWN->{wide} == $VIEW[0] && ($SHOWN->{scale} // 1) == $VIEW_SCALE ? $SHOWN->{list} : undef;
     $DRAWN = 0;
     delete @$live{qw(scroll_sent scroll_echo scroll_echoed scroll_clamp)} if $live;    # the window shows another drawing now: no scroll it was sent for the one before is still owed back, and where it stopped short of one says nothing of this (sub live_input)
     if ($kept && ($SHOWN || $live && $live->{shown})) { live_scroll_told($live); if ($live && $live->{unsent} && $list && $list == $live->{shown}) { window("relaid $TAB", @$list, '.'); $DRAWN = 1 } }    # the window's own drawing stands; a page kept running that drew meanwhile is sent, read where it was, and where its script scrolled it while another tab was shown goes just before
@@ -8694,6 +8729,33 @@ sub prefetch_go {                         # ($first, $page): the page $page aske
     return;
 }
 
+sub prefetch_soon {                       # [C19] ($live, $dest, $to): "=soon DEST URL", a GET the page's own script set going and makes in a later task (a script it made: yle.fi waited 205, 88 and 280 ms on three, one after another, 2026-11-25). Judged here as sub live_fetched will judge the request, begun with the two lines sub prefetch_pump writes first, and handed over only by sub prefetch_take when the page asks for exactly it. Whatever this refuses is simply not begun: the request says why when it comes
+    my ($live, $dest, $to) = @_;
+    return if $live->{home} || $TOR_WANTED || listed($to) || ++$live->{soon} > $LIVE_FETCH_MOST;
+    my ($url, $host) = address($to);
+    return if !$url || $PREFETCH{$url};
+    my ($rules) = permit_rules();
+    my $allowed = permit_site("https://$live->{host}", $rules, $live->{url}) or return;    # [C26] never for a site whose scripts do not run
+    return if defined filter_said($url, $FILTER_DEST{$dest}, $live->{host});    # [C27]
+    shield_asked($url);
+    return unless shield_said($url) eq 'allow';    # [C28] before any lookup
+    return if defined sso_cookie($url, $live->{host});    # [C7] as in sub prefetch_go
+    my $top = $allowed eq 'sandbox' ? undef : $live->{url};
+    return if defined $top && defined identity_of_host($host);    # [C7] D19
+    return if $allowed eq 'sandbox' && $host ne $live->{host} && $dest ne 'script' && sandbox_says('fetch-other') eq 'refused';    # [C26] E1: what the sandbox's table refuses the request is not begun
+    my ($where) = find($host);
+    return unless $where && !grep { $_->{own} } @$where;    # [C8]
+    my ($kept) = keeping();
+    push @PREFETCH_WAITING, { url => $url, where => $where, ask => { method => 'GET', type => '-', body => '', origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => undef, top => $top, as => undef, dest => $dest, from => $live->{host} }, kept => $kept, page => $live->{url} };
+    if ($dest eq 'data' && defined $top && !jar_skips($url)) {    # [C7] a data request is begun ahead only where no cookie goes with it: the jar is asked now, once, and a request it has a cookie for is made by the page's own ask
+        my $ask = $PREFETCH_WAITING[-1]{ask};
+        if (length($ask->{jar} = jar_cookie($url, undef, $ask) // q{})) { pop @PREFETCH_WAITING; return }
+    }
+    $PREFETCH{$url} = $PREFETCH_WAITING[-1];
+    prefetch_pump();
+    return;
+}
+
 sub prefetch_pump {                       # the requests waiting started, up to $PREFETCH_AT_ONCE at a time, and what the running ones wrote read
     my $running = grep { $_->{pid} && !$_->{done} } values %PREFETCH;
     return unless @PREFETCH_WAITING && $running < $PREFETCH_AT_ONCE;
@@ -8704,7 +8766,7 @@ sub prefetch_pump {                       # the requests waiting started, up to 
         my $one = shift @PREFETCH_WAITING;
         record("the page $one->{page} names " . ($one->{ask}{dest} eq 'script' ? 'the script' : 'for an early load') . " $one->{url}; lzrprf fetches it ahead, for when the page asks for it", $one->{kept}) or last;    # [C5] written down first, connected second
         record("$one->{url} -> lzrprf connects to the first that answers of: " . join(', ', map { $_->{text} } @{ $one->{where} }), $one->{kept}) or last;
-        $one->{ask}{jar} = jar_cookie($one->{url}, undef, $one->{ask}) // q{} if defined $one->{ask}{top} && !jar_skips($one->{url});    # [C7] the jar asked here, by the window, never by the run below: the line Cookie it gives this request now, and what the answer sets is told to the jar only when the page takes it (sub prefetch_take)
+        $one->{ask}{jar} = jar_cookie($one->{url}, undef, $one->{ask}) // q{} if defined $one->{ask}{top} && !exists $one->{ask}{jar} && !jar_skips($one->{url});    # [C7] the jar asked here, by the window, never by the run below: the line Cookie it gives this request now, and what the answer sets is told to the jar only when the page takes it (sub prefetch_take)
         pipe(my $from, my $to) or last;
         @$one{qw(from to said)} = ($from, $to, '');
         push @batch, $one;
@@ -8826,6 +8888,11 @@ sub prefetch_take {                       # ($url, $ask): the answer fetched ahe
     my ($url, $ask, $shown) = @_;
     my $one = $PREFETCH{$url} or return;
     return if prefetch_asked($one->{ask}) ne prefetch_asked($ask) || defined $ask->{cookie} || length($ask->{body} // '');    # another request than the one made ahead: made now, as asked
+    if ($one->{ask}{dest} eq 'data' && defined $ask->{top} && !exists $one->{answer} && !jar_skips($url) && length(jar_cookie($url, undef, $ask) // q{})) {    # [C7] the jar has a cookie for it now that it had not when it was told ahead (a sign-in step between): what was begun without it is dropped, and the request is made now, with it
+        if ($one->{pid} && !$one->{done}) { prefetch_ended($one); close $one->{from} }
+        delete $PREFETCH{$url}; @PREFETCH_WAITING = grep { $_ != $one } @PREFETCH_WAITING;
+        return;
+    }
     if ($one->{answer}) { return @{ $one->{answer} } unless $shown; delete $PREFETCH{$url}; return }    # the page laid out again in this visit asks the same again: the same answer, every check of its request run again; once it is shown and runs, what it asks is fetched anew
     if (!$one->{pid}) { delete $PREFETCH{$url}; @PREFETCH_WAITING = grep { $_ != $one } @PREFETCH_WAITING; return }    # not begun yet: made now, as asked
     my $until = now() + $FETCH_SECONDS + 5;
@@ -9934,7 +10001,8 @@ sub body_of {                             # the body of an answer 200, as curl g
 # the other hosts its page names, each in the shape of a host name, and how
 # many there are (the last line of "sub visit").
 sub window {                              # all the lines in one write: a list of thousands of lines printed one by one (autoflush) woke the window once a line, and a page took 100 ms to arrive (measured 2026-11-23)
-    print join('', map { "$_\n" } (@_ && $_[0] =~ /^(?:page|relaid|patch)\b/ ? named_owed(@_) : ()), @_) or leave() if @_;    # without a window ("lzrprf try" only) this is printed for the test to read
+    $WINDOW_LISTS++ if @_ && $_[0] =~ /^(?:page|relaid|patch|runs|tabs?)\b/;
+    print join('', map { "$_\n" } (@_ && $_[0] =~ /^(?:page|relaid|patch|runs)\b/ ? named_owed(@_) : ()), @_) or leave() if @_;    # without a window ("lzrprf try" only) this is printed for the test to read
     sound_hushed() if $SOUND && @_ && $_[0] =~ /^(?:tabs |page(?: [0-9]+)?\z|live (?!on ))/;    # [C12] another tab, a new page shown, or no page kept running: every sound stops and goes
     timed('sent ' . ($_[0] =~ /^(\S+)/ ? $1 : '')) if $TIMED && @_;    # "lzrprf try" with "times": the moment the window was handed each write, by its first word
 }
@@ -10030,6 +10098,40 @@ sub hear {                                # the next thing the window says; noth
     }
 }
 
+sub window_changed {                      # the window holds the list $old of the tab shown, and $new is to stand there: only what changed is sent. One stretch as "patch TAB FIRST DROP" and its lines; several as "runs TAB K", K lines "FIRST DROP COUNT" in the order of the list (places in $old), then the lines of them all; the whole list ("relaid") when little would be saved or there is no list to go from. yle.fi's list is 7100 lines and 1.5 MB, and it was sent whole twice more while the page loaded (measured in the staging browser, 2026-11-25)
+    my ($old, $new) = @_;
+    my ($first, $last, @runs) = (0, 0);
+    return window("relaid $TAB", @$new, '.') unless $old;
+    $first++ while $first < @$old && $first < @$new && $old->[$first] eq $new->[$first];
+    $last++ while $last < @$old - $first && $last < @$new - $first && $old->[$#$old - $last] eq $new->[$#$new - $last];
+    my $saved = 0; $saved += length($new->[$_]) + 1 for 0 .. $first - 1, @$new - $last .. $#$new;
+    my ($end_old, $end_new) = (@$old - $last, @$new - $last);    # the middle that differs: $first up to these
+    my $middle = 0; $middle += length($new->[$_]) + 1 for $first .. $end_new - 1;
+    if ($middle > 4096 && $end_old > $first) {    # a long middle: the lines of it that stand in both are found, each stretch between them a run
+        my %at; push @{ $at{$new->[$_]} }, $_ for $first .. $end_new - 1;
+        my ($i, $j, $same) = ($first, $first, 0);
+        while (($i < $end_old || $j < $end_new) && @runs <= 64) {
+            if ($i < $end_old && $j < $end_new && $old->[$i] eq $new->[$j]) { $same += length($new->[$j]) + 1; $i++; $j++; next }
+            my ($to_old, $to_new) = ($end_old, $end_new);
+            FIND: for my $k ($i .. ($i + 64 < $end_old ? $i + 64 : $end_old) - 1) {    # the next line of the old list that stands in the new one with the line after it: there the two go on alike
+                my $places = $at{$old->[$k]} or next;
+                shift @$places while @$places && $places->[0] < $j;
+                for my $p (@$places[0 .. ($#$places < 7 ? $#$places : 7)]) {
+                    next unless $k + 1 < $end_old && $p + 1 < $end_new ? $old->[$k + 1] eq $new->[$p + 1] : $k + 1 == $end_old && $p + 1 == $end_new;
+                    ($to_old, $to_new) = ($k, $p);
+                    last FIND;
+                }
+            }
+            push @runs, [$i, $to_old - $i, $j, $to_new - $j];
+            ($i, $j) = ($to_old, $to_new);
+        }
+        if (@runs > 1 && @runs <= 64 && $saved + $same > 512) {
+            return window("runs $TAB " . @runs, (map { "$_->[0] $_->[1] $_->[3]" } @runs), (map { @$new[$_->[2] .. $_->[2] + $_->[3] - 1] } @runs), '.');
+        }
+    }
+    return window("patch $TAB $first " . (@$old - $first - $last), @$new[$first .. $#$new - $last], '.') if $saved > 512;
+    window("relaid $TAB", @$new, '.');
+}
 # The live debug link [C31]. Off until you switch it on in the cogwheel's menu
 # ("Live debug link"), in a window that is neither incognito nor Tor; on, it
 # holds for $LINK_SECONDS and then ends by itself, and the same row turns it
@@ -10363,6 +10465,12 @@ sub link_command {                        # [C31] one command: checked, written 
         return window("link shot $nonce $which");    # a private window is never on the link, so ",private" changes nothing here, and is written down as asked
     }
 }
+sub link_drew {                           # [C31] "link drew MS" from the window: a list was drawn, and its drawing took MS; said only while the link is on, written during a measured load
+    my ($took) = @_;
+    return unless link_on() && defined $LINK{go_at};
+    link_line('INFO', 'drew', 'the window drew a list', run => 0, t_ms => int((Time::HiRes::time() - $LINK{go_at}) * 1000), draw_ms => $took);
+}
+
 sub link_shot {                           # [C31] "link shot NONCE PNG-IN-BASE64" from the window: its own drawing, kept for the sender
     my ($nonce, $text) = @_;
     return unless link_on();
@@ -10532,11 +10640,12 @@ sub live_asked {                          # [C19] the request at the front of wh
         return 0 if length($live->{held}) < $end + 1 + $size;
         return ['=early', substr($live->{held}, $end + 1, $size), $end + 1 + $size];
     }
-    return unless $permit || substr($live->{held}, 0, 7) eq '=fetch ';
+    my $soon = substr($live->{held}, 0, 6) eq '=soon ';    # [C19] a request the page's script set going, told ahead: one line, no body, answered with nothing (sub prefetch_soon)
+    return unless $permit || $soon || substr($live->{held}, 0, 7) eq '=fetch ';
     my $end = index $live->{held}, "\n";
     if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
     my $line = substr($live->{held}, 0, $end);
-    return [$line, '', $end + 1] if $permit;
+    return [$line, '', $end + 1] if $permit || $soon;
     my ($size) = $line =~ /^=fetch [A-Z]{1,8} (0|[1-9][0-9]{0,5}) / or return [$line];
     return [$line] if $size > $LIVE_FETCH_UP;
     return 0 if length($live->{held}) < $end + 1 + $size;
@@ -10562,11 +10671,12 @@ sub live_early {
     ($LAID_TALLY, $TITLED, @FONTS_NAMED) = ($tally, $titled, @fonts);
     timed('early-checked ' . ($lines ? scalar @$lines : 'unfit')) if $TIMED;
     return unless $lines && @$lines;
-    window("page $TAB", @{ (pictured($lines, $paths, $live->{host}, undef, undef, pictures_so_far($live->{host})))[0] }, '.');    # nothing is fetched for this one
+    my ($sent) = pictured($lines, $paths, $live->{host}, undef, undef, pictures_so_far($live->{host}));    # nothing is fetched for this one
+    window("page $TAB", @$sent, '.');
     $DRAWN = 1;
     timed('list-early');
     prefetch_go('', $live->{url}, 'found') if $PREFETCH_NAMED && %FINDING;    # and what the page names on other hosts, looked up since its run began (sub prefetch_later): since release 101 that is after sub ahead_fonts, which began them before, so yle.fi's two fonts were asked for by the page first, one after the other, 200 ms its scripts waited (measured 2026-11-25); here and not before the list, where waiting for a name held the first drawing 20 ms
-    pictures_ahead($lines, $paths, $live->{host});    # its pictures begin now, while its scripts run
+    pictures_ahead($lines, $paths, $live->{host}, $sent);    # its pictures begin now, while its scripts run
     return;
 }
 
@@ -10582,6 +10692,7 @@ sub live_fetched {                        # [C19]
     $live->{looked} = 0;
     return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';
+    if (substr($line, 0, 6) eq '=soon ') { $line =~ m{^=soon (script|image|data) ([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form'); return prefetch_soon($live, $1, $2) }
     return live_replied($live, 0, '', '') if $live->{home};    # the local home has no network door, including absolute script requests    # [C26]
     my ($method, $size, $type, $dest, $as, $to) = $line =~ m{^=fetch (GET|HEAD|POST) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?(?:as ([a-z]{1,16}) )?([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form');
     return live_end($live, 'it wrote a line of no form') if $method ne 'POST' && ($size || $type ne '-');
@@ -10761,6 +10872,7 @@ sub live_sent {                           # [C19] a reply written to a page kept
 # settings come from and keeps every rule of its own in its memory only.
 # A rule holds for the kinds of its class (sub permit_kinds); a line of
 # another form, the six fields of before the class among them, is no form.
+my $PERMIT_PENDING;                       # [C26] the question about scripts the window shows and you have not answered: {n, site, url, items, allowed, host}
 sub permit_rules {                        # [C26] the rules: [always|deny, site, class, script origin, sha256, caps, date, "file" or "memory"] each, the file's first; and whether a file is there that was not read
     my @held = map { [@$_] } @PERMIT_HELD;
     my $file = kept_in() . '/scripts';
@@ -11342,10 +11454,12 @@ sub permit_visited {                      # [C26] a visit begins: what you allow
     $PERMIT_ROUND = defined $PERMIT_RELOAD && $PERMIT_RELOAD eq $url ? $PERMIT_ROUND + 1 : 0;
     undef $PERMIT_RELOAD;
     $PERMIT_ASK = { site => $site, url => $url, items => {}, stripped => 0, refused => 0, boxed => 0 };
+    undef $PERMIT_PENDING;                # a question of the page before that you left unanswered is Deny Once, as it always was; a late answer to it is not taken
 }
 
 sub permits_asked {                       # [C26] once the page is drawn: its scripts no rule allows, and what was taken out of it or refused, put to you, each by its name and with its source: Deny Once, Deny Always, Allow Once, Always Allow. Deny Once is the first button and the answer when nobody answers; Deny Always keeps a deny rule, and a script a deny rule names is never put to you again. Returns true when the page is to be loaded again with what you allowed
     my $ask = $PERMIT_ASK or return 0;
+    return 0 if $PERMIT_PENDING;          # one question at a time: what the page asks meanwhile waits for the answer (sub permits_later)
     return 0 unless ($TABS[$TAB]{url} // '') eq $ask->{url};
     my $site = $ask->{site};
     my ($rules) = permit_rules();
@@ -11369,7 +11483,25 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
     my $i = 0;
     window(map { my ($name, $where, $bytes, $who) = permit_named($site, @$_[0 .. 2]); my $info = $PERMIT_INFO{"$site $_->[1] $_->[2]"}; my $source = $info ? $info->{source} : '';
         'permitscript ' . join("\t", $i++, $name, $where, $bytes, $who, length $source, MIME::Base64::encode_base64($source, '')) } @items);    # [C26] each script with its source, shown in the question as text that never runs
-    my $press = asked("permit $site\t$words", 'Deny Once', 'Deny Always', 'Allow Once', 'Always Allow');
+    my $state = { site => $site, url => $ask->{url}, items => \@items, allowed => $allowed, host => $host };
+    my @buttons = ('Deny Once', 'Deny Always', 'Allow Once', 'Always Allow');
+    return permit_answered($state, asked("permit $site\t$words", @buttons)) unless $FROM;    # "lzrprf try": the test's answer at once
+    $state->{n} = asked_later("permit $site\t$words", @buttons); $PERMIT_PENDING = $state;    # Henry 2026-11-25: the page goes on while the question stands; its answer comes as any other line (sub permit_button)
+    return 0;
+}
+
+sub permit_button {                       # [C26] the answer to the question about scripts, heard in the main loop; returns the address to load again on an Allow
+    my ($n, $press) = @_;
+    my $state = $PERMIT_PENDING or return;
+    return unless $n == $state->{n};
+    undef $PERMIT_PENDING;
+    return permit_answered($state, $press) && ($TABS[$TAB]{url} // '') eq $state->{url} ? $state->{url} : undef;
+}
+
+sub permit_answered {                     # [C26] what Deny Once, Deny Always, Allow Once and Always Allow do; true when the page is to be loaded again
+    my ($state, $press) = @_;
+    my ($site, $allowed, $host, @items) = (@$state{qw(site allowed host)}, @{ $state->{items} });
+    my $ask = { url => $state->{url} };
     if ($press == 1 || $press == 2) {
         $PERMIT_DENIED{$site}{''} = 1 unless $allowed;    # not asked again on this visit
         $PERMIT_DENIED{$site}{permit_class($_->[0]) . " $_->[1] $_->[2]"} = 1 for @items;
@@ -12343,17 +12475,7 @@ sub live_patched {
     return [@{ $live->{made} } + $start, $drop, \@lines];
 }
 
-sub live_window_patch {
-    my ($old, $new) = @_;
-    my ($first, $last) = (0, 0);
-    if ($old) {
-        $first++ while $first < @$old && $first < @$new && $old->[$first] eq $new->[$first];
-        $last++ while $last < @$old-$first && $last < @$new-$first && $old->[$#$old-$last] eq $new->[$#$new-$last];
-        my $saved = 0; $saved += length($new->[$_]) + 1 for 0 .. $first-1, @$new-$last .. $#$new;
-        return window("patch $TAB $first " . (@$old-$first-$last), @$new[$first .. $#$new-$last], '.') if $saved > 512;
-    }
-    window("relaid $TAB", @$new, '.');
-}
+sub live_window_patch { window_changed(@_) }    # the list the window holds and the one to stand there (20-window-side.pl)
 # The parts of LZRBRWSR (Henry, 2026-11-24, HC-0858). The installer asks for each part whether to
 # include it, and "Add or remove LZR modules" in the cogwheel's menu changes the same choice later.
 # Both write one record, $ROOT/parts (~/.lzrprf/parts): its first line "lzrbrwsr parts 1", then one
@@ -13992,6 +14114,8 @@ sub trmnl_fds { return map { grep { defined } @$_{qw(to from master)} } trmnl_al
 my $ASKED = 0;
 sub ask { my ($words, @buttons) = @_; return asked('ask ' . $words =~ s/\s+/ /gr, @buttons) }
 
+sub asked_later { my ($line, @buttons) = @_; $ASKED++; window(join "\t", $line, @buttons); return $ASKED }    # a question whose answer the main loop hears as any line (sub permit_button): it holds nothing
+
 sub asked {                               # a question in a line of its own kind: "ask" in the strip, "redirect" in a modal; up to four buttons
     my ($line, @buttons) = @_;
     $ASKED++;
@@ -14005,6 +14129,7 @@ sub asked {                               # a question in a line of its own kind
     while ((my $left = $until - now()) > 0) {
         my $event = hear($left) // leave();
         return $1 if $event =~ /^button $ASKED ([1-4])$/ && $1 <= @buttons;
+        if ($event =~ /^button /) { push @LATER, $event; next }    # the answer to the question about scripts, which stood before this one: heard after it (sub permit_button)
         viewing($event); if ($event =~ /^page scroll [0-9]{1,2} [0-9]{1,6} [0-9]{1,6}$/) { my $back = live_scroll_back(); @LATER = ((grep { !/^page scroll / || $_ eq $back && $_ ne $event } @LATER), $event) } elsif ($event =~ /^tor (?:on|off)$/) { push @LATER, $event }    # a new size of the window's page said meanwhile is still its size; the page is laid out at it after the question (sub relaid); Tor turned on or off is heard after it too, and where the window shows the page from, the newest place only: one said each frame of a long question is not kept by the hundred, but the page's own scroll said back is kept too, so the window's places are heard again after it (sub live_input)
     }
     return 1;
@@ -14633,6 +14758,29 @@ function pictureKept(rows) {
     if (!spec[0]) return;
     try { pictureNames[spec[0]] = { image: picture(spec[1], spec[2], rows), bytes: spec[1] * spec[2] * 4, used: namedTick }; } catch (fault) { delete pictureNames[spec[0]]; }    // rows that are no picture: its places stay grey
 }
+// A picture's rounded edge (a Q line before its N: x, y, w, h and the horizontal and vertical radius of the
+// top-left, top-right, bottom-right and bottom-left corners, px of the laid page, whose y grows downward): a
+// path the picture is drawn inside, so a picture in a box with rounded corners has them, as the box has.
+function roundedOp(op, q) { if (q && op[2] == 'M') op.round = roundEdge(q); return op; }
+function roundEdge(q) {
+    var x = q[0], y = q[1], w = q[2], h = q[3], r = q.slice(4, 12).map(function (v) { return Math.max(0, v); }), k = 0.4477, p = $.NSBezierPath.bezierPath;
+    var f = Math.min(1, w / Math.max(1e-6, r[0] + r[2]), w / Math.max(1e-6, r[4] + r[6]), h / Math.max(1e-6, r[1] + r[7]), h / Math.max(1e-6, r[3] + r[5]));    // radii that would overlap scaled down together (CSS Backgrounds 3 5.5)
+    r = r.map(function (v) { return v * f; });
+    var at = function (a, b) { return $.NSMakePoint(a, b); }, curve = function (to, c1, c2) { p.curveToPointControlPoint1ControlPoint2(to, c1, c2); };
+    p.moveToPoint(at(x + r[0], y));
+    p.lineToPoint(at(x + w - r[2], y)); curve(at(x + w, y + r[3]), at(x + w - r[2] * k, y), at(x + w, y + r[3] * k));
+    p.lineToPoint(at(x + w, y + h - r[5])); curve(at(x + w - r[4], y + h), at(x + w, y + h - r[5] * k), at(x + w - r[4] * k, y + h));
+    p.lineToPoint(at(x + r[6], y + h)); curve(at(x, y + h - r[7]), at(x + r[6] * k, y + h), at(x, y + h - r[7] * k));
+    p.lineToPoint(at(x, y + r[1])); curve(at(x + r[0], y), at(x, y + r[1] * k), at(x + r[0] * k, y));
+    p.closePath;
+    return p;
+}
+function clippedTo(path, draw) {    // draw() inside path, when there is one; the clip ends with it
+    if (!path) return draw();
+    var context = $.NSGraphicsContext.currentContext;
+    context.saveGraphicsState;
+    try { path.addClip; draw(); } finally { context.restoreGraphicsState; }
+}
 function namedOp(line, grey) {    // the drawing of a line N: the kept bitmap in its place, as a line M with rows is drawn, or a grey box when the window does not hold it
     var parts = line.slice(1).split(','), n = parts.slice(1).map(Number), one = pictureNames[parts[0]];
     if (!one) { namedMissing = true; return [n[1], n[3], 'G', n[0], n[2], grey]; }
@@ -14736,9 +14884,29 @@ function reloadPlaced() {    // the place a new drawing is shown from, or null w
     if (keep.tab != selected || keep.address != current || Date.now() > keep.until || keep.last !== null && sheet && Math.round(canvas.visibleRect.origin.y) != keep.last) { reloadPlace = null; return null; }
     return keep;
 }
+
+// "runs TAB K" (sub window_changed): the list the window holds with K stretches of it changed at once. The
+// first K lines say each stretch, "FIRST DROP COUNT", in the order of the list and by places in the list
+// held; the lines after them are the new lines of every stretch, one after another. null for anything that
+// does not fit the list held: the caller then asks for the whole list ("page refresh").
+function runsOf(old, lines, k) {
+    var out = [], from = 0, at = k;
+    if (!old || k < 1 || k > lines.length) return null;
+    for (var i = 0; i < k; i++) {
+        var h = /^(\d{1,6}) (\d{1,6}) (\d{1,6})$/.exec(lines[i]);
+        if (!h) return null;
+        var first = +h[1], drop = +h[2], count = +h[3];
+        if (first < from || first + drop > old.length || at + count > lines.length) return null;
+        for (var n = from; n < first; n++) out.push(old[n]);
+        for (var m = 0; m < count; m++) out.push(lines[at + m]);
+        from = first + drop; at += count;
+    }
+    if (at != lines.length) return null;
+    for (var r = from; r < old.length; r++) out.push(old[r]);
+    return out;
+}
 END
 }
-
 # The sound of a video in the window [C22]. The window's player stays muted:
 # its container lets no sound play (the register of sound components is not
 # among its 42 names). A click on "Sound off" turns a video's sound on, and
@@ -15149,8 +15317,8 @@ function heard(line) {
         if (typeof listPatch != 'undefined' && listPatch) {
             var old = listFor == selected ? drawnLines : drawings[listFor] && drawings[listFor].lines, patch = listPatch;
             listPatch = null;
-            if (!old || patch[0] > old.length || patch[1] > old.length - patch[0]) { say('page refresh ' + listFor); again = false; return; }
-            lines = old.slice(0, patch[0]).concat(lines, old.slice(patch[0] + patch[1]));
+            var whole = patch.length == 1 ? runsOf(old, lines, patch[0]) : !old || patch[0] > old.length || patch[1] > old.length - patch[0] ? null : old.slice(0, patch[0]).concat(lines, old.slice(patch[0] + patch[1]));
+            if (!whole) { say('page refresh ' + listFor); again = false; return; } lines = whole;
         }
         if (listFor != selected && listFor >= 0 && listFor < tabs.length) {    // a list for a tab that is not in front: it becomes that tab's kept drawing, and the screen stays as it is
             var before = drawings[listFor];
@@ -15160,7 +15328,7 @@ function heard(line) {
             return;
         }
         drawnLines = lines;
-        try { draw(lines); } catch (fault) { drawnLines = []; unlaid(); page.string = $(''); listed([]); say('fault ' + String(fault).replace(/[^\x20-\x7e]/g, '?').slice(0, 200)); }
+        try { var drewAt = typeof linkId != 'undefined' && linkId ? Date.now() : 0; draw(lines); if (drewAt) say('link drew ' + (Date.now() - drewAt)); } catch (fault) { drawnLines = []; unlaid(); page.string = $(''); listed([]); say('fault ' + String(fault).replace(/[^\x20-\x7e]/g, '?').slice(0, 200)); }
         again = false;
         if (scrollWanted !== null) { pageScrollApply(scrollWanted); pageScrollTell(false); }    // the page's own place, which its drawing came with: shown from there, and said only where the view stops elsewhere
         else pageScrollTell(true);    // where this drawing is shown from: lzrprf hands a page only what it was not told already
@@ -15171,7 +15339,7 @@ function heard(line) {
     var aside = selected != perlTab;    // the window shows a tab lzrprf has not been told of yet: what lzrprf says of its own tab's bar, lock and arrows is said again once it is told
     if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
     if (word == 'picture') pictureBegun(rest); else if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
-    else if (word == 'patch') { var p = /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/.exec(rest); if (p) { listFor = +p[1]; listPatch = [+p[2], +p[3]]; list = []; again = true; } }
+    else if (word == 'patch' || word == 'runs') { var p = (word == 'patch' ? /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/ : /^(\d{1,2}) (\d{1,3})$/).exec(rest); if (p) { listFor = +p[1]; listPatch = word == 'patch' ? [+p[2], +p[3]] : [+p[2]]; list = []; again = true; } }    // runs: several stretches in one list (runsOf, 28-window-pointer.pl)
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
     else if (word == 'tabs') tabsTold(rest);
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
@@ -15288,7 +15456,7 @@ function place() {
     tabsView.frame = $.NSMakeRect(0, high - TABS_HIGH, wide, TABS_HIGH);
     belt.frame = $.NSMakeRect(0, row, wide, BAR_ROW);
     var inset = INCOGNITO ? 96 : 0;    // DECLARED(the incognito label: its mark, 22 points, and the word at 12 points, about 62, with a gap after)
-    bar.frame = $.NSMakeRect(pillAt + 42 + inset, row + 18, pillWide - 42 - 44 - inset, 20);
+    bar.frame = $.NSMakeRect(pillAt + 42 + inset, row + 18, pillWide - 42 - 44 - inset, 20); if (barCover) barCover.frame = bar.frame;
     star.frame = $.NSMakeRect(pillAt + pillWide - 40, row + 13, 30, 30);
     cog.frame = $.NSMakeRect(wide - 50, row + 13, 30, 30);
     if (faces) faces.frame = $.NSMakeRect(wide - 84, row + 13, 30, 30);
@@ -15384,18 +15552,18 @@ function laid(lines, first) {
     var previous = again ? sheet : null, old = previous || sheet;    // old: the page drawn until now, whose bitmaps a new page takes where a tile's place and rows are the same (a reload, a step within one site)
     if (!previous || Object.keys(inks).length > 256 || Object.keys(typefaces).length > 256) { inks = {}; typefaces = {}; }    // reuse ordinary pages; a changing page retains at most one checked frame plus 256 cached looks
     var size = /^L(\d+)x(\d+)$/.exec(lines[first]), next = { wide: +size[1], high: +size[2], ops: [], tiles: Object.create(null), saved: Object.create(null), buckets: {}, spanning: [] }, characters = 0;
-    var grey = $.NSColor.colorWithWhiteAlpha(0.55, 0.4), kept = {};    // the tiles of this page, by number: [wide, high, bitmap]
+    var grey = $.NSColor.colorWithWhiteAlpha(0.55, 0.4), kept = {}, roundNext = null;    // the tiles of this page, by number: [wide, high, bitmap]
     for (var at = first + 1; at < lines.length; at++) {
-        var line = lines[at], kind = line.charAt(0), saved = previous && previous.saved && previous.saved[line];
+        var line = lines[at], kind = line.charAt(0), saved = previous && previous.saved && previous.saved[line], roundFor = roundNext; if (kind != 'Q') roundNext = null;    // a rounded edge is for the very next line alone
         if (saved && /[RGVX]/.test(kind)) { next.ops.push(saved); next.saved[line] = saved; if (kind == 'X') characters += saved[8].length; continue; }
         var n = kind == 'X' ? line.slice(1).split(',', 3).map(Number) : line.slice(1).split(',').map(Number);
         if (kind == 'R') next.ops.push([n[1], n[3], 'R', n[0], n[2], colour(line.split(',')[4])]);    // [top, height, kind, left, width, what draws it, ...]
-        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(namedOp(line, grey));    // a picture placed by its name (28-window-pointer.pl)
+        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(roundedOp(namedOp(line, grey), roundFor)); else if (kind == 'Q') roundNext = n;    // a picture placed by its name, cut to the rounded edge a Q line before it gave (28-window-pointer.pl)
         else if (kind == 'V') next.ops.push([n[1], n[3], 'V', n[0], n[2], n[4]]);    // a video's place and its number: a play mark over its poster, drawn by videoMark, and the video once clicked
         else if (kind == 'M' || kind == 'K') {
-            var height = kind == 'M' ? n[5] : n[4], rows = lines.slice(at + 1, at + 1 + height), before = old && old.tiles && old.tiles[line];
+            var s = kind == 'K' && n[5] == 2 ? 2 : 1, height = kind == 'M' ? n[5] : n[4] * s, rows = lines.slice(at + 1, at + 1 + height), before = old && old.tiles && old.tiles[line];
             var same = before && before.rows.length == rows.length && before.rows.every(function (row, i) { return row === rows[i]; });
-            var image = same ? before.image : kind == 'M' ? picture(n[4], n[5], rows) : { wide: n[3], high: n[4], rows: rows, made: null };    // a tile is made from its rows the first time the view draws it (sub paint), so a page's first frame waits for the tiles it shows, not for all of them: decoding is 1.5 ms a tile, 40 ms for a page of 26 (measured 2026-11-24); lzrprf checked every row before it was handed over
+            var image = same ? before.image : kind == 'M' ? picture(n[4], n[5], rows) : { wide: n[3] * s, high: n[4] * s, rows: rows, made: null };    // a tile is made from its rows the first time the view draws it (sub paint), so a page's first frame waits for the tiles it shows, not for all of them: decoding is 1.5 ms a tile, 40 ms for a page of 26 (measured 2026-11-24); lzrprf checked every row before it was handed over
             var op = same ? before.op : kind == 'M' ? [n[1], n[3], 'M', n[0], n[2], image, n.length > 9 ? $.NSMakeRect(n[6] / 100, n[5] - (n[7] + n[9]) / 100, n[8] / 100, n[9] / 100) : $.NSZeroRect] : [n[2], n[4], 'M', n[1], n[3], image];    // an object-fit's part of the picture: its rows run down, the image's own space up
             next.tiles[line] = { rows: rows, image: image, op: op }; next.ops.push(op);
             if (kind == 'K') kept[n[0]] = [n[3], n[4], image];
@@ -15446,10 +15614,10 @@ function pageBack(look) {    // the room beside a laid page shows its colour: it
 }
 
 // The size of the page's view, in points, told to lzrprf as "view W H" when it changed: lzrprf
-// lays the page shown out again at that width (its sub relaid). Two whole numbers and nothing else.
+// lays the page shown out again at that width (its sub relaid). Two whole numbers, and 2 after them on a retina screen.
 function view() {
     if (typeof homeAvailable != 'undefined' && homeAvailable && !current && pageShown && liveOn && !listing) homeAsked(false);
-    var size = scroll.contentSize, z = zoomOf(selected), line = 'view ' + zoomWidth(size.width, z) + ' ' + zoomWidth(size.height, z);    // a page zoomed in is laid for a narrower page, zoomed out for a wider one
+    var size = scroll.contentSize, z = zoomOf(selected), line = 'view ' + zoomWidth(size.width, z) + ' ' + zoomWidth(size.height, z) + (typeof win != 'undefined' && win && win.backingScaleFactor > 1.5 ? ' 2' : '');    // a page zoomed in is laid for a narrower page, zoomed out for a wider one
     if (line == viewing) return;
     viewing = line;
     say(line);
@@ -16102,7 +16270,7 @@ function beltClicked(event) {
     if (lockAt(at)) return secureToggled();
     secureHidden();
     if (!pillHit(at)) return windowHeld(event);    // beside the pill, the few points around it that take its press (pillReach) and the buttons, the row moves the window
-    if (!bar.enabled) return;
+    if (!bar.enabled || barSelectsAll(bar)) return;    // the first press beside the field selects the whole address too (barSelectsAll, 28-window1-tabs.pl)
     win.makeFirstResponder(bar);
     var editor = bar.currentEditor;
     if (editor && !editor.isNil()) editor.selectedRange = $.NSMakeRange(at.x < bar.frame.origin.x ? 0 : bar.stringValue.length, 0);
@@ -18598,7 +18766,7 @@ function paint(dirty) {
             if (op[0] > bottom || op[0] + op[1] < top) return;
             if (op[2] == 'X') return op[5].drawAtPointWithAttributes($.NSMakePoint(op[3], op[7]), op[6]);
             var box = $.NSMakeRect(op[3], op[0], op[4], op[1]);
-            if (op[2] == 'M') return (op[5].rows ? op[5].made || (op[5].made = tile(op[5].wide, op[5].high, op[5].rows)) : op[5]).drawInRectFromRectOperationFractionRespectFlippedHints(box, op[6] || $.NSZeroRect, 2, 1, true, $());    // a tile is made here once, the first time it is drawn (sub laid)
+            if (op[2] == 'M') return clippedTo(op.round, function () { (op[5].rows ? op[5].made || (op[5].made = tile(op[5].wide, op[5].high, op[5].rows)) : op[5]).drawInRectFromRectOperationFractionRespectFlippedHints(box, op[6] || $.NSZeroRect, 2, 1, true, $()); });    // a tile is made here once, the first time it is drawn (sub laid)
             if (op[2] == 'V') return videoMark(box, op[5]);
             op[5].setFill;
             $.NSRectFillUsingOperation(box, 2);    // over what is under it, so a colour that is partly clear shows the page through it
@@ -18912,7 +19080,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'framed:': { types: ['void', ['id']], implementation: function (sender) { framed(); } },
     'windowWillStartLiveResize:': { types: ['void', ['id']], implementation: function (note) { sizing(true); } },
     'windowDidEndLiveResize:': { types: ['void', ['id']], implementation: function (note) { sizing(false); viewNow(); } },
-    'windowDidChangeBackingProperties:': { types: ['void', ['id']], implementation: function (note) { glassPlaced(); } },
+    'windowDidChangeBackingProperties:': { types: ['void', ['id']], implementation: function (note) { glassPlaced(); view(); } },    // a move to a screen of another scale: the page is drawn again at its pixels
     'windowDidEnterFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
     'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },
@@ -19233,7 +19401,34 @@ function firstClicked(event) {
     tabSaid('tab select ' + i, undefined, !!kept);
 }
 ObjC.registerSubclass({ name: 'LzrprfFirst', superclass: 'NSObject', methods: { 'missed:': { types: ['void', ['id']], implementation: function (sender) { firstMissed(); } } } });
+// The address bar's first press selects the whole address, so it copies at once; a press while the bar is edited places the
+// caret where it lands, as any field does (Henry, 2026-11-25). Find's field keeps a field's own press.
+function barSelectsAll(field) {
+    if (!bar || !field.isEqual(bar) || !bar.enabled) return false;
+    var editor = bar.currentEditor;
+    if (editor && !editor.isNil()) return false;
+    win.makeFirstResponder(bar);
+    bar.selectText(null);
+    belt.needsDisplay = true;
+    return true;
+}
 ObjC.registerSubclass({ name: 'LzrprfField', superclass: 'NSTextField', methods: clickThrough({}) });    // the bar and Find's field
+// The bar's press is taken by a cover lying over it, never by the field: no class here calls ObjC.super (release 74 hung on
+// it). Not edited, the press selects the whole address; edited, the press goes to the field editor, which places the caret
+// where it lands, selects a word on two presses and a stretch on a drag, as a field does.
+var barCover;
+function coverPressed(event, right) {
+    if (!bar || !bar.enabled) return;
+    if (barSelectsAll(bar) && !right) return;
+    var editor = bar.currentEditor;
+    if (!editor || editor.isNil()) return;
+    if (right) editor.rightMouseDown(event); else editor.mouseDown(event);
+}
+ObjC.registerSubclass({ name: 'LzrprfCover', superclass: 'NSView', methods: clickThrough({
+    'resetCursorRects': { implementation: function () { this.addCursorRectCursor(this.bounds, $.NSCursor.IBeamCursor); } },
+    'rightMouseDown:': { implementation: function (event) { coverPressed(event, true); } },
+    'mouseDown:': { implementation: function (event) { pressSeen(event); coverPressed(event); } }
+}) });
 // The window, continued from 28-window.pl (split there at 800+ lines, HC-0843): LZRDFNDR's Show all
 // processes, then the window's start (function run).
 //
@@ -19542,6 +19737,9 @@ function run(argv) {
     bar.enabled = false;
     bar.autoresizingMask = 2 | 8;
     root.addSubview(bar);
+    barCover = $.LzrprfCover.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 24));    // over the bar: it takes the bar's press (coverPressed)
+    barCover.autoresizingMask = 2 | 8;
+    root.addSubview(barCover);
     star = $.LzrprfStar.alloc.initWithFrame($.NSMakeRect(0, 0, 30, 30));
     if (INCOGNITO) star.toolTip = $(UNKEPT_TIP);
     root.addSubview(star);
@@ -19830,6 +20028,7 @@ elsif ($command eq 'incognito') { $INCOGNITO = 1; run(@ARGV ? @ARGV : '/Applicat
 elsif ($command eq 'try' && @ARGV > 4 && $ARGV[0] =~ m{^\Q$DIR\E/[A-Za-z0-9][A-Za-z0-9.]*\z} && $ARGV[1] =~ /^(?:-|127\.0\.0\.1:\d+)$/ && $ARGV[3] =~ /^(?:allow|deny|ask|[1234]{1,9})$/) {
     ($TRY, $DIR, $PEER, $TYPED, $ANSWER) = (1, splice @ARGV, 0, 4);    # for tests: lzrprf try FOLDER PEER|- TYPED|- allow|deny|ask|DIGITS /path/to/program
     if (open my $in, '<', "$DIR/live-seconds") { (<$in> // '') =~ /^([0-9]{1,2}(?:\.[0-9]{1,3})?) ([0-9]{1,2}(?:\.[0-9]{1,3})?)$/ and ($LIVE_STOP_SECONDS, $LIVE_FRAME_SECONDS) = ($1, $2) }    # [C18] "lzrprf try" only: a test's own $LIVE_STOP_SECONDS and $LIVE_FRAME_SECONDS, so what it tries does not hang on how busy the computer is
+    if (open my $in, '<', "$DIR/view-scale") { $VIEW_SCALE = 2 if (<$in> // '') eq "2\n" }    # "lzrprf try" only: a test's own retina screen, its tiles drawn at scale 2 (the load test's --scale2)
     run(@ARGV);
 }
 elsif ($command eq 'profiles' && !@ARGV) { print "$_\t", profile_name($_), "\n" for profile_ids() }    # each profile's id and its name; "--profile" takes each id but "first", which is the profile used without it

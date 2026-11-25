@@ -51,7 +51,7 @@ my $SENT_BYTES = 64 * 1024;               # the most that is carried from curl t
 my $FIND_SECONDS = 10;                    # the most a name lookup may take
 my $FOUND = 8;                            # the most addresses of one name that are taken: the first eight this computer has a way to
 my $LOOKED = 16;                          # the most addresses of one name that are looked at for that: what the lookup gave beyond them is left out
-my $PAGE_BYTES = 12 * 1024 * 1024;        # the most one page container may write: room for the 32 tiles of a laid page, 32 x 262,656 bytes of base64, about 8.4 MB, and the rest of the page
+my $PAGE_BYTES = 48 * 1024 * 1024;        # the most one page container may write (four times 12 MiB since retina tiles: each has four times the pixels at scale 2): room for the 32 tiles of a laid page, 32 x 262,656 bytes of base64, about 8.4 MB, and the rest of the page
 my $PAGE_SECONDS = 30;                    # a page container is ended after this, whatever it is doing
 my $PAGE_ROOM = 2097152;                 # the address space, in KiB, a page container may take on top of what the shell that starts it holds: 2 GiB. What the application itself holds at its start is not measured
 my $LIVE_SECONDS = 1800;                  # DECLARED(half an hour: a page kept running with its tab, sub live_kept, is ended after this whatever it does, and its last drawing stays; reading a long form takes minutes, not hours)
@@ -98,7 +98,7 @@ my $JOINER = qr/(?!\x{103a})\p{Ccc=9}/;    # a sign that joins the letter after 
 my $HANGS = qr/[\p{M}\p{GCB=Extend}\p{GCB=SpacingMark}\p{GCB=Prepend}\p{GCB=V}\p{GCB=T}]|(?<=\p{GCB=L})\p{GCB=L}|(?<=\p{GCB=Prepend})[^\x{fffd}]|(?<=$JOINER)[^\x{fffd}]|(?<=$JOINER\p{M})[^\x{fffd}]/;    # a character that hangs on the one before it: see "What the window is spared"
 my $SOLID = qr/[^\x{20}\x{1680}\x{2000}-\x{2006}\x{2008}-\x{200a}\x{205f}\x{3000}\x{200b}]/;    # a character where no line may end: all but the spaces that let one end (a no-break space does not)
 my $MADE = 120;                           # the most lines that say what the page is made of
-my %LAID = (R => 20_000, X => 30_000, G => 1000, M => 64, I => 1000, K => 32, J => 1024, V => 8);    # a laid page: the most rectangles, runs of text, grey boxes, pictures, places for a fetched picture, tiles (numbered under K), places of a tile and places of a video
+my %LAID = (R => 20_000, X => 30_000, G => 1000, M => 64, I => 1000, K => 32, J => 1024, Q => 1000, V => 8);    # a laid page: the most rectangles, runs of text, grey boxes, pictures, places for a fetched picture, tiles (numbered under K), places of a tile, places of a video and rounded edges a fetched picture is cut to
 my $RUN_TEXT = 2000;                      # the most characters in one run of text of a laid page
 my $ALL_TEXT = 1_000_000;                 # the most characters in all its runs together
 my $PIXELS = 262_144;                     # the most pixels in all its pictures together: one picture of 512 by 512
@@ -265,10 +265,12 @@ my $WENT = 0;                             # when the visit shown began, on the c
 my $DRAWN = 0;                            # a page was handed to the window, and the window has not said yet that it could not draw it
 my @VIEW_WIDE = (320, 1600);              # the narrowest and the widest a page is laid out: a window's width outside them is taken as the nearer one, and the application refuses a =view frame outside them
 my @VIEW_HIGH = (240, 2160);              # the same for the height of its first screen, which a page's vh is taken from
+my $VIEW_SCALE = 1;                       # device pixels a point of the window's screen, 1 or 2 (a retina screen), as the window last said it: a page's tiles are drawn at it
 my @VIEW = (960, 768);                    # the size of the window's page, in points, as the window last said it and held to those bounds; until it says one, the size every page was laid at before
 my $LAID_WIDE;                            # the width the run being checked was asked to lay its page at: a laid page of any other width is unfit
 my $OUTRUN = 0;                           # a relayout runs (sub relaid): the window is heard while it runs, and a newer width ends it (sub outrun)
 my $SHOWN;                                # the page shown, kept to lay it out again when the window's page changes width: its address, its answer, the frame of style sheets it was laid with, whether that was a second run, its host, its decoded pictures, the width it was laid at
+my $WINDOW_LISTS = 0;                     # how many times the window was handed lines of a page (page, relaid, patch, runs) or its tabs: a list sent earlier is still the one it holds while this stands (sub pictures_pumped)
 my @HELD;                                 # what the window said while lzrprf looked for its latest size, in order: heard before anything new
 my @LATER;                                # Tor turned on or off in the window while a question was open, and the newest place the window showed the page from: heard by the loop of sub behind once the question is answered, so the window's onion never waits for an answer that was dropped
 my $TABS_MOST = 32;                       # the most tabs one window holds: the owner's order of 2026-11-20

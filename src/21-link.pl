@@ -331,6 +331,12 @@ sub link_command {                        # [C31] one command: checked, written 
         return window("link shot $nonce $which");    # a private window is never on the link, so ",private" changes nothing here, and is written down as asked
     }
 }
+sub link_drew {                           # [C31] "link drew MS" from the window: a list was drawn, and its drawing took MS; said only while the link is on, written during a measured load
+    my ($took) = @_;
+    return unless link_on() && defined $LINK{go_at};
+    link_line('INFO', 'drew', 'the window drew a list', run => 0, t_ms => int((Time::HiRes::time() - $LINK{go_at}) * 1000), draw_ms => $took);
+}
+
 sub link_shot {                           # [C31] "link shot NONCE PNG-IN-BASE64" from the window: its own drawing, kept for the sender
     my ($nonce, $text) = @_;
     return unless link_on();

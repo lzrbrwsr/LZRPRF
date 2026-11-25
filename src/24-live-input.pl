@@ -510,14 +510,4 @@ sub live_patched {
     return [@{ $live->{made} } + $start, $drop, \@lines];
 }
 
-sub live_window_patch {
-    my ($old, $new) = @_;
-    my ($first, $last) = (0, 0);
-    if ($old) {
-        $first++ while $first < @$old && $first < @$new && $old->[$first] eq $new->[$first];
-        $last++ while $last < @$old-$first && $last < @$new-$first && $old->[$#$old-$last] eq $new->[$#$new-$last];
-        my $saved = 0; $saved += length($new->[$_]) + 1 for 0 .. $first-1, @$new-$last .. $#$new;
-        return window("patch $TAB $first " . (@$old-$first-$last), @$new[$first .. $#$new-$last], '.') if $saved > 512;
-    }
-    window("relaid $TAB", @$new, '.');
-}
+sub live_window_patch { window_changed(@_) }    # the list the window holds and the one to stand there (20-window-side.pl)

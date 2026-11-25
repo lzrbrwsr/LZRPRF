@@ -155,11 +155,12 @@ sub live_asked {                          # [C19] the request at the front of wh
         return 0 if length($live->{held}) < $end + 1 + $size;
         return ['=early', substr($live->{held}, $end + 1, $size), $end + 1 + $size];
     }
-    return unless $permit || substr($live->{held}, 0, 7) eq '=fetch ';
+    my $soon = substr($live->{held}, 0, 6) eq '=soon ';    # [C19] a request the page's script set going, told ahead: one line, no body, answered with nothing (sub prefetch_soon)
+    return unless $permit || $soon || substr($live->{held}, 0, 7) eq '=fetch ';
     my $end = index $live->{held}, "\n";
     if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
     my $line = substr($live->{held}, 0, $end);
-    return [$line, '', $end + 1] if $permit;
+    return [$line, '', $end + 1] if $permit || $soon;
     my ($size) = $line =~ /^=fetch [A-Z]{1,8} (0|[1-9][0-9]{0,5}) / or return [$line];
     return [$line] if $size > $LIVE_FETCH_UP;
     return 0 if length($live->{held}) < $end + 1 + $size;
@@ -185,11 +186,12 @@ sub live_early {
     ($LAID_TALLY, $TITLED, @FONTS_NAMED) = ($tally, $titled, @fonts);
     timed('early-checked ' . ($lines ? scalar @$lines : 'unfit')) if $TIMED;
     return unless $lines && @$lines;
-    window("page $TAB", @{ (pictured($lines, $paths, $live->{host}, undef, undef, pictures_so_far($live->{host})))[0] }, '.');    # nothing is fetched for this one
+    my ($sent) = pictured($lines, $paths, $live->{host}, undef, undef, pictures_so_far($live->{host}));    # nothing is fetched for this one
+    window("page $TAB", @$sent, '.');
     $DRAWN = 1;
     timed('list-early');
     prefetch_go('', $live->{url}, 'found') if $PREFETCH_NAMED && %FINDING;    # and what the page names on other hosts, looked up since its run began (sub prefetch_later): since release 101 that is after sub ahead_fonts, which began them before, so yle.fi's two fonts were asked for by the page first, one after the other, 200 ms its scripts waited (measured 2026-11-25); here and not before the list, where waiting for a name held the first drawing 20 ms
-    pictures_ahead($lines, $paths, $live->{host});    # its pictures begin now, while its scripts run
+    pictures_ahead($lines, $paths, $live->{host}, $sent);    # its pictures begin now, while its scripts run
     return;
 }
 
@@ -205,6 +207,7 @@ sub live_fetched {                        # [C19]
     $live->{looked} = 0;
     return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';
+    if (substr($line, 0, 6) eq '=soon ') { $line =~ m{^=soon (script|image|data) ([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form'); return prefetch_soon($live, $1, $2) }
     return live_replied($live, 0, '', '') if $live->{home};    # the local home has no network door, including absolute script requests    # [C26]
     my ($method, $size, $type, $dest, $as, $to) = $line =~ m{^=fetch (GET|HEAD|POST) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?(?:as ([a-z]{1,16}) )?([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form');
     return live_end($live, 'it wrote a line of no form') if $method ne 'POST' && ($size || $type ne '-');

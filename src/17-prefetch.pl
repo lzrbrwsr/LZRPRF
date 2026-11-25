@@ -123,6 +123,33 @@ sub prefetch_go {                         # ($first, $page): the page $page aske
     return;
 }
 
+sub prefetch_soon {                       # [C19] ($live, $dest, $to): "=soon DEST URL", a GET the page's own script set going and makes in a later task (a script it made: yle.fi waited 205, 88 and 280 ms on three, one after another, 2026-11-25). Judged here as sub live_fetched will judge the request, begun with the two lines sub prefetch_pump writes first, and handed over only by sub prefetch_take when the page asks for exactly it. Whatever this refuses is simply not begun: the request says why when it comes
+    my ($live, $dest, $to) = @_;
+    return if $live->{home} || $TOR_WANTED || listed($to) || ++$live->{soon} > $LIVE_FETCH_MOST;
+    my ($url, $host) = address($to);
+    return if !$url || $PREFETCH{$url};
+    my ($rules) = permit_rules();
+    my $allowed = permit_site("https://$live->{host}", $rules, $live->{url}) or return;    # [C26] never for a site whose scripts do not run
+    return if defined filter_said($url, $FILTER_DEST{$dest}, $live->{host});    # [C27]
+    shield_asked($url);
+    return unless shield_said($url) eq 'allow';    # [C28] before any lookup
+    return if defined sso_cookie($url, $live->{host});    # [C7] as in sub prefetch_go
+    my $top = $allowed eq 'sandbox' ? undef : $live->{url};
+    return if defined $top && defined identity_of_host($host);    # [C7] D19
+    return if $allowed eq 'sandbox' && $host ne $live->{host} && $dest ne 'script' && sandbox_says('fetch-other') eq 'refused';    # [C26] E1: what the sandbox's table refuses the request is not begun
+    my ($where) = find($host);
+    return unless $where && !grep { $_->{own} } @$where;    # [C8]
+    my ($kept) = keeping();
+    push @PREFETCH_WAITING, { url => $url, where => $where, ask => { method => 'GET', type => '-', body => '', origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => undef, top => $top, as => undef, dest => $dest, from => $live->{host} }, kept => $kept, page => $live->{url} };
+    if ($dest eq 'data' && defined $top && !jar_skips($url)) {    # [C7] a data request is begun ahead only where no cookie goes with it: the jar is asked now, once, and a request it has a cookie for is made by the page's own ask
+        my $ask = $PREFETCH_WAITING[-1]{ask};
+        if (length($ask->{jar} = jar_cookie($url, undef, $ask) // q{})) { pop @PREFETCH_WAITING; return }
+    }
+    $PREFETCH{$url} = $PREFETCH_WAITING[-1];
+    prefetch_pump();
+    return;
+}
+
 sub prefetch_pump {                       # the requests waiting started, up to $PREFETCH_AT_ONCE at a time, and what the running ones wrote read
     my $running = grep { $_->{pid} && !$_->{done} } values %PREFETCH;
     return unless @PREFETCH_WAITING && $running < $PREFETCH_AT_ONCE;
@@ -133,7 +160,7 @@ sub prefetch_pump {                       # the requests waiting started, up to 
         my $one = shift @PREFETCH_WAITING;
         record("the page $one->{page} names " . ($one->{ask}{dest} eq 'script' ? 'the script' : 'for an early load') . " $one->{url}; lzrprf fetches it ahead, for when the page asks for it", $one->{kept}) or last;    # [C5] written down first, connected second
         record("$one->{url} -> lzrprf connects to the first that answers of: " . join(', ', map { $_->{text} } @{ $one->{where} }), $one->{kept}) or last;
-        $one->{ask}{jar} = jar_cookie($one->{url}, undef, $one->{ask}) // q{} if defined $one->{ask}{top} && !jar_skips($one->{url});    # [C7] the jar asked here, by the window, never by the run below: the line Cookie it gives this request now, and what the answer sets is told to the jar only when the page takes it (sub prefetch_take)
+        $one->{ask}{jar} = jar_cookie($one->{url}, undef, $one->{ask}) // q{} if defined $one->{ask}{top} && !exists $one->{ask}{jar} && !jar_skips($one->{url});    # [C7] the jar asked here, by the window, never by the run below: the line Cookie it gives this request now, and what the answer sets is told to the jar only when the page takes it (sub prefetch_take)
         pipe(my $from, my $to) or last;
         @$one{qw(from to said)} = ($from, $to, '');
         push @batch, $one;
@@ -255,6 +282,11 @@ sub prefetch_take {                       # ($url, $ask): the answer fetched ahe
     my ($url, $ask, $shown) = @_;
     my $one = $PREFETCH{$url} or return;
     return if prefetch_asked($one->{ask}) ne prefetch_asked($ask) || defined $ask->{cookie} || length($ask->{body} // '');    # another request than the one made ahead: made now, as asked
+    if ($one->{ask}{dest} eq 'data' && defined $ask->{top} && !exists $one->{answer} && !jar_skips($url) && length(jar_cookie($url, undef, $ask) // q{})) {    # [C7] the jar has a cookie for it now that it had not when it was told ahead (a sign-in step between): what was begun without it is dropped, and the request is made now, with it
+        if ($one->{pid} && !$one->{done}) { prefetch_ended($one); close $one->{from} }
+        delete $PREFETCH{$url}; @PREFETCH_WAITING = grep { $_ != $one } @PREFETCH_WAITING;
+        return;
+    }
     if ($one->{answer}) { return @{ $one->{answer} } unless $shown; delete $PREFETCH{$url}; return }    # the page laid out again in this visit asks the same again: the same answer, every check of its request run again; once it is shown and runs, what it asks is fetched anew
     if (!$one->{pid}) { delete $PREFETCH{$url}; @PREFETCH_WAITING = grep { $_ != $one } @PREFETCH_WAITING; return }    # not begun yet: made now, as asked
     my $until = now() + $FETCH_SECONDS + 5;

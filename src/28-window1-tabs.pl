@@ -118,4 +118,31 @@ function firstClicked(event) {
     tabSaid('tab select ' + i, undefined, !!kept);
 }
 ObjC.registerSubclass({ name: 'LzrprfFirst', superclass: 'NSObject', methods: { 'missed:': { types: ['void', ['id']], implementation: function (sender) { firstMissed(); } } } });
+// The address bar's first press selects the whole address, so it copies at once; a press while the bar is edited places the
+// caret where it lands, as any field does (Henry, 2026-11-25). Find's field keeps a field's own press.
+function barSelectsAll(field) {
+    if (!bar || !field.isEqual(bar) || !bar.enabled) return false;
+    var editor = bar.currentEditor;
+    if (editor && !editor.isNil()) return false;
+    win.makeFirstResponder(bar);
+    bar.selectText(null);
+    belt.needsDisplay = true;
+    return true;
+}
 ObjC.registerSubclass({ name: 'LzrprfField', superclass: 'NSTextField', methods: clickThrough({}) });    // the bar and Find's field
+// The bar's press is taken by a cover lying over it, never by the field: no class here calls ObjC.super (release 74 hung on
+// it). Not edited, the press selects the whole address; edited, the press goes to the field editor, which places the caret
+// where it lands, selects a word on two presses and a stretch on a drag, as a field does.
+var barCover;
+function coverPressed(event, right) {
+    if (!bar || !bar.enabled) return;
+    if (barSelectsAll(bar) && !right) return;
+    var editor = bar.currentEditor;
+    if (!editor || editor.isNil()) return;
+    if (right) editor.rightMouseDown(event); else editor.mouseDown(event);
+}
+ObjC.registerSubclass({ name: 'LzrprfCover', superclass: 'NSView', methods: clickThrough({
+    'resetCursorRects': { implementation: function () { this.addCursorRectCursor(this.bounds, $.NSCursor.IBeamCursor); } },
+    'rightMouseDown:': { implementation: function (event) { coverPressed(event, true); } },
+    'mouseDown:': { implementation: function (event) { pressSeen(event); coverPressed(event); } }
+}) });
