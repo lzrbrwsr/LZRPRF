@@ -85,7 +85,7 @@
 # All rights reserved. The licence: https://lzrbrwsr.com/terms.html
 set -eu
 unset IFS ARGV0	# two names a shell may have read for itself at its start; see the lines before the first case below
-AUTO=; GIVEN=; SHOWN=; for word in "$@"; do case "$word" in auto) AUTO=auto GIVEN=auto ;; shown) SHOWN=shown ;; esac; done	# "auto": every question answered yes; kept through the start again below. GIVEN: started in auto, so no question is shown. SHOWN: started again through the reader of "Started in auto" below
+AUTO=; GIVEN=; SHOWN=; PARTS_GIVEN=; for word in "$@"; do case "$word" in auto) AUTO=auto GIVEN=auto ;; shown) SHOWN=shown ;; parts=*) PARTS_GIVEN="${word#parts=}" ;; esac; done	# "auto": every question answered yes; kept through the start again below. parts=NAME,...: the parts chosen without asking (packaging/parts.sh.in), kept through it too. GIVEN: started in auto, so no question is shown. SHOWN: started again through the reader of "Started in auto" below
 PATH=/usr/bin:/bin:/usr/sbin:/sbin	# the system's own tools, whatever your shell was set to find first
 export PATH
 
@@ -155,7 +155,7 @@ oneonly) ;;
 			eval "value=\${$name:-}"
 			case "$value" in '') ;; *) set -- "$@" "$name=$value" ;; esac
 		done
-		exec /usr/bin/env -i "$@" /bin/sh "$0" again ${AUTO:+auto} ;;
+		exec /usr/bin/env -i "$@" /bin/sh "$0" again ${AUTO:+auto} ${PARTS_GIVEN:+"parts=$PARTS_GIVEN"} ;;
 	esac ;;
 esac
 set --
@@ -163,14 +163,14 @@ umask 022
 BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="6889184a88aaf5f679f463a84ddc02c1faa617e41b618cf1c759e1a559d0082e"
-RELEASE="83"
-LZRPRF_COMMIT="9096e91c3369f1e95dcff09206d00e7d056b86f8"
+SHA256="ad2e11ddeae287f3b1e04d5dd9546892fcfb8b1fb3e70993c044a8b3d72a3053"
+RELEASE="113"
+LZRPRF_COMMIT="15943d6ecab7d26e277fc8a991acb9450624f1b4"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="a6080ebec2eb055c0bd37e63c40fd8511cbc5aa0555a922ed1e2270b4b421d06"
-SELFTEST_SHA256="1d0aab62ef882b0a0747fcd45442d1300956eb4180a6adf01ea5bed057ff1edb"
+LZRPRF_SHA256="475320ed7d29abf4e0eb5901b247c32478c538e84bee68bd3052be7c0b46c2f5"
+SELFTEST_SHA256="d7c7023f6354413e505adee2913fa682d2e9cf6bb4f13c5226c7022d152b5b8a"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
-BLOCKLIST_SHA256="8bd7fe0cb692805f5124fa09584611eab3e56a919a07f0bd9792ef5af3631416"
+BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
 # RELEASE_KEY: the public half of the release key; a release is installed only when its manifest is signed with it
 RELEASE_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINHg3YnFC/5ryVmSXSX4jSb/+x8HsD8B52O07Ug75X+C lzrbrwsr-release"
 # APPROVAL_KEYS: the public halves of the approval keys, comma between them; one of them approves each release
@@ -331,9 +331,7 @@ stop() {
 }
 
 [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] || stop "so far only macOS on Apple silicon is built."
-for part in perl sandbox-exec curl osascript openssl; do
-	[ -x "/usr/bin/$part" ] || stop "this Mac lacks /usr/bin/$part, which lzrprf or its self-test is made of."
-done
+for part in perl sandbox-exec curl osascript openssl; do [ -x "/usr/bin/$part" ] || stop "this Mac lacks /usr/bin/$part, which lzrprf or its self-test is made of."; done
 
 # The six variables of the tests count only when every file comes from this computer.
 if [ -n "$TESTING" ]; then
@@ -395,6 +393,121 @@ if [ -z "${LZRBRWSR_UNATTENDED:-}" ]; then
 	fi
 	fi
 fi
+# The parts of LZRBRWSR (Henry, 2026-11-24). Each part but the browser itself is asked for, one by
+# one, and only the parts you include are installed and shown. scripts/package.sh writes these lines
+# into the installer at its line of the parts (the word PARTS between two at signs), so they are part of the one file whose SHA-256 is published.
+#   LZRBRWSR  the browser with its profiles and its settings: always installed. The window, and the
+#             settings where the other parts are switched on and off later ("Add or remove LZR
+#             modules" in the cogwheel's menu), are its own, so it cannot be left out.
+#   LZRDFNDR  the tool that shows and stops what runs on this Mac
+#   LZRTRMNL  the terminal tab (its program core-lzrbrwsr-trmnl)
+#   LZRTNNL   Tor, and an optional VPN of your own under it, set up from the Tor window (the program arti)
+#   LZRGM     the minigame of the home page
+# What you chose is written to ~/.lzrprf/parts once everything else stands: its first line
+# "lzrbrwsr parts 1", then one name a line. lzrprf reads it (and "Add or remove LZR modules" writes
+# it), so the installer and the browser share one record. An install over an earlier one offers what
+# that record holds; the first install offers every part. Started in auto (lzrprf's update, or
+# "sh install.sh auto"), with no question, or after you answered a, the offer is taken as it stands.
+# The word parts=NAME,NAME,... chooses without asking: lzrbrwsr alone is the browser with no other
+# part, and a name that is not a part stops the installer before anything changes. The program of a
+# part left out is taken out of the checked app before it is put in place; LZRDFNDR and LZRGM are
+# inside the program and lzrprf, so they stay on the disk, switched off and shown nowhere.
+# SYNC: ../../lzrprf/src/24-parts.pl (the same record, read by lzrprf), ../../lzrprf/docs/installer.md, ../scripts/test-package-parts.sh, identity/staging (lzr_name)
+parts_all="lzrdfndr lzrtrmnl lzrtnnl lzrgm"
+parts_about() {
+	case "$1" in
+	lzrdfndr) echo "LZRDFNDR, the tool that shows and stops what runs on this Mac" ;;
+	lzrtrmnl) echo "LZRTRMNL, the terminal tab" ;;
+	lzrtnnl) echo "LZRTNNL, Tor with an optional VPN of your own, set up from the Tor window" ;;
+	lzrgm) echo "LZRGM, the minigame of the home page" ;;
+	esac
+}
+parts=""	# the parts chosen besides LZRBRWSR, in the order above
+if [ -n "$PARTS_GIVEN" ]; then
+	for name in $(printf '%s' "$PARTS_GIVEN" | tr ',' ' '); do
+		case " lzrbrwsr $parts_all " in *" $name "*) ;; *) stop "parts= names \"$(printf '%s' "$name" | LC_ALL=C tr -c 'a-z0-9' '?' | cut -c1-40)\", which is no part. The parts: lzrbrwsr $parts_all." ;; esac
+	done
+	for name in $parts_all; do case ",$PARTS_GIVEN," in *",$name,"*) parts="$parts $name" ;; esac; done
+	step "the parts were given as a word (parts=): LZRBRWSR$(for name in $parts; do printf ' %s' "$name" | tr 'a-z' 'A-Z'; done)"
+else
+	offer="$parts_all"	# the first install offers every part; a later one, what the record holds
+	if [ -f "$HOME/.lzrprf/parts" ] && [ ! -L "$HOME/.lzrprf/parts" ] && [ "$(sed -n 1p "$HOME/.lzrprf/parts")" = "lzrbrwsr parts 1" ]; then
+		offer=""
+		for name in $parts_all; do ! grep -qx "$name" "$HOME/.lzrprf/parts" || offer="$offer $name"; done
+	fi
+	if [ -n "$GIVEN$AUTO${LZRBRWSR_UNATTENDED:-}" ]; then
+		parts="$offer"
+		step "the parts installed: LZRBRWSR$(for name in $parts; do printf ' %s' "$name" | tr 'a-z' 'A-Z'; done) (as the last install chose, or all of them the first time)"
+	else
+		printf '\n  LZRBRWSR, the browser with its profiles and settings, is always installed:\n  the window, and the settings where you switch the other parts on and off later, are its own.\n  Each other part is asked for in turn. Enter takes the answer in capitals.\n' >/dev/tty
+		for name in $parts_all; do
+			case " $offer " in *" $name "*) hint="Y/n" ;; *) hint="y/N" ;; esac
+			while :; do
+				printf '  Include %s? [%s] ' "$(parts_about "$name")" "$hint" >/dev/tty
+				read -r answer </dev/tty || stop "no answer came from the terminal."
+				case "$answer:$hint" in
+				y:* | Y:* | yes:* | Yes:* | YES:* | :Y/n) parts="$parts $name"; break ;;
+				n:* | N:* | no:* | No:* | NO:* | :y/N) break ;;
+				esac
+			done
+		done
+	fi
+fi
+parts_unpacked() {	# parts_unpacked <checked app>: the program of a part left out is taken out of it before it is summed and put in place
+	case " $parts " in *" lzrtnnl "*) ;; *) rm -f "$1/Contents/MacOS/arti" ;; esac
+	case " $parts " in *" lzrtrmnl "*) ;; *) rm -f "$1/Contents/MacOS/core-lzrbrwsr-trmnl" ;; esac
+}
+parts_written() {	# the record, under the lock, once everything else stands; a record that cannot be written is said: lzrprf then counts every part as installed, and a program left out makes it ask for an install
+	rm -f "$HOME/.lzrprf/parts.new"
+	if { echo "lzrbrwsr parts 1"; echo lzrbrwsr; for name in $parts; do echo "$name"; done; } >"$HOME/.lzrprf/parts.new" && chmod 600 "$HOME/.lzrprf/parts.new" && mv -f "$HOME/.lzrprf/parts.new" "$HOME/.lzrprf/parts"; then
+		step "the parts are kept in:  $HOME/.lzrprf/parts (LZRBRWSR$(for name in $parts; do printf ' %s' "$name" | tr 'a-z' 'A-Z'; done))"
+	else
+		rm -f "$HOME/.lzrprf/parts.new"
+		step "the record of the parts could not be written ($HOME/.lzrprf/parts): run the installer again"
+	fi
+	lzr_pathed
+}
+# lzr, LZRTRMNL's command (lzrprf lzr), on your PATH with no password asked, the way rustup and Homebrew do it: a
+# launcher in a folder of the install's own (~/.lzrprf/path), and one marked line in ~/.zprofile and
+# ~/.zshrc (and ~/.bash_profile when your login shell is bash) that puts that folder on the PATH of new
+# terminals, never twice. lzr belongs to LZRTRMNL: an install without it takes the launcher and the lines
+# away again, and so does switching LZRTRMNL off in Add or remove LZR modules (the launcher; the line,
+# which then finds an empty folder, at the next install). Staging's identity names the launcher lzr-stg,
+# in ~/.lzrprf-stg/path, so the two never shadow each other. The launcher says in one line when the
+# installed lzrprf has no lzr yet, instead of a shell error.
+lzr_name=lzr
+lzr_line='case ":$PATH:" in *":$HOME/.lzrprf/path:"*) ;; *) export PATH="$HOME/.lzrprf/path:$PATH" ;; esac	# LZRBRWSR: lzr, the command of LZRTRMNL, on your PATH; its installer adds and removes this line'
+lzr_ready=""	# the line of the closing words that says lzr is ready, when it is
+lzr_pathed() {
+	case " $parts " in
+	*" lzrtrmnl "*) ;;
+	*)	# LZRTRMNL left out: its launcher and its lines go
+		rm -f "$HOME/.lzrprf/path/$lzr_name"; rmdir "$HOME/.lzrprf/path" 2>/dev/null || true
+		for file in .zprofile .zshrc .bash_profile; do
+			[ -f "$HOME/$file" ] && grep -qxF "$lzr_line" "$HOME/$file" || continue
+			{ grep -vxF "$lzr_line" "$HOME/$file" >"$tmp/rc" || true; } && cat "$tmp/rc" >"$HOME/$file" && step "the line of lzr was taken out of ~/$file" || step "the line of lzr could not be taken out of ~/$file: remove the line that ends in \"its installer adds and removes this line\" by hand"
+		done
+		return 0 ;;
+	esac
+	mkdir -p "$HOME/.lzrprf/path" && rm -f "$HOME/.lzrprf/path/$lzr_name.new" && cat >"$HOME/.lzrprf/path/$lzr_name.new" <<'LZR' && chmod 755 "$HOME/.lzrprf/path/$lzr_name.new" && mv -f "$HOME/.lzrprf/path/$lzr_name.new" "$HOME/.lzrprf/path/$lzr_name" || { step "lzr could not be put in $HOME/.lzrprf/path: LZRTRMNL's own terminal still finds it"; return 0; }
+#!/bin/sh
+# lzr, the command of LZRTRMNL, written by the LZRBRWSR installer, which takes it away with LZRTRMNL: it starts the lzr of the installed lzrprf.
+lzrprf="$HOME/.lzrprf/lzrprf"
+[ -f "$lzrprf" ] && /usr/bin/grep -qF "\$command eq 'lzr'" "$lzrprf" && exec /usr/bin/perl "$lzrprf" lzr "$@"
+echo "${0##*/}: the installed lzrprf ($lzrprf) has no lzr yet. It comes with a newer release of LZRBRWSR: take the update its window offers, or run the installer again." >&2
+exit 127
+LZR
+	files=".zprofile .zshrc"
+	case "$(/usr/bin/perl -e 'print((getpwuid $<)[8])')" in */bash) files="$files .bash_profile" ;; esac
+	for file in $files; do
+		[ -f "$HOME/$file" ] && grep -qxF "$lzr_line" "$HOME/$file" && continue	# never twice
+		{ [ ! -s "$HOME/$file" ] || [ -z "$(tail -c1 "$HOME/$file")" ] || echo; printf '%s\n' "$lzr_line"; } >>"$HOME/$file" || step "~/$file could not be written: put $HOME/.lzrprf/path on your PATH yourself to type $lzr_name"
+	done
+	step "$lzr_name, LZRTRMNL's command, is in $HOME/.lzrprf/path, and ~/$(echo $files | sed 's/ / and ~\//g') put it on the PATH of new terminals"
+	lzr_ready="
+  $lzr_name, the command of LZRTRMNL, is ready in every new terminal: open one and type $lzr_name.
+"
+}
 
 # One installer at a time, from here until the files are placed: two of them would each pass the checks below
 # against what the other is about to replace, and each undo the other's renames. The lock is a
@@ -671,24 +784,24 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 83
+release 113
 home local
-new New: LZRTRMNL, a terminal tab from the home page, runs your login shell, drawn by a sealed helper, with scrollback, select, copy, paste and program titles; not in incognito or Tor
-new LZRDFNDR: Show all processes lists every process with its CPU, memory and, where known, what it is; its panel opens at once, and the minigame sentry is set in its Other tab
-new Faster: an article opens in less than half the time, new and closed tabs open and close almost at once, typing on big pages is quicker, and windows resize smoothly
-new Sign-in pages: on Google the email field is as wide as in Chrome and Next responds; the Apple sign-in page now loads, with more of the page parts sign-in pages use
-new Tor opens its window first and shows its real progress; Stop Tor asks first and shows each step. A video plays its sound when you click Sound off; the minigame has a Quit button
-new Behind the scenes: tests run on copies that never touch your files, new engine parts land only when graded against Chrome, and the self-test is steadier
+new Pages load much faster: a page is drawn before its scripts run, and its style sheets, fonts, scripts and pictures are fetched ahead and side by side the moment the site answers.
+new Pictures are sent to the window once and appear with the first drawing; a page you load again shows them at once instead of grey boxes, and stays where you were reading it.
+new The installer asks for each LZR module one by one (LZRDFNDR, LZRTRMNL, LZRTNNL and LZRGM); Add or remove LZR modules in the cogwheel menu changes them later.
+new LZRTNNL: Tor connects only when you press Connect to Tor, with an optional WireGuard VPN under it that stops all traffic if the VPN drops.
+new Onion addresses on Ahmia's list of banned onion services are never opened; the page that refuses one names the list and says where to report a mistake.
+new Fixes: the home page is no longer black in a wide window or after a resize, and shows on every start; with LZRTRMNL, new terminals have lzr on their PATH.
 newest https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/latest
 installer https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/install.sh
 same https://lzrbrwsr.com/install.sh
 report https://origin.lzrbrwsr.com/report
 file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-file lzrbrwsr-bin 07c8739c8ca8ee97c9e0d5bd8f07e527cebdbe0fb269ffb3fb5271ab69d019ae
+file lzrbrwsr-bin 7fa8028d469b8926768ec361ea967dc78248c1802b1b785b864a45a21a7e76e4
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
-file core-lzrbrwsr-trmnl 9e968dc5b94cd8b5247150a44eef1060a2c4707b22a65b4c597b63f7e2514064
-lzrprf a6080ebec2eb055c0bd37e63c40fd8511cbc5aa0555a922ed1e2270b4b421d06
-blocklist 8bd7fe0cb692805f5124fa09584611eab3e56a919a07f0bd9792ef5af3631416
+file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
+lzrprf 475320ed7d29abf4e0eb5901b247c32478c538e84bee68bd3052be7c0b46c2f5
+blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."
 grep -qx "lzrprf $LZRPRF_SHA256" "$tmp/release" || stop "the app's release file does not name the lzrprf this installer carries."
@@ -722,7 +835,8 @@ fi
 # while it runs that flies at lzrprf's wall and strikes it: the sparks fly back
 # off the wall, in yellow and bright white, and nothing passes it. Every run of
 # lzrprf is a line of its own, under the step it belongs to, as it ends: its
-# number, what it tries, and how long it took. Every word of it is read from the
+# number, the protection it verifies, and how long it took; a sentence longer than
+# its column goes on in rows under it, never cut. Every word of it is read from the
 # test's own output: its lines "now ..." and its numbered headings are the
 # titles, its lines "ran ..." the runs, and the lines "held" under a heading are
 # counted. Nothing here decides what held; a run that ran is judged afterwards.
@@ -737,9 +851,19 @@ shown() {	# shown <frame> <seconds so far> <has the test ended: 0 or 1>
 		}
 		/^now / { closed_title(); n++; title[n] = substr($0, 8); sub(/[.:;].*/, "", title[n]); next }
 		/^[0-9]+\. / { closed_title(); n++; title[n] = $0; sub(/^[0-9]+\. /, "", title[n]); sub(/[.:;].*/, "", title[n]); next }
-		/^ran / {
-			ran[n]++; what = $0; sub(/^ran +[^ ]+ +[^ ]+ +/, "", what)
-			line(sprintf("      %s%-8s%s %-56s %5s s", B, $2, N, substr(what, 1, 56), $3)); next
+		function put(part) {	# one row of a run: the first carries its number and its time, the rows after it stand under the sentence
+			if (count != "") line(sprintf("      %s%-8s%s %-56s %5s s", B, count, N, part, took))
+			else line(sprintf("               %s", part))
+			count = ""
+		}
+		/^ran / {	# the whole sentence is shown, wrapped at a space into rows of at most 56 characters, so every row fits 80 columns
+			ran[n]++; what = $0; sub(/^ran +[^ ]+ +[^ ]+ +/, "", what); count = $2; took = $3
+			while (length(what) > 56) {
+				cut = 57; while (cut > 1 && substr(what, cut, 1) != " ") cut--
+				if (cut == 1) cut = 57	# a word longer than the row is broken
+				put(substr(what, 1, cut - 1)); what = substr(what, cut); sub(/^ +/, "", what)
+			}
+			put(what); next
 		}
 		/^(held|works) / { held[n]++ }
 		/^FAILED/ { failed[n]++ }
@@ -804,7 +928,7 @@ while kill -0 "$testing" 2>/dev/null; do
 			said="$seconds"
 		elif [ "$((seconds - said))" -ge 5 ]; then
 			said="$seconds"
-			step "  still testing, $seconds s: $(grep -cE '^(held|works) ' "$tmp/selftest.out" || true) checks held so far"
+			step "  Still waiting... $seconds s"
 		fi
 	fi
 done
@@ -837,7 +961,7 @@ fi
 # a file, the quarantine mark among them, stays where it is.
 find "$tmp/unpacked" -type d -exec chmod 755 {} +
 find "$tmp/unpacked" -type f -exec chmod 644 {} +
-chmod 755 "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/lzrbrwsr" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/arti" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl"
+chmod 755 "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/lzrbrwsr" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/arti" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl"; parts_unpacked "$tmp/unpacked/LZRBRWSR.app"
 
 # Putting in place, as one change as far as files allow. First both new parts are written whole into
 # folders of their own beside where they go (the same disk, so that a name can be taken by a rename),
@@ -1013,6 +1137,7 @@ else
 	[ -z "$rulesum$filterfiles" ] || step "the curated script rules and the filter lists could not be kept, so lzrprf uses none of them: it asks, and filters nothing"
 	for part in $rulefiles $filterfiles; do rm -f "$HOME/.lzrprf/$part.new" "$HOME/.lzrprf/$part"; done
 fi
+parts_written
 unlock
 rm -f "$HOME/.lzrprf/rules" "$HOME/.lzrprf/refused"	# kept by an earlier lzrprf; this one keeps neither
 trap - INT TERM HUP QUIT
@@ -1055,7 +1180,7 @@ if [ -n "$dock" ] && [ -z "${LZRBRWSR_UNATTENDED:-}" ]; then
 fi
 
 cat <<DONE
-
+$lzr_ready
   Open LZRBRWSR from Applications. It is one window. The window, its address
   bar and the words under the bar are lzrprf's: the browser has no window and
   no network. Type an address into the bar. lzrprf writes it down, fetches
