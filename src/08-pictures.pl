@@ -30,7 +30,7 @@
 #
 #   P<w>,<h>      then exactly h lines p<hex>, 8 times w lowercase hex characters each:
 #                 red, green, blue and how opaque, a byte each, not multiplied by it;
-#                 1 to 1024 wide and high, 200,000 pixels at most; or P0,0 for none
+#                 1 to 2048 wide and high, 800,000 pixels at most; or P0,0 for none
 #
 # Anything else is no picture, and so is a picture not begun within one clock
 # of $PICTURE_SECONDS for them all. Each place I becomes, for the window, an M
@@ -384,10 +384,10 @@ sub fit_crop {
 # AVIF or HEIF, as the application judged it, judged again here. In a folder
 # of its own, readable by you alone and removed after, the file is written,
 # and the system's own sips runs in the decoder container to write it as a
-# PNG: told to make it at most 1024 pixels a side when the file says it is
+# PNG: told to make it at most $DECODED_SIDE pixels a side when the file says it is
 # larger (sub stated_size; sips -Z makes a small picture larger too, so it is
 # told only then), and once more on the PNG when a side of it is still over
-# 1024 (a file that said too little). In its container sips ends at once when
+# $DECODED_SIDE (a file that said too little). In its container sips ends at once when
 # asked the size of an AVIF, so the size is read here. A PNG is taken only
 # when the system said, before sips started ($GATE), that it ran contained,
 # and only when out.png is a plain file with no other name. Returns the PNG,

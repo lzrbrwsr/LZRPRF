@@ -146,3 +146,15 @@ ObjC.registerSubclass({ name: 'LzrprfCover', superclass: 'NSView', methods: clic
     'rightMouseDown:': { implementation: function (event) { coverPressed(event, true); } },
     'mouseDown:': { implementation: function (event) { pressSeen(event); coverPressed(event); } }
 }) });
+// The question about scripts never holds the page (sub permit_button), and it does not hold the tabs either (Henry, 2026-11-25):
+// a press on the strip under its veil is its default answer, Deny Once, as when nobody answers, and then the press the strip
+// takes as any other: a tab chosen, closed, made or dragged. Every other modal keeps its veil whole.
+var permitAsked = 0;    // the number of the question about scripts last shown (permitTold)
+function veilPressed(event) {
+    if (!modalOpen || (modalKind != 'permit' && modalKind != 'tall') || permitAsked != asked || !tabsView) return;
+    var at = tabsView.convertPointFromView(event.locationInWindow, null), size = tabsView.bounds.size;
+    if (at.x < 0 || at.y < 0 || at.x > size.width || at.y > size.height) return;
+    closeModal();
+    say('button ' + permitAsked + ' 1');
+    tabsView.mouseDown(event);
+}

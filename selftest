@@ -714,7 +714,7 @@ if ($ENV{LZRPRF_PICTURE}) {
         $body //= '';
         if (substr($body, 0, 8) ne "\x89PNG\r\n\x1a\n") { substr($body, -1, 1) = 'x' if $kind eq 'pixdiffer'; print 'S', length($body), "\n", $body; exit 0 }
         my ($wide, $high) = unpack 'NN', substr($body, 16, 8);
-        if ($wide > 1024 || $high > 1024) { print "P0,0\n"; exit 0 }
+        if ($wide > 2048 || $high > 2048) { print "P0,0\n"; exit 0 }
         require Compress::Zlib;
         my ($at, $type, $data) = (8, 0, '');
         while ($at + 8 <= length $body) {
@@ -4383,7 +4383,7 @@ my @large_log = log_of('pictureslarge');
 my $drawn_large = sub { my ($page) = @_; return $page && grep({ $_ eq 'M0,0,20,20,1,1' } @$page) && grep({ $_ eq 'G30,0,20,20' } @$page) };
 check($drawn_large->($large->{page}) && $drawn_large->($unstated->{page}) && grep({ m{^https://site\.test/out/pixlarge answered: \d+ bytes from 127\.0\.0\.1; decoded by the operating system \(sips\) and then by the application$} } @large_log)
         && grep({ m{^https://site\.test/out/pixdiffer answered: \d+ bytes from 127\.0\.0\.1; the operating system's decoder gave no picture: the application handed back another file than the site answered$} } @large_log),
-    'an AVIF of 3000 by 2000 is made at most 1024 a side by sips on its first run, told so by the size the file states (a copy of lzrprf that runs sips once), and on a second run when that size is not read (a copy that reads none); a file the application hands back changed by one byte is not given to the system at all, only the body the site answered is [C21]',
+    'an AVIF of 3000 by 2000 is made at most 2048 a side by sips on its first run, told so by the size the file states (a copy of lzrprf that runs sips once), and on a second run when that size is not read (a copy that reads none); a file the application hands back changed by one byte is not given to the system at all, only the body the site answered is [C21]',
     join(' ', map { $_ ? join(',', grep { /^[MG]/ } @$_) : 'no page' } $large->{page}, $unstated->{page}));
 check(grep({ m{^https://site\.test/out/pixavif\?one answered: \d+ bytes from 127\.0\.0\.1; the operating system's decoder gave no picture: it wrote a PNG larger than lzrprf takes$} } log_of('bigpng')),
     'a PNG the system\'s decoder wrote that is larger than lzrprf takes is not read (here a copy of lzrprf that takes 100 bytes) [C21]', join(' | ', grep { /pixavif/ } log_of('bigpng')));
