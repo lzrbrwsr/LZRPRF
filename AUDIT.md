@@ -756,8 +756,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-link.pl	248	link_reaped	C31
 21-link.pl	261	link_checked	C31
 21-link.pl	280	link_command	C31
-21-link.pl	334	link_drew	C31
-21-link.pl	340	link_shot	C31
+21-link.pl	341	link_drew	C31
+21-link.pl	347	link_shot	C31
 21-live.pl	1	-	-
 21-live.pl	8	live_of	-
 21-live.pl	10	live_kept	C18

@@ -264,18 +264,18 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 127
+    release 128
     home local
-    new A promotion now reaches browsers in seconds, and the script question no longer stops you switching or closing tabs.
+    new Testers can clear one site's cookies from the staging control, so a site greets them as on a first visit.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin da765c41090070eedfadb3939c550ecaece9146077cbfc41f66508eba5cc5678
+    file lzrbrwsr-bin 6a7e1ec5489e661b310557fbb778633dc46626b58f2fdc4c5222746c806afd1a
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf f0ada5c0960032454f770793961f8b423c8ce07a4f5e8f00b06f0307c28ae62e
+    lzrprf 480e10add36b017db4c36c04a8f6c7399b3d5eef4493e1e2b56446824aecccff
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.
