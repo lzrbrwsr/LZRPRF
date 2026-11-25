@@ -58,7 +58,7 @@ END
 # shell set them and became "env -i", which became sandbox-exec: two
 # programs started for every container, three containers a page. Since then
 # lzrprf sets them itself (sub limited, which says why that is as strong).
-my $PAGE_LIMITS = { bytes => 0, told => [qw(LZRPRF_CONTAINED LZRPRF_SEAL)], set => [qw(LZRPRF_EARLY LZRPRF_TIMES LZRPRF_PICTURE LZRPRF_TOOL LZRPRF_JUDGE LZRPRF_JAR LZRPRF_TOR LZRPRF_HOME)] };    # the bytes one file may hold; the variables told always, and those told only when they hold something
+my $PAGE_LIMITS = { bytes => 0, told => [qw(LZRPRF_CONTAINED LZRPRF_SEAL)], set => [qw(LZRPRF_EARLY LZRPRF_SOON LZRPRF_TIMES LZRPRF_PICTURE LZRPRF_TOOL LZRPRF_JUDGE LZRPRF_JAR LZRPRF_TOR LZRPRF_HOME)] };    # the bytes one file may hold; the variables told always, and those told only when they hold something
 
 # What curl's container is allowed on top of it: one socket file, behind which
 # lzrprf holds the connection to the site, and the list of certificate

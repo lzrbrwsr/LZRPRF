@@ -9,6 +9,8 @@
 my $ASKED = 0;
 sub ask { my ($words, @buttons) = @_; return asked('ask ' . $words =~ s/\s+/ /gr, @buttons) }
 
+sub asked_later { my ($line, @buttons) = @_; $ASKED++; window(join "\t", $line, @buttons); return $ASKED }    # a question whose answer the main loop hears as any line (sub permit_button): it holds nothing
+
 sub asked {                               # a question in a line of its own kind: "ask" in the strip, "redirect" in a modal; up to four buttons
     my ($line, @buttons) = @_;
     $ASKED++;
@@ -22,6 +24,7 @@ sub asked {                               # a question in a line of its own kind
     while ((my $left = $until - now()) > 0) {
         my $event = hear($left) // leave();
         return $1 if $event =~ /^button $ASKED ([1-4])$/ && $1 <= @buttons;
+        if ($event =~ /^button /) { push @LATER, $event; next }    # the answer to the question about scripts, which stood before this one: heard after it (sub permit_button)
         viewing($event); if ($event =~ /^page scroll [0-9]{1,2} [0-9]{1,6} [0-9]{1,6}$/) { my $back = live_scroll_back(); @LATER = ((grep { !/^page scroll / || $_ eq $back && $_ ne $event } @LATER), $event) } elsif ($event =~ /^tor (?:on|off)$/) { push @LATER, $event }    # a new size of the window's page said meanwhile is still its size; the page is laid out at it after the question (sub relaid); Tor turned on or off is heard after it too, and where the window shows the page from, the newest place only: one said each frame of a long question is not kept by the hundred, but the page's own scroll said back is kept too, so the window's places are heard again after it (sub live_input)
     }
     return 1;

@@ -306,6 +306,9 @@ function run(argv) {
     bar.enabled = false;
     bar.autoresizingMask = 2 | 8;
     root.addSubview(bar);
+    barCover = $.LzrprfCover.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 24));    // over the bar: it takes the bar's press (coverPressed)
+    barCover.autoresizingMask = 2 | 8;
+    root.addSubview(barCover);
     star = $.LzrprfStar.alloc.initWithFrame($.NSMakeRect(0, 0, 30, 30));
     if (INCOGNITO) star.toolTip = $(UNKEPT_TIP);
     root.addSubview(star);

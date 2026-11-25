@@ -107,11 +107,11 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
         if ($OUTRUN && $FROM && vec($ready, fileno $FROM, 1)) { last if $outrun = outrun(); next unless vec($ready, fileno $from_page, 1) }
         $open = sysread($from_page, $wrote, 65536, length $wrote) // $!{EINTR};
         next unless $keep;
-        while ($wrote =~ /\A=(?:fetch|permit|early) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
+        while ($wrote =~ /\A=(?:fetch|permit|early|soon) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
             $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0 };
             $early->{held} = $wrote;
             my $asked = live_asked($early) or last;    # not all there yet
-            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ' || $asked->[0] eq '=early';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
+            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ' || $asked->[0] eq '=early' || substr($asked->[0], 0, 6) eq '=soon ';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
             live_fetched($early, $asked);
             return (undef, 'ended') if $early->{ended};    # a request of no form, or a reply the page did not take: it is ended as a page kept running is (sub live_end)
             ($wrote, $looked) = ($early->{held}, 0);
@@ -123,7 +123,7 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
     timed("run-read $$ " . length $wrote) if $TIMED;
     if ($outrun) { kill 'KILL', $feeder, $page; waitpid $_, 0 for $feeder, $page; return (undef, 'outrun') }    # a newer width was said: this run is of no use, and the next is not kept waiting behind it
     if ($ready_at >= 0 && length $wrote <= $PAGE_BYTES) {    # the page is kept running: its first list, and what it wrote after "=ready" is the beginning of its next answer
-        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], until => now() + $LIVE_SECONDS, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
+        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $LIVE_SECONDS, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
     }
     if ($tool && $tool eq 'judge' && !$open && length $wrote <= $PAGE_BYTES) {    # [C28] complete output is not enough: the judge must exit successfully within the same clock
         my $exit;

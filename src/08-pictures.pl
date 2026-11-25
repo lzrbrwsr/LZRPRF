@@ -158,13 +158,14 @@ sub pictures_judged {                     # ($lines, $paths, $host): the picture
 }
 
 sub pictures_ahead {
-    my ($lines, $paths, $host) = @_;
+    my ($lines, $paths, $host, $sent) = @_;
     my $page = $AHEAD_PAGE or return;
     return if $PICTURES_AHEAD || $TOR_WANTED || $page->{host} ne $host;
     my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;
     return unless %wanted;
     $PICTURES_AHEAD = pictures_state($paths, \%wanted, $host, @$page{qw(where kept answer)}) or return;
     $PICTURES_AHEAD->{early} = [$lines, $paths, $host];    # the list they are drawn into when they are here (sub pictures_pumped)
+    $PICTURES_AHEAD->{sent} = [$sent, $TAB, $WINDOW_LISTS] if $sent;    # the list the window was just handed, and how to tell that it still holds it
     timed('pictures-ahead ' . scalar @{ $PICTURES_AHEAD->{waiting} }) if $TIMED;
     pictures_begun($PICTURES_AHEAD, 2);
     return;
@@ -177,7 +178,8 @@ sub pictures_pumped {                     # the pictures begun ahead: what they 
     pictures_begun($P, 2);
     if ($P->{early} && !%{ $P->{running} } && !@{ $P->{waiting} } && !$P->{lost} && !$P->{shown}++ && %{ $P->{picture} }) {    # all of them here before the page's own list: the early list drawn once more, with them in their places
         my ($shown) = pictured(@{ $P->{early} }, undef, undef, pictures_so_far($P->{host}));
-        window("relaid $TAB", @$shown, '.');
+        my $held = $P->{sent} && $P->{sent}[1] == $TAB && $P->{sent}[2] == $WINDOW_LISTS ? $P->{sent}[0] : undef;    # the window still holds the early list: only the pictures' lines are sent
+        window_changed($held, $shown);
         timed('pictures-early') if $TIMED;
     }
     return;
@@ -259,6 +261,7 @@ sub pictured {
         my ($x, $y, $w, $h, $n, @fit) = /^I(\d+),(\d+),(\d+),(\d+),(\d+)(?:,([1-4]),(\d+),(\d+),(\d+),(\d+))?$/ or (push(@shown, $_), next);
         my $one = $picture{ $paths->[$n] };
         if ($one && ($drawn += $one->[0] * $one->[1]) <= $DRAWN_PIXELS) {
+            $one = $picture{ $paths->[$n] } = picture_one($one);
             my @crop = defined $fit[0] ? fit_crop($x, $y, $w, $h, $one->[0], $one->[1], @fit) : ($x, $y, $w, $h);
             next unless @crop;    # the fit leaves nothing of the picture in its box
             push @shown, 'N' . join(',', picture_named($one), @crop[0 .. 3], $one->[0], $one->[1], @crop[4 .. $#crop]);    # by its name: its rows go to the window once (sub named_owed), however many lists place it
@@ -280,6 +283,8 @@ sub pictured {
 # laid_run), so a page cannot place a bitmap of another page. The window keeps
 # a bounded number of bitmaps; one it no longer has is asked for with "page
 # refresh", and then every picture of the list is owed again (sub named_again).
+my %NAMED_LIKE;                           # the names of this process by what a picture looks like at a glance (sub picture_like), so a picture decoded again finds the name of the same pixels
+
 sub picture_named {                       # ($one): the name of a decoded picture, made the first time it is placed
     my ($one) = @_;
     if ($NAMED_OWNER != $$) {             # the first name of this process: a start of its own
@@ -287,18 +292,40 @@ sub picture_named {                       # ($one): the name of a decoded pictur
         if (open my $random, '<:raw', '/dev/urandom') { read($random, $bytes, 4); close $random }
         $bytes = pack('N', (time() ^ ($$ << 15)) & 0xffffffff) unless length($bytes) == 4;
         ($NAMED_RUN, $NAMED_OWNER, $NAMED_COUNT) = (unpack('H*', $bytes), $$, 0);
-        %NAMED = %NAMED_AT = ();
+        %NAMED = %NAMED_AT = %NAMED_LIKE = ();
     }
     my $known = $NAMED_AT{ 0 + $one };
     return $known->[0] if $known && defined $known->[1] && $known->[1] == $one;
     if (!(++$NAMED_COUNT % 64)) {         # the names of pictures no page keeps any more are let go
         for my $name (grep { !defined $NAMED{$_}[1] } keys %NAMED) { delete $NAMED{$name} }
         for my $at (grep { !defined $NAMED_AT{$_}[1] } keys %NAMED_AT) { delete $NAMED_AT{$at} }
+        for my $like (grep { !$NAMED{ $NAMED_LIKE{$_} } } keys %NAMED_LIKE) { delete $NAMED_LIKE{$like} }
     }
+    my $like = picture_like($one);
     my $entry = [$NAMED_RUN . sprintf('%x', $NAMED_COUNT), $one, 0];
     weaken($entry->[1]);
     $NAMED{ $entry->[0] } = $NAMED_AT{ 0 + $one } = $entry;
+    $NAMED_LIKE{$like} = $entry->[0];
     return $entry->[0];
+}
+
+sub picture_one {                         # ($one): the picture already named that holds the same pixels, when one is still kept; else $one. A page asked again, or the next page of a site, decodes its pictures again: placed as the one the window holds, no row is sent and the second copy is let go
+    my ($one) = @_;
+    return $one if $NAMED_OWNER != $$ || $NAMED_AT{ 0 + $one };
+    my $same = $NAMED{ $NAMED_LIKE{ picture_like($one) } // '' };
+    return $same && defined $same->[1] && picture_same($same->[1], $one) ? $same->[1] : $one;
+}
+
+sub picture_like {                        # ($one): what a decoded picture looks like at a glance: its size, its rows' number and its middle row
+    my ($one) = @_;
+    return join ',', @$one[0, 1], $#$one, $one->[ 2 + int(($#$one - 2) / 2) ] // '';
+}
+
+sub picture_same {                        # ($one, $other): both hold the same size and the same rows, each compared whole
+    my ($one, $other) = @_;
+    return 0 if @$one != @$other;
+    $one->[$_] eq $other->[$_] or return 0 for 0 .. $#$one;
+    return 1;
 }
 
 sub named_owed {                          # (@lines of one list): the rows of each picture it names that the window was not sent yet, as lines to write before it

@@ -216,9 +216,9 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 02-limits-and-state.pl	209	sandbox_says	C26 C27 C4
 02-limits-and-state.pl	260	permit_class	C26
 02-limits-and-state.pl	261	permit_kinds	C26
-02-limits-and-state.pl	289	fresh_tab	C19
-02-limits-and-state.pl	305	now	C19 C6 C8 C14 C30
-02-limits-and-state.pl	324	timed	C28
+02-limits-and-state.pl	291	fresh_tab	C19
+02-limits-and-state.pl	307	now	C19 C6 C8 C14 C30
+02-limits-and-state.pl	326	timed	C28
 03-containers.pl	1	-	C1 C28 C21 C3 C24 C12
 03-containers.pl	185	shell_held	-
 03-containers.pl	190	shell_measured	-
@@ -291,11 +291,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
 06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C15
-06-behind.pl	153	unheard	-
-06-behind.pl	197	paired	-
-06-behind.pl	212	unnamed	-
-06-behind.pl	219	leave	C17 C7 C29 C12 C16
-06-behind.pl	236	closed	-
+06-behind.pl	155	unheard	-
+06-behind.pl	199	paired	-
+06-behind.pl	214	unnamed	-
+06-behind.pl	221	leave	C17 C7 C29 C12 C16
+06-behind.pl	238	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-
@@ -307,28 +307,28 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 07-visit-beside.pl	98	run_read	C19 C26 C28
 07-visit.pl	1	-	-
 07-visit.pl	4	visit	C19 C29 C17 C23 C26 C5 C28 C8 C7 C4 C14 C30
-07-visit.pl	235	laid_out	C28 C9
-07-visit.pl	251	outrun	-
-07-visit.pl	266	faces	C13
-07-visit.pl	302	contained	C28 C20 C13 C14 C26 C7 C3
-07-visit.pl	356	page_started	C1 C3
-07-visit.pl	379	spare_for	-
-07-visit.pl	387	spare_taken	-
-07-visit.pl	398	spare_dropped	-
-07-visit.pl	406	spare_work	-
-07-visit.pl	413	idle_taken	C1
-07-visit.pl	425	run_seal	-
-07-visit.pl	451	keeper	C9
-07-visit.pl	539	unhung	-
-07-visit.pl	547	parted	-
-07-visit.pl	556	checked	C30 C9 C22 C14
-07-visit.pl	659	laid	-
-07-visit.pl	672	laid_run	C4
-07-visit.pl	720	redirect_noted	C4
-07-visit.pl	731	redirect_answered	C4
-07-visit.pl	733	redirects_listed	C4
-07-visit.pl	745	redirects_told	C4 C23
-07-visit.pl	747	redirects_decide	C4
+07-visit.pl	237	laid_out	C28 C9
+07-visit.pl	253	outrun	-
+07-visit.pl	268	faces	C13
+07-visit.pl	304	contained	C28 C20 C13 C14 C26 C7 C3
+07-visit.pl	358	page_started	C1 C3
+07-visit.pl	381	spare_for	-
+07-visit.pl	389	spare_taken	-
+07-visit.pl	400	spare_dropped	-
+07-visit.pl	408	spare_work	-
+07-visit.pl	415	idle_taken	C1
+07-visit.pl	427	run_seal	-
+07-visit.pl	453	keeper	C9
+07-visit.pl	541	unhung	-
+07-visit.pl	549	parted	-
+07-visit.pl	558	checked	C30 C9 C22 C14
+07-visit.pl	661	laid	-
+07-visit.pl	674	laid_run	C4
+07-visit.pl	724	redirect_noted	C4
+07-visit.pl	735	redirect_answered	C4
+07-visit.pl	737	redirects_listed	C4
+07-visit.pl	749	redirects_told	C4 C23
+07-visit.pl	751	redirects_decide	C4
 08-pictures.pl	1	-	C7 C5 C17 C8 C22
 08-pictures.pl	46	pictures_state	C28
 08-pictures.pl	57	pictures_begun	C23 C28 C27 C4 C5 C8 C6 C7 C1 C3 C21
@@ -336,22 +336,25 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 08-pictures.pl	137	pictures_ended	C21 C17
 08-pictures.pl	152	pictures_judged	-
 08-pictures.pl	160	pictures_ahead	-
-08-pictures.pl	173	pictures_pumped	-
-08-pictures.pl	186	pictures_waited	-
-08-pictures.pl	199	pictures_so_far	-
-08-pictures.pl	206	pictures_before	-
-08-pictures.pl	222	pictures_dropped	-
-08-pictures.pl	229	pictured	C28
-08-pictures.pl	283	picture_named	-
-08-pictures.pl	304	named_owed	-
-08-pictures.pl	317	named_again	-
-08-pictures.pl	331	fit_crop	C21
-08-pictures.pl	368	system_decoded	C21 C24
-08-pictures.pl	407	plain_read	C24
-08-pictures.pl	427	ts_sounds	C24 C21
-08-pictures.pl	479	system_converted	C21
-08-pictures.pl	505	stated_size	C21
-08-pictures.pl	536	decoders_removed	C24
+08-pictures.pl	174	pictures_pumped	-
+08-pictures.pl	188	pictures_waited	-
+08-pictures.pl	201	pictures_so_far	-
+08-pictures.pl	208	pictures_before	-
+08-pictures.pl	224	pictures_dropped	-
+08-pictures.pl	231	pictured	C28
+08-pictures.pl	288	picture_named	-
+08-pictures.pl	312	picture_one	-
+08-pictures.pl	319	picture_like	-
+08-pictures.pl	324	picture_same	-
+08-pictures.pl	331	named_owed	-
+08-pictures.pl	344	named_again	-
+08-pictures.pl	358	fit_crop	C21
+08-pictures.pl	395	system_decoded	C21 C24
+08-pictures.pl	434	plain_read	C24
+08-pictures.pl	454	ts_sounds	C24 C21
+08-pictures.pl	506	system_converted	C21
+08-pictures.pl	532	stated_size	C21
+08-pictures.pl	563	decoders_removed	C24
 09-videos.pl	1	-	C22
 09-videos.pl	28	videoed	C23 C27 C5 C4 C28 C8 C6 C7 C22 C24
 09-videos.pl	162	hls_fetched	C5 C6 C7 C22 C23 C28
@@ -653,26 +656,27 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 17-prefetch.pl	41	prefetch_begin	C17 C26 C14 C23
 17-prefetch.pl	86	prefetch_later	C27 C28
 17-prefetch.pl	98	prefetch_go	C26 C7 C28 C27 C8
-17-prefetch.pl	126	prefetch_pump	C5 C7
-17-prefetch.pl	146	prefetch_select	-
-17-prefetch.pl	155	prefetch_heard	-
-17-prefetch.pl	175	prefetch_made	C28 C6 C7
-17-prefetch.pl	219	prefetch_numbers	-
-17-prefetch.pl	235	prefetch_ended	-
-17-prefetch.pl	242	prefetch_asked	C19
-17-prefetch.pl	244	prefetch_keep	C17 C7
-17-prefetch.pl	254	prefetch_take	C7
-17-prefetch.pl	290	together_said	C6 C7
-17-prefetch.pl	298	together_started	-
-17-prefetch.pl	316	together_read	-
-17-prefetch.pl	325	fetched_together	-
-17-prefetch.pl	361	fetchers_for	-
-17-prefetch.pl	393	fetcher_taken	-
-17-prefetch.pl	407	fetchers_dropped	C14 C30 C5
-17-prefetch.pl	422	ahead_key	-
-17-prefetch.pl	424	ahead_begin	C5
-17-prefetch.pl	441	ahead_sheets	C14 C23 C27
-17-prefetch.pl	464	ahead_fonts	C30 C23 C27
+17-prefetch.pl	126	prefetch_soon	C19 C26 C27 C28 C7 C8
+17-prefetch.pl	153	prefetch_pump	C5 C7
+17-prefetch.pl	173	prefetch_select	-
+17-prefetch.pl	182	prefetch_heard	-
+17-prefetch.pl	202	prefetch_made	C28 C6 C7
+17-prefetch.pl	246	prefetch_numbers	-
+17-prefetch.pl	262	prefetch_ended	-
+17-prefetch.pl	269	prefetch_asked	C19
+17-prefetch.pl	271	prefetch_keep	C17 C7
+17-prefetch.pl	281	prefetch_take	C7
+17-prefetch.pl	322	together_said	C6 C7
+17-prefetch.pl	330	together_started	-
+17-prefetch.pl	348	together_read	-
+17-prefetch.pl	357	fetched_together	-
+17-prefetch.pl	393	fetchers_for	-
+17-prefetch.pl	425	fetcher_taken	-
+17-prefetch.pl	439	fetchers_dropped	C14 C30 C5
+17-prefetch.pl	454	ahead_key	-
+17-prefetch.pl	456	ahead_begin	C5
+17-prefetch.pl	473	ahead_sheets	C14 C23 C27
+17-prefetch.pl	496	ahead_fonts	C30 C23 C27
 18-licence-and-support.pl	1	-	C16
 18-licence-and-support.pl	19	licence_key	-
 18-licence-and-support.pl	27	licence_read	-
@@ -720,14 +724,15 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 19-updates.pl	568	body_of	-
 20-window-side.pl	1	-	C29
 20-window-side.pl	14	window	C12
-20-window-side.pl	23	strip_back	-
-20-window-side.pl	27	busy	-
-20-window-side.pl	28	idle	-
-20-window-side.pl	35	aside	-
-20-window-side.pl	43	noted	C23
-20-window-side.pl	44	said_noted	-
-20-window-side.pl	56	stated	-
-20-window-side.pl	64	hear	C12 C29 C19
+20-window-side.pl	24	strip_back	-
+20-window-side.pl	28	busy	-
+20-window-side.pl	29	idle	-
+20-window-side.pl	36	aside	-
+20-window-side.pl	44	noted	C23
+20-window-side.pl	45	said_noted	-
+20-window-side.pl	57	stated	-
+20-window-side.pl	65	hear	C12 C29 C19
+20-window-side.pl	112	window_changed	-
 21-link.pl	1	-	C31
 21-link.pl	49	link_folder	-
 21-link.pl	50	link_state	C31
@@ -751,7 +756,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-link.pl	248	link_reaped	C31
 21-link.pl	261	link_checked	C31
 21-link.pl	280	link_command	C31
-21-link.pl	334	link_shot	C31
+21-link.pl	334	link_drew	C31
+21-link.pl	340	link_shot	C31
 21-live.pl	1	-	-
 21-live.pl	8	live_of	-
 21-live.pl	10	live_kept	C18
@@ -762,54 +768,56 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-live.pl	79	live_due	C19
 21-live.pl	91	live_turn	C18 C19 C26 C5 C17 C6 C7
 21-live.pl	147	live_asked	C19 C26
-21-live.pl	179	live_early	C19
-21-live.pl	198	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	290	live_parts	C19
-21-live.pl	309	unchunked	-
-21-live.pl	324	live_replied	C19
-21-live.pl	329	live_sent	C19
+21-live.pl	180	live_early	C19
+21-live.pl	200	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
+21-live.pl	293	live_parts	C19
+21-live.pl	312	unchunked	-
+21-live.pl	327	live_replied	C19
+21-live.pl	332	live_sent	C19
 22-permits.pl	1	-	C26
-22-permits.pl	42	permit_rules	C26
-22-permits.pl	64	permit_written	C26
-22-permits.pl	75	permit_stored	C26
-22-permits.pl	90	permit_covers	C26
-22-permits.pl	96	permit_site	C26
-22-permits.pl	105	permit_signin	C26
-22-permits.pl	114	permit_password	C26
-22-permits.pl	121	permit_seen	C26
-22-permits.pl	129	permit_info	C26
-22-permits.pl	138	permit_tracker	C26
-22-permits.pl	146	permit_named	C26
-22-permits.pl	155	permit_part	C26
-22-permits.pl	171	permit_decision	C26
-22-permits.pl	184	sites_told	C26
-22-permits.pl	189	sites_listed	C26
-22-permits.pl	206	sites_decide	C26 C4
-22-permits.pl	240	permit_layers	C26
-22-permits.pl	258	permit_layers_kept	C26
-22-permits.pl	287	curated	C26
-22-permits.pl	318	curated_read	C26
-22-permits.pl	355	curated_rule	C26
-22-permits.pl	392	curated_on	C26
-22-permits.pl	399	permit_curated	C26
-22-permits.pl	410	permit_refused	C26
-22-permits.pl	417	permit_decided	C26
-22-permits.pl	433	permit_queued	C26
-22-permits.pl	450	permit_page	C26
-22-permits.pl	488	permit_parts	C26
-22-permits.pl	504	permit_unread	-
-22-permits.pl	512	permit_read	-
-22-permits.pl	521	permit_stripped	C26
-22-permits.pl	536	permit_body	C26
-22-permits.pl	575	permit_tag	C26
-22-permits.pl	589	permit_scripted	C26
-22-permits.pl	599	live_permitted	C26
-22-permits.pl	615	permit_visited	C26
-22-permits.pl	625	permits_asked	C26
-22-permits.pl	703	permits_later	C26
-22-permits.pl	708	scripts_set	C26 C4
-22-permits.pl	732	scripts_layer	C26 C4
-22-permits.pl	750	scripts_told	C26
+22-permits.pl	43	permit_rules	C26
+22-permits.pl	65	permit_written	C26
+22-permits.pl	76	permit_stored	C26
+22-permits.pl	91	permit_covers	C26
+22-permits.pl	97	permit_site	C26
+22-permits.pl	106	permit_signin	C26
+22-permits.pl	115	permit_password	C26
+22-permits.pl	122	permit_seen	C26
+22-permits.pl	130	permit_info	C26
+22-permits.pl	139	permit_tracker	C26
+22-permits.pl	147	permit_named	C26
+22-permits.pl	156	permit_part	C26
+22-permits.pl	172	permit_decision	C26
+22-permits.pl	185	sites_told	C26
+22-permits.pl	190	sites_listed	C26
+22-permits.pl	207	sites_decide	C26 C4
+22-permits.pl	241	permit_layers	C26
+22-permits.pl	259	permit_layers_kept	C26
+22-permits.pl	288	curated	C26
+22-permits.pl	319	curated_read	C26
+22-permits.pl	356	curated_rule	C26
+22-permits.pl	393	curated_on	C26
+22-permits.pl	400	permit_curated	C26
+22-permits.pl	411	permit_refused	C26
+22-permits.pl	418	permit_decided	C26
+22-permits.pl	434	permit_queued	C26
+22-permits.pl	451	permit_page	C26
+22-permits.pl	489	permit_parts	C26
+22-permits.pl	505	permit_unread	-
+22-permits.pl	513	permit_read	-
+22-permits.pl	522	permit_stripped	C26
+22-permits.pl	537	permit_body	C26
+22-permits.pl	576	permit_tag	C26
+22-permits.pl	590	permit_scripted	C26
+22-permits.pl	600	live_permitted	C26
+22-permits.pl	616	permit_visited	C26
+22-permits.pl	627	permits_asked	C26
+22-permits.pl	660	permit_button	C26
+22-permits.pl	668	permit_answered	C26
+22-permits.pl	724	permits_later	C26
+22-permits.pl	729	scripts_set	C26 C4
+22-permits.pl	753	scripts_layer	C26 C4
+22-permits.pl	771	scripts_told	C26
 23-filters.pl	1	-	C27 C23 C26
 23-filters.pl	34	filters	C27
 23-filters.pl	67	filter_empty	C27
@@ -952,9 +960,10 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 24-trmnl.pl	490	trmnl_fds	-
 25-ask-and-address.pl	1	-	-
 25-ask-and-address.pl	10	ask	-
-25-ask-and-address.pl	12	asked	-
-25-ask-and-address.pl	35	address	C23 C8
-25-ask-and-address.pl	52	own_network	-
+25-ask-and-address.pl	12	asked_later	-
+25-ask-and-address.pl	14	asked	-
+25-ask-and-address.pl	38	address	C23 C8
+25-ask-and-address.pl	55	own_network	-
 26-log.pl	1	-	C12
 26-log.pl	13	log_shown	C16
 26-log.pl	50	choose_keeping	-

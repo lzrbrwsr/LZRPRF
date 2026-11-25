@@ -15,6 +15,7 @@ elsif ($command eq 'incognito') { $INCOGNITO = 1; run(@ARGV ? @ARGV : '/Applicat
 elsif ($command eq 'try' && @ARGV > 4 && $ARGV[0] =~ m{^\Q$DIR\E/[A-Za-z0-9][A-Za-z0-9.]*\z} && $ARGV[1] =~ /^(?:-|127\.0\.0\.1:\d+)$/ && $ARGV[3] =~ /^(?:allow|deny|ask|[1234]{1,9})$/) {
     ($TRY, $DIR, $PEER, $TYPED, $ANSWER) = (1, splice @ARGV, 0, 4);    # for tests: lzrprf try FOLDER PEER|- TYPED|- allow|deny|ask|DIGITS /path/to/program
     if (open my $in, '<', "$DIR/live-seconds") { (<$in> // '') =~ /^([0-9]{1,2}(?:\.[0-9]{1,3})?) ([0-9]{1,2}(?:\.[0-9]{1,3})?)$/ and ($LIVE_STOP_SECONDS, $LIVE_FRAME_SECONDS) = ($1, $2) }    # [C18] "lzrprf try" only: a test's own $LIVE_STOP_SECONDS and $LIVE_FRAME_SECONDS, so what it tries does not hang on how busy the computer is
+    if (open my $in, '<', "$DIR/view-scale") { $VIEW_SCALE = 2 if (<$in> // '') eq "2\n" }    # "lzrprf try" only: a test's own retina screen, its tiles drawn at scale 2 (the load test's --scale2)
     run(@ARGV);
 }
 elsif ($command eq 'profiles' && !@ARGV) { print "$_\t", profile_name($_), "\n" for profile_ids() }    # each profile's id and its name; "--profile" takes each id but "first", which is the profile used without it

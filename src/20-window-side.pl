@@ -12,7 +12,8 @@
 # the other hosts its page names, each in the shape of a host name, and how
 # many there are (the last line of "sub visit").
 sub window {                              # all the lines in one write: a list of thousands of lines printed one by one (autoflush) woke the window once a line, and a page took 100 ms to arrive (measured 2026-11-23)
-    print join('', map { "$_\n" } (@_ && $_[0] =~ /^(?:page|relaid|patch)\b/ ? named_owed(@_) : ()), @_) or leave() if @_;    # without a window ("lzrprf try" only) this is printed for the test to read
+    $WINDOW_LISTS++ if @_ && $_[0] =~ /^(?:page|relaid|patch|runs|tabs?)\b/;
+    print join('', map { "$_\n" } (@_ && $_[0] =~ /^(?:page|relaid|patch|runs)\b/ ? named_owed(@_) : ()), @_) or leave() if @_;    # without a window ("lzrprf try" only) this is printed for the test to read
     sound_hushed() if $SOUND && @_ && $_[0] =~ /^(?:tabs |page(?: [0-9]+)?\z|live (?!on ))/;    # [C12] another tab, a new page shown, or no page kept running: every sound stops and goes
     timed('sent ' . ($_[0] =~ /^(\S+)/ ? $1 : '')) if $TIMED && @_;    # "lzrprf try" with "times": the moment the window was handed each write, by its first word
 }
@@ -108,3 +109,37 @@ sub hear {                                # the next thing the window says; noth
     }
 }
 
+sub window_changed {                      # the window holds the list $old of the tab shown, and $new is to stand there: only what changed is sent. One stretch as "patch TAB FIRST DROP" and its lines; several as "runs TAB K", K lines "FIRST DROP COUNT" in the order of the list (places in $old), then the lines of them all; the whole list ("relaid") when little would be saved or there is no list to go from. yle.fi's list is 7100 lines and 1.5 MB, and it was sent whole twice more while the page loaded (measured in the staging browser, 2026-11-25)
+    my ($old, $new) = @_;
+    my ($first, $last, @runs) = (0, 0);
+    return window("relaid $TAB", @$new, '.') unless $old;
+    $first++ while $first < @$old && $first < @$new && $old->[$first] eq $new->[$first];
+    $last++ while $last < @$old - $first && $last < @$new - $first && $old->[$#$old - $last] eq $new->[$#$new - $last];
+    my $saved = 0; $saved += length($new->[$_]) + 1 for 0 .. $first - 1, @$new - $last .. $#$new;
+    my ($end_old, $end_new) = (@$old - $last, @$new - $last);    # the middle that differs: $first up to these
+    my $middle = 0; $middle += length($new->[$_]) + 1 for $first .. $end_new - 1;
+    if ($middle > 4096 && $end_old > $first) {    # a long middle: the lines of it that stand in both are found, each stretch between them a run
+        my %at; push @{ $at{$new->[$_]} }, $_ for $first .. $end_new - 1;
+        my ($i, $j, $same) = ($first, $first, 0);
+        while (($i < $end_old || $j < $end_new) && @runs <= 64) {
+            if ($i < $end_old && $j < $end_new && $old->[$i] eq $new->[$j]) { $same += length($new->[$j]) + 1; $i++; $j++; next }
+            my ($to_old, $to_new) = ($end_old, $end_new);
+            FIND: for my $k ($i .. ($i + 64 < $end_old ? $i + 64 : $end_old) - 1) {    # the next line of the old list that stands in the new one with the line after it: there the two go on alike
+                my $places = $at{$old->[$k]} or next;
+                shift @$places while @$places && $places->[0] < $j;
+                for my $p (@$places[0 .. ($#$places < 7 ? $#$places : 7)]) {
+                    next unless $k + 1 < $end_old && $p + 1 < $end_new ? $old->[$k + 1] eq $new->[$p + 1] : $k + 1 == $end_old && $p + 1 == $end_new;
+                    ($to_old, $to_new) = ($k, $p);
+                    last FIND;
+                }
+            }
+            push @runs, [$i, $to_old - $i, $j, $to_new - $j];
+            ($i, $j) = ($to_old, $to_new);
+        }
+        if (@runs > 1 && @runs <= 64 && $saved + $same > 512) {
+            return window("runs $TAB " . @runs, (map { "$_->[0] $_->[1] $_->[3]" } @runs), (map { @$new[$_->[2] .. $_->[2] + $_->[3] - 1] } @runs), '.');
+        }
+    }
+    return window("patch $TAB $first " . (@$old - $first - $last), @$new[$first .. $#$new - $last], '.') if $saved > 512;
+    window("relaid $TAB", @$new, '.');
+}

@@ -740,7 +740,7 @@ sub given {
     my $in = '';
     while (1) {
         my $at = 0;
-        $at = $+[0] if $in =~ /\A=view [0-9]+ [0-9]+\n/;
+        $at = $+[0] if $in =~ /\A=view [0-9]+ [0-9]+(?: 2)?\n/;
         if (substr($in, $at) =~ /\A=fonts((?: [0-9]+){8})\n/) { my ($end, @sizes) = ($+[0], split ' ', $1); $at += $end; $at += $_ for @sizes }
         if (length($in) >= $at && substr($in, $at) =~ /\A=sheets((?: [0-9]+)*)\n/) { my ($end, @sizes) = ($+[0], split ' ', $1); $at += $end; $at += $_ for @sizes }
         if (length($in) >= $at && substr($in, $at) =~ /\A=webfonts((?: [0-9]+)*)\n/) { my ($end, @sizes) = ($+[0], split ' ', $1); $at += $end; $at += $_ for @sizes }    # [C30]
@@ -753,7 +753,7 @@ sub given {
 if ($kind eq 'nap') { given(); print STDERR "napping\n"; sleep 5; print STDERR "woke\n"; exit 0 }
 my $answer = $kind eq 'noread' ? '' : given();
 my $view = 'none';                         # the size of the window, the first frame of every page run: taken off before the fonts
-$view = "$1 $2" if $answer =~ s/\A=view ([1-9][0-9]{2,3}) ([1-9][0-9]{2,3})\n//;
+$view = "$1 $2" if $answer =~ s/\A=view ([1-9][0-9]{2,3}) ([1-9][0-9]{2,3})(?: 2)?\n//;
 print STDERR "view\t$address\t$view\n" if $kind =~ /^view/;
 my $faces = 'none';
 if ($answer =~ /\A=fonts((?: (?:0|[1-9][0-9]{0,6})){8})\n/) { require Digest::SHA; my ($at, @sizes) = ($+[0], split ' ', $1); $faces = join(' ', @sizes) . "\t" . join(' ', map { my $one = substr($answer, $at, $_); $at += $_; length($one) ? Digest::SHA::sha256_hex($one) : '-' } @sizes); substr($answer, 0, $at, '') }
@@ -824,12 +824,23 @@ sub live_page {                           # a page kept running, as the applicat
             my ($status, $head, $body) = live_reply(\$held);
             print STDERR "live\t$address\treply $to $status " . length($body) . "\n";
         }
+        print "=soon script https://site.test/shield/block\n=soon script $origin/out/permitdata?soon\n";    # [C19] its script sets two requests going: told ahead, answered with nothing; then it makes the second
+        print "=fetch GET 0 - script $origin/out/permitdata?soon\n";
+        my ($status, $head, $body) = live_reply(\$held);
+        print STDERR "live\t$address\ttold ahead $status " . length($body) . "\n";
+        print "=soon image $origin/out/permitdata?pic\n=fetch GET 0 - image $origin/out/permitdata?pic\n";    # [C19] and a picture its script made
+        ($status, $head, $body) = live_reply(\$held);
+        print STDERR "live\t$address\ttold ahead $status " . length($body) . "\n";
+        print "=soon data $origin/out/permitdata?dat\n=fetch GET 0 - data $origin/out/permitdata?dat\n";    # [C19] and a plain GET of its fetch()
+        ($status, $head, $body) = live_reply(\$held);
+        print STDERR "live\t$address\ttold ahead $status " . length($body) . "\n";
     }
     if ($kind eq 'livepermitfetch' || $kind eq 'livepermitbytes') {    # [C26] its reader asks lzrprf for a script, then for a module, each by its destination word, while the page is read
         for my $to ("script $origin/out/permitscript", $kind eq 'livepermitfetch' ? "data $origin/out/permitdata" : "module $origin/sheet/css?bytes") {
             print "=fetch GET 0 - $to\n";
             my ($status, $head, $body) = live_reply(\$held);
             print STDERR "live\t$address\treply $to $status " . length($body) . "\n";
+            print "=soon script $origin/out/permitdata?unallowed\n" if $status == 403 && $kind eq 'livepermitfetch';    # [C26] told ahead by a page whose scripts do not run: nothing is begun
         }
     }
     if ($kind eq 'livepermitbox' || $kind eq 'livepermitcurated') {    # [C26] E1 and E2: its engine asks about its scripts; then its reader and its script ask lzrprf for addresses of each kind while the page is read, and its engine asks about the bytes of each script it is handed
@@ -937,8 +948,11 @@ sub live_page {                           # a page kept running, as the applicat
         }
         elsif ($kind eq 'livejar' && $line =~ /^=click /) {    # [C7] on a click its script asks its own host, and on the first sets a cookie by document.cookie, which comes as =keep in front of its answer
             my $n = ++$main::jar_clicks;
-            print "=fetch GET 0 - $origin/jar/livedata$n\n";
+            my $soon = $address =~ /\?soon/;    # the run livejarsoon: the same page of a site you allowed, not of your own network
+            print "=soon data $origin/jar/" . ($n == 1 ? 'livesoon' : 'livelate') . "\n" if $soon;    # [C7] [C19] a GET told ahead: the first while the jar holds no cookie for it, the second when it does
+            print "=fetch GET 0 - $origin/jar/" . ($soon ? 'soondata' : 'livedata') . "$n\n";
             my ($status) = live_reply(\$held);
+            if ($soon && $n == 2) { for my $late (qw(livesoon livelate)) { print "=fetch GET 0 - data $origin/jar/$late\n"; live_reply(\$held) } }    # both asked for after the cookie was set
             print $n == 1 ? "=keep w=3;%20Max-Age=3600\n" : '', "=again\nPp0\nT\@came $status\n=ready\n";
         }
         elsif ($kind =~ /^livesso/ && $line =~ /^=click /) {    # [C7] on a click its script asks the stand-in provider's sign-in host: from a page of the provider's own family, and from a page of another site
@@ -1034,7 +1048,7 @@ my %list = (
     long => $long,
     noend => "=page\nPp0\nT\@x",
     nothing => '',
-    big => "=page\n" . ("T\@" . 'x' x 1000 . "\n") x 12_600,
+    big => "=page\n" . ("T\@" . 'x' x 1000 . "\n") x 50_400,    # past $PAGE_BYTES, 48 MiB since retina tiles
     control => "=page\nPp0\nT\@$marks\n",
     madelate => "=page\nPp0\nT\@x\nUd+HTML\t5\n",
     madekind => "=page\nUz+HTML\t5\n",
@@ -1187,7 +1201,7 @@ exit 0 if $part ne 'page' || $kind;
 report 'what it is given', -p STDIN ? 'a pipe that holds a finished answer' : 'something else';
 report 'the answer of the site', $answer =~ m{^HTTP/1\.1 200 OK\r\n.*\r\n\r\nthe page of the test site\n$}s ? 'whole' : 'not whole';
 report 'what it writes to', -p STDOUT ? 'a pipe, which cannot hand over a connection' : 'something else';
-report 'the variables it is given', join(' ', sort keys %ENV) eq 'LZRPRF_CONTAINED LZRPRF_EARLY LZRPRF_SEAL' ? 'the address it lays out, its seal and that its page is drawn before its scripts, and no other' : join(' ', sort keys %ENV);
+report 'the variables it is given', join(' ', sort keys %ENV) eq 'LZRPRF_CONTAINED LZRPRF_EARLY LZRPRF_SEAL LZRPRF_SOON' ? 'the address it lays out, its seal, that its page is drawn before its scripts and that its requests are told ahead, and no other' : join(' ', sort keys %ENV);
 report 'the first line it is handed', $sealed;
 report 'descriptors it holds besides its three', join(' ', grep { POSIX::fstat($_) } 3 .. 1023) || 'none';
 attempts();
@@ -2085,6 +2099,7 @@ my %about = (
     permitbad => q{Verifying that a scripts file with one malformed line counts for nothing and is never written over.},
     permitfetch => q{Verifying that an external script of a site not allowed is refused without being fetched, until Allow Once.},
     permitahead => q{Verifying that a page of a site you allowed has the scripts it names fetched ahead, and only those it loads.},
+    livejarsoon => q{Verifying that a data request told ahead is never handed over once the jar holds a cookie for it.},
     permitbytes => q{Verifying that an external script whose bytes a Deny rule names is never handed to the page.},
     permitpost => q{Verifying that a page sending to another host is refused while it is read, and asked about once shown.},
     permitstrip => q{Verifying that a page of a site whose scripts are not allowed reaches the application with its scripts taken out.},
@@ -2814,7 +2829,7 @@ my $order_js = join("\n", 'function run(argv) {',    # the window's own reader o
     q{var hand = { performSelectorWithObjectAfterDelay: function () { dues++; } }; function say(line) { said.push(line); }},
     q{function keep() { } function unlaid() { } function listed() { } function pieces() { } function told() { } function layersClear() { } function pointerReset() { } function layersTold() { } function pictureBegun() { } function pictureKept() { } function namedSettled() { }},
     q{function draw(lines) { var share = origin.y / high; high = lines.length * 1000; origin = { x: 0, y: Math.round(share * high) }; }},
-    ($text_of_lzrprf =~ /^(var scrollSaid = .*)$/m), ($text_of_lzrprf =~ /^(function (?:liveTold|pageScrollNow|pageScrollTell|pageScrollMoved|pageScrollFrame|pageScrollTabbed|pageScrollApply|pageScrollTo|heard)\(.*?^\}\n)/msg),
+    ($text_of_lzrprf =~ /^(var scrollSaid = .*)$/m), ($text_of_lzrprf =~ /^(function (?:liveTold|pageScrollNow|pageScrollTell|pageScrollMoved|pageScrollFrame|pageScrollTabbed|pageScrollApply|pageScrollTo|heard|runsOf)\(.*?^\}\n)/msg),
     'var due = ' . ($scroll_due // 'null') . ';',
     q{function lines(all) { all.forEach(heard); due(null); at.push(origin.y); }},
     q{lines(['page 0', 'Pp0', 'T@first', '.', 'live on 0']);},
@@ -2824,7 +2839,9 @@ my $order_js = join("\n", 'function run(argv) {',    # the window's own reader o
     q{lines(['scroll 1 0 50']);},
     q{origin = { x: 0, y: 800 }; pageScrollMoved(); due(null);},
     q{lines(['relaid 0', 'Pp0', 'T@a', 'T@b', 'T@c', 'T@d', '.']);},
-    q{return said.join(',') + ' at=' + at.join(',');},
+    q{var saidThen = said.join(','), atThen = at.join(','), before = said.length;},
+    q{['runs 0 2', '1 1 2', '4 1 0', 'T@x', 'T@y', '.'].forEach(heard); var runsGot = drawnLines.join('|'); ['runs 0 1', '9 9 0', '.'].forEach(heard);},    # two stretches of the list held changed in one list: the second line becomes two, the last goes; then a stretch outside the list held
+    q{return saidThen + ' at=' + atThen + ' runs=' + runsGot + ' ' + said.slice(before).filter(function (l) { return /^page refresh/.test(l); }).join('+');},
     '}');
 run_of('scrollorder', command => ['/usr/bin/osascript', '-l', 'JavaScript', '-e', $order_js]);    # a page shown from 300; its script scrolls it to 500 in the answer to a click, which also makes it longer; drawn again with no scroll; a scroll for another tab; a scroll of yours; drawn again    # a page kept running from its start, a scroll of three moves in one frame, lzrprf's own scroll, a view that stops short of it, lines of no form, a place past the bound, no page kept, the next page's start and a drawing
 my $lack_js = join("\n", 'function run(argv) {',    # the window's keeping of pictures sent once, read from lzrprf and run with no window: a name it holds, a name it lacks, the one asking, and the bound
@@ -3785,7 +3802,8 @@ run_of('permitfile', typed => "$t/out/livepermitfile", answer => '1', fetches =>
 my $permit_bad = "always\t$t\tinline\t$permit_sha{a}\t-\t$permit_day\n";    # a rule in the six fields of before the class: a line of another form
 run_of('permitbad', typed => "$t/out/livepermitalways?bad", answer => '4', fetches => [('/out/livepermitalways?bad') x 2], prepare => sub { $permit_public->($_[0]); put_file("$_[0]/scripts", $permit_bad) });    # the rule it holds counts for nothing either
 run_of('permitfetch', typed => "$t/out/livepermitfetch", answer => '3', fetches => ['/out/livepermitfetch', '/out/permitdata', '/out/livepermitfetch', '/out/permitscript', '/out/permitdata'], prepare => $permit_public);
-run_of('permitahead', typed => "$t/out/livepermitfetchahead", fetches => ['/out/livepermitfetchahead', '/out/permitscript', '/out/permitdata?ahead'], prepare => sub { $permit_public->($_[0]); put_file("$_[0]/scripts", $permit_rule->('always', $t, 'inline', $permit_sha{a}) . "\n") });    # an Always rule of yours: the site runs outside the sandbox
+run_of('livejarsoon', typed => join(',,', "$t/jar/out/livejar?soon", '=page click 3 3', '=page click 3 3'), prepare => sub { $permit_public->($_[0]); put_file("$_[0]/scripts", $permit_rule->('always', $t, 'inline', $permit_sha{a}) . "\n") });
+run_of('permitahead', typed => "$t/out/livepermitfetchahead", fetches => ['/out/livepermitfetchahead', '/out/permitscript', '/out/permitdata?ahead', '/out/permitdata?soon', '/out/permitdata?pic', '/out/permitdata?dat'], prepare => sub { $permit_public->($_[0]); put_file("$_[0]/scripts", $permit_rule->('always', $t, 'inline', $permit_sha{a}) . "\n") });    # an Always rule of yours: the site runs outside the sandbox
 run_of('permitbytes', typed => "$t/out/livepermitbytes", answer => '1', fetches => ['/out/livepermitbytes', '/out/permitscript', '/sheet/css?bytes'], prepare => sub {
     $permit_public->($_[0]);
     put_file("$_[0]/scripts", join '', map { "$_\n" } $permit_rule->('always', $t, 'inline', $permit_sha{a}), $permit_rule->('deny', $t, $t, Digest::SHA::sha256_hex("the page of the test site\n")));    # the bytes the site answers for its script
@@ -3996,12 +4014,27 @@ sub ended_how { my ($name) = @_; my $r = $run{$name} // return 'it was never sta
 sub slurp { open my $in, '<', $_[0] or return ''; binmode $in; local $/; return <$in> // '' }
 sub out { slurp("$site_folder/$_[0].out") }
 sub err { slurp("$site_folder/$_[0].err") }
+sub changed_list {                        # the list the window held with a "patch FIRST DROP" or a "runs K" applied, as the window's own reader does (heard, runsOf)
+    my ($held, $kind, $lines) = @_;
+    my @old = @{ $held // [] };
+    if (my ($first, $drop) = $kind =~ /^patch ([0-9]+) ([0-9]+)$/) { return [@old[0 .. $first - 1], @$lines, @old[$first + $drop .. $#old]] }
+    my ($k) = $kind =~ /^runs ([0-9]+)$/;
+    my @new = @$lines;
+    my ($from, @out) = (0);
+    for my $head (splice @new, 0, $k // 0) {
+        my ($first, $drop, $count) = split / /, $head;
+        push @out, @old[$from .. $first - 1], splice(@new, 0, $count);
+        $from = $first + $drop;
+    }
+    return [@out, @old[$from .. $#old]];
+}
 sub told {                                # what the window was told in one run: [word, rest], and for a page ['page', its lines]
     my ($name) = @_;
-    my (@all, $list, $kind, %named);     # %named: the rows of each picture sent once ("picture NAME WIDE HIGH"); a line N that places one reads here as the line M and the rows it stands for
+    my (@all, $list, $kind, %named, $held);     # %named: the rows of each picture sent once ("picture NAME WIDE HIGH"); a line N that places one reads here as the line M and the rows it stands for
     for my $line (split /\n/, out($name), -1) {
-        if ($list) { if ($line eq '.') { $kind =~ /^picture (\S+)/ ? ($named{$1} = $list) : push @all, [$kind, $list]; undef $list } elsif ($line =~ /^N([0-9a-f]+),(.*)$/ && $named{$1}) { push @$list, "M$2", @{ $named{$1} } } else { push @$list, $line } next }
+        if ($list) { if ($line eq '.') { $kind =~ /^picture (\S+)/ ? ($named{$1} = $list) : push @all, $kind =~ /^(?:patch|runs) / ? ['relaid', $held = changed_list($held, $kind, $list)] : [$kind, $held = $list]; undef $list } elsif ($line =~ /^N([0-9a-f]+),(.*)$/ && $named{$1}) { push @$list, "M$2", @{ $named{$1} } } else { push @$list, $line } next }
         if ($line =~ /^picture [0-9a-f]{9,24} [0-9]+ [0-9]+$/) { ($kind, $list) = ($line, []); next }
+        if ($line =~ /^(patch|runs) (?:0|[1-9][0-9]?) ([0-9]+(?: [0-9]+)?)$/) { ($kind, $list) = ("$1 $2", []); next }    # only what changed of the list the window holds: read here as the whole list laid again
         if ($line =~ /^(page|relaid)(?: (?:0|[1-9][0-9]?))?$/) { ($kind, $list) = ($1, []); next }    # a page, or the page shown laid out again from what was kept; lzrprf names the tab it is for
         my ($word, $rest) = split / /, $line, 2;
         push @all, [$word // '', $rest // ''];
@@ -4065,7 +4098,7 @@ else {
 my %once = map { $_->[0] => $_->[1] } @in_page;
 check(($once{'what it is given'} // '') eq 'a pipe that holds a finished answer' && ($once{'the answer of the site'} // '') eq 'whole', 'the application is given the finished answer, after the connection to the site is closed', "$once{'what it is given'}; the answer is $once{'the answer of the site'}");
 check(($once{'what it writes to'} // '') eq 'a pipe, which cannot hand over a connection', 'what it writes goes to lzrprf through a pipe', $once{'what it writes to'} // 'nothing came of it');
-check(($once{'the variables it is given'} // '') eq 'the address it lays out, its seal and that its page is drawn before its scripts, and no other', 'a page run of a visit sees three variables: the address it lays out, the seal of its run, and LZRPRF_EARLY, which asks it for the page as it is before its scripts run', $once{'the variables it is given'} // 'nothing came of it');
+check(($once{'the variables it is given'} // '') eq 'the address it lays out, its seal, that its page is drawn before its scripts and that its requests are told ahead, and no other', 'a page run of a visit sees four variables: the address it lays out, the seal of its run, LZRPRF_EARLY, which asks it for the page as it is before its scripts run, and LZRPRF_SOON, which lets it tell ahead the requests its scripts set going', $once{'the variables it is given'} // 'nothing came of it');
 check(($once{'the first line it is handed'} // '') eq 'the seal of its variables, first', 'the first line its keeper hands it, after the system said it is contained, is "=seal" and the seal of its variables: the handshake the application refuses to start without [C1]', $once{'the first line it is handed'} // 'nothing came of it');
 check(($once{'descriptors it holds besides its three'} // '') eq 'none', 'it holds no open file or socket besides its three descriptors', $once{'descriptors it holds besides its three'} // 'nothing came of it');
 check(-e "$secret.written.outside" && !grep({ !/\.outside$/ } glob "$secret.written.*"), 'no file was written in the home folder from inside a container', 'looked for it');
@@ -4529,9 +4562,10 @@ my $once_out = out('pictureskept');       # the same run, as the window was told
 my @once_sent = $once_out =~ /^picture ([0-9a-f]{9,24}) [0-9]+ [0-9]+$/mg;
 my %once_times; $once_times{$_}++ for @once_sent;
 my @once_placed = $once_out =~ /^N([0-9a-f]{9,24}),/mg;
-check(@once_sent >= 2 && @once_sent <= 4 && !grep({ $_ != 1 } values %once_times) && @once_placed > @once_sent && !grep({ !$once_times{$_} } @once_placed) && $once_out !~ /^M[0-9]/m
+check(@once_sent == 1 && !grep({ $_ != 1 } values %once_times) && @once_placed > @once_sent && !grep({ !$once_times{$_} } @once_placed) && $once_out !~ /^M[0-9]/m
+    && $text_of_lzrprf =~ /^            \$one = \$picture\{ \$paths->\[\$n\] \} = picture_one\(\$one\);$/m && $text_of_lzrprf =~ /^    \$one->\[\$_\] eq \$other->\[\$_\] or return 0 for 0 \.\. \$#\$one;$/m
     && $text_of_lzrprf =~ /^var NAMED_MOST = 512, NAMED_BYTES = 512 \* 1024 \* 1024;/m && $text_of_lzrprf =~ /^    if \(namedMissing && !namedAsked\) \{ namedAsked = true; say\('page refresh ' \+ selected\); \} else if \(!namedMissing\) namedAsked = false;$/m,
-    'a picture is sent to the window once: its rows go in one message "picture" with a name made for this process, and every list of the page, the first, each laid again and the page asked again, places it by a line N with that name and no row; no list holds a line M; the window keeps at most NAMED_MOST bitmaps and NAMED_BYTES of them, and asks once for the rows of a name it does not hold',
+    'a picture is sent to the window once: its rows go in one message "picture" with a name made for this process, and every list of the page, the first, each laid again and the page asked again, places it by a line N with that name and no row; the two pictures of the page hold the same pixels and are decoded again when it is asked again, and all of them are the one picture sent (sub picture_one); no list holds a line M; the window keeps at most NAMED_MOST bitmaps and NAMED_BYTES of them, and asks once for the rows of a name it does not hold',
     scalar(@once_sent) . ' pictures sent, placed ' . scalar(@once_placed) . ' times; lines M with rows: ' . scalar(() = $once_out =~ /^M[0-9]/mg));
 check((out('namedlack') =~ s/\s+$//r) eq 'M/1/3/2x2:2/whole 0 G/1/3/grey G/1/3/grey page refresh 0 2 undefined 1 dddddddd1+eeeeeeee1 eeeeeeee1+ffffffff1',
     'the window\'s keeping of pictures sent once, read from lzrprf and run with no window: a name it holds is drawn as its bitmap and nothing is asked; a name it lacks is a grey box and "page refresh" is said once, not again while lists go on lacking one, and again only after a list that lacked none; rows that are no picture and a message of no form keep nothing; over the bound no picture made for the list drawn now goes, then the one no list placed for longest, never one the last list placed',
@@ -4711,6 +4745,9 @@ check($jar_cookie->('/jar/clearbefore') eq 'a=kept' && $jar_cookie->('/jar/clear
     'clearing history and sessions clears every cookie, its file too; Clear Cookies of This Site clears the shown site\'s', 'clear: ' . $jar_cookie->('/jar/clearafter') . '; forget: ' . $jar_cookie->('/jar/forgetafter'));
 check($jar_cookie->('/jar/livedata1') eq '' && $jar_cookie->('/jar/livedata2') eq 'w=3' && err('livejar') =~ m{^jar\tscript\thttps://site\.test/jar/out/livejar\tw=3; Max-Age=3600$}m,
     'a cookie a page kept running sets by its script reaches the jar with the page\'s address as lzrprf knows it, and is sent on the page\'s next request to its site', 'first: ' . $jar_cookie->('/jar/livedata1') . '; second: ' . $jar_cookie->('/jar/livedata2'));
+my @jar_soon = map { $_->{bytes} =~ /\r\nCookie: ([^\r]*)\r\n/ ? $1 : '' } asked('/jar/livesoon');
+check("@jar_soon[0, -1]" eq ' w=3' && @jar_soon == 2 && $jar_cookie->('/jar/livelate') eq 'w=3' && !(grep { m{/jar/live(?:soon|late) was fetched ahead for the page} } log_of('livejarsoon')),
+    'a data GET told ahead is begun only while the jar holds no cookie for it, and when a cookie was set before the page asks, what was begun is dropped and the request is made then, with the cookie; one told ahead when the jar has a cookie is made once, by the page\'s ask', 'soon: ' . join('|', @jar_soon) . '; late: ' . $jar_cookie->('/jar/livelate'));
 # The one exception to [C7]: a provider connected in a profile, here a stand-in on hosts of this test site.
 my $sso_cookie = sub { my ($path) = @_; my @all = asked($path); return @all != 1 ? "asked " . scalar(@all) . " times" : $all[0]{bytes} =~ /\r\nCookie: ([^\r]*)\r\n/ ? $1 : '' };    # the line Cookie the one request for this path carried, '' for none
 my $sso_host = sub { my @all = asked($_[0]); return @all == 1 && $all[0]{bytes} =~ /\r\nHost: ([^\r]+)\r\n/ ? $1 : '' };
@@ -5484,7 +5521,7 @@ check("@sound_bad_heard" eq '1 2 3 4 5 6 7 8 9 10 11' && join('/', @sound_bad_en
 check((out('scrollwire') =~ s/\s+$//r) eq 'page scroll 0 0 0,page scroll 0 0 120,page scroll 0 0 50,page scroll 0 0 60,page scroll 0 0 40,page scroll 0 0 200000,page scroll 0 0 7,page scroll 0 0 7,page scroll 1 0 9 frames=1 dues=7',
     'the window, read from lzrprf and run with no window, says where it shows a page kept running ("page scroll T X Y", T the tab shown) when the page starts running and after each drawing, and as you scroll at most once a frame however often the view moved, in whole pixels up to 200000; lzrprf\'s own "scroll T X Y" is said back once at once and shown, and said again only where the view stops short of it; a line for another tab or of no form scrolls nothing, nothing is said while no page is kept running, and a frame asked for before another tab was chosen says nothing',
     out('scrollwire') =~ s/\s+$//r || err('scrollwire') =~ s/\s+/ /gr);
-check((out('scrollorder') =~ s/\s+$//r) eq 'page scroll 0 0 0,page scroll 0 0 300,page scroll 0 0 500,page scroll 0 0 800,page scroll 0 0 1000 at=0,500,500,500,1000',
+check((out('scrollorder') =~ s/\s+$//r) eq 'page scroll 0 0 0,page scroll 0 0 300,page scroll 0 0 500,page scroll 0 0 800,page scroll 0 0 1000 at=0,500,500,500,1000 runs=Pp0|T@x|T@y|T@b|T@c page refresh 0',
     'the window\'s own reader of lzrprf\'s lines, read from lzrprf and run with no window: a script\'s scroll to 500 that came with a drawing which made the page longer leaves the window at 500 and says only 500 back, never the place before; a drawing after it with no scroll keeps 500, a scroll for another tab moves nothing, and once you scroll elsewhere the next drawing keeps where you read',
     out('scrollorder') =~ s/\s+$//r || err('scrollorder') =~ s/\s+/ /gr);
 my @fetch_heard = grep { !/^pid / } live_heard('livefetch', 'livefetch');
@@ -5593,8 +5630,16 @@ my @ahead_log = log_of('permitahead');
 check(join('/', @ahead_replies) eq "script $t/out/permitscript 200 26/script $t/out/permitdata?ahead 200 26"
     && (grep { $_ eq "the page $t/out/livepermitfetchahead names the script $t/out/permitdata?ahead; lzrprf fetches it ahead, for when the page asks for it" } @ahead_log) == 1
     && (grep { index($_, "$t/out/permitdata?ahead was fetched ahead for the page: answered: ") == 0 } @ahead_log) == 1
-    && !(grep { /permitdata\?(?:never|old)/ } @ahead_log),
-    'a page of a site you allowed has the second script it names fetched ahead when it asks for its first, and is handed that answer; a script inside noscript and one marked nomodule are never fetched',
+    && !(grep { /permitdata\?(?:never|old)/ } @ahead_log)
+    && join('/', permit_heard('permitahead', 'told ahead')) eq '200 26/200 26/200 26'
+    && (grep { index($_, "$t/out/permitdata?dat was fetched ahead for the page: answered: ") == 0 } @ahead_log) == 1
+    && (grep { $_ eq "the page $t/out/livepermitfetchahead names for an early load $t/out/permitdata?pic; lzrprf fetches it ahead, for when the page asks for it" } @ahead_log) == 1
+    && (grep { index($_, "$t/out/permitdata?pic was fetched ahead for the page: answered: ") == 0 } @ahead_log) == 1
+    && (grep { $_ eq "the page $t/out/livepermitfetchahead names the script $t/out/permitdata?soon; lzrprf fetches it ahead, for when the page asks for it" } @ahead_log) == 1
+    && (grep { index($_, "$t/out/permitdata?soon was fetched ahead for the page: answered: ") == 0 } @ahead_log) == 1
+    && (grep { $_ eq "the page $t/out/livepermitfetchahead asked for $t/out/permitdata?soon (GET, script)" } @ahead_log) == 1
+    && !(grep { m{shield/block} } @ahead_log) && !(grep { /permitdata\?unallowed/ } @permit_fetch_log),
+    'a page of a site you allowed has the second script it names fetched ahead when it asks for its first, and is handed that answer; a script inside noscript and one marked nomodule are never fetched; a script, a picture or a plain data GET its script tells ahead ("=soon") is begun with the same lines and handed over when the page asks for it, and one the shield blocks, or one of a site whose scripts are not allowed, is never begun',
     join('/', @ahead_replies) . ' log=' . join(' | ', grep { /ahead|never|old/ } @ahead_log));
 my @bytes_replies = permit_heard('permitbytes', 'reply');
 check(join('/', @bytes_replies) eq "script $t/out/permitscript 403 0/module $t/sheet/css?bytes 200 21"
@@ -6156,8 +6201,8 @@ check(join(' ', sort keys %programs) eq "@known" && $text_of_lzrprf !~ /\bsystem
 my @supers = grep { !m{^\s*//} } grep { /ObjC\.super\(/ } split /\n/, $text_of_lzrprf;
 my @blocks_on_press = grep { !m{^\s*//} } grep { /MonitorForEvents|'sendEvent:'/ } split /\n/, $text_of_lzrprf;
 my %pressed_first = map { $_ => 1 } ($text_of_lzrprf =~ /^ObjC\.registerSubclass\(\{ name: 'Lzrprf(\w+)', superclass: 'NSView', methods: (?:clickThrough\()?\{\n(?:    .*\n)*?    'mouseDown:': \{ implementation: function \(event\) \{ pressSeen\(event\); \w+\((?:event)?\); \} \}/mg);
-check(!@supers && !@blocks_on_press && join(' ', sort keys %pressed_first) eq 'Belt Cog Faces Frame Home Marks Star Tabs' && $text_of_lzrprf =~ /^function pressSeen\(event\) \{ \}/m,
-    'the chrome handles a press from the mouseDown: of each of its own views (the frame, the home page, the tabs, the belt, the cogwheel, Profiles, the star, the bookmarks bar), before the view\'s own handling of it; no press depends on what a block hands back (no monitor of the application\'s events: the bridge hands AppKit back its own wrapper of the event, and in release 75 every press was lost), and no class of the window takes sendEvent: or calls ObjC.super (in release 74 that went back into itself once the system observed the window, and every press hung it)',
+check(!@supers && !@blocks_on_press && join(' ', sort keys %pressed_first) eq 'Belt Cog Cover Faces Frame Home Marks Star Tabs' && $text_of_lzrprf =~ /^function pressSeen\(event\) \{ \}/m,
+    'the chrome handles a press from the mouseDown: of each of its own views (the frame, the home page, the tabs, the belt, the cover over the address bar, the cogwheel, Profiles, the star, the bookmarks bar), before the view\'s own handling of it; no press depends on what a block hands back (no monitor of the application\'s events: the bridge hands AppKit back its own wrapper of the event, and in release 75 every press was lost), and no class of the window takes sendEvent: or calls ObjC.super (in release 74 that went back into itself once the system observed the window, and every press hung it)',
     scalar(@supers) . ' calls of ObjC.super, ' . scalar(@blocks_on_press) . ' monitors or sendEvent:, pressed first by ' . (join(' ', sort keys %pressed_first) || 'none'));
 check($text_of_lzrprf =~ /^            POSIX::_exit\(0\) if !defined \$second \|\| \$second;\n(?:            #.*\n)*            my \$nowhere = POSIX::open\('\/dev\/null', O_RDWR\) \/\/ POSIX::_exit\(127\);\n            POSIX::dup2\(\$nowhere, \$_\) \/\/ POSIX::_exit\(127\) for 0 \.\. 2;\n            seal\(\);\n            for \(1 \.\. 80\) \{/m,
     'after Close and restart, the process that waits to start the application again first lets go of the window\'s pipes and every other descriptor, so the window sees lzrprf end and closes at once rather than after the 20 seconds that process waits',
@@ -6169,7 +6214,7 @@ check($text_of_lzrprf =~ /^            my \$pid = fork \/\/ next;\n            i
     'a request begun ahead by the one copy that makes them all is ended as one lzrprf began itself was: each is a group of its own, ended with the curl it started when the visit is dropped (sub prefetch_end ends every one not done, by the number its maker told, and then the maker, and reaps it); and when lzrprf goes away its maker sees that and ends, and each of its copies then carries nothing on (sub alive: its parent is no longer the one it began under)',
     'the lines of sub prefetch_made, sub prefetch_ended, sub prefetch_end and sub alive');
 my %calls = map { my $name = $_; $name => scalar(() = $text_of_lzrprf =~ /(?<![\w\$])$name\(/g) } 'fetch', 'visit', 'fixed', 'reach', 'laid_out', 'pictured', 'sheeted', 'fonted', 'videoed', 'hls_fetched', 'prefetch_begin';
-check("@calls{'fetch', 'visit', 'fixed', 'reach', 'laid_out', 'pictured', 'sheeted', 'fonted', 'videoed', 'hls_fetched', 'prefetch_begin'}" eq '8 1 10 1 7 7 2 2 1 1 1' && $text_of_lzrprf =~ /^        my \$got = fixed\("the live debug link sent " \. /m && $text_of_lzrprf =~ /^            fixed\("the live debug link sent a picture of the window: /m && $text_of_lzrprf =~ /^    return if \(\$LINK\{local\} \/\/ 0\) == 2;    # this Mac only: no sender is started\n/m && $text_of_lzrprf =~ /^                my \(\$got, \$why, \$peer\) = fetch\(\$one->\{url\}, \$one->\{where\}, \$one->\{ask\}\);/m && $text_of_lzrprf =~ /^    beside_wanted\(\$url, \$host, \$got, \$kept, \$where\);/m && $text_of_lzrprf =~ /^sub beside_wanted \{ \$BESIDE_WANTED = \[\@_\]; prefetch_begin\(\@_\); return \}/m && $text_of_lzrprf =~ /^    my \@sheeted = sheeted\(\$named, \$host, \$where, \$kept\) or return;/m && $text_of_lzrprf =~ /^        my \(\$frame, \$with\) = sheeted\(\$named, \$host, \$where, \$kept\) or return idle\(\$UNWRITTEN\);/m && $text_of_lzrprf =~ /^    my \$got = fixed\('you chose to add ' \. join/m && $text_of_lzrprf =~ m{^        elsif \(\$event =~ /\^video \(0\|\[1-9\]\[0-9\]\?\)\$/ && \$1 < \$VIDEOS\) \{ videoed\(\$1\) \}    # \[C22\] }m && $text_of_lzrprf =~ /^    my \(\$got, \$why, \$from\) = fetch\(\$url, \$to, undef, undef, \[\$listed \? \$HLS_PLAYLIST : \$VIDEO_BYTES, \$VIDEO_SECONDS\], \$heard\);/m && $text_of_lzrprf =~ /^        my \(\$got, \$why\) = fetch\(\$address, \$to, undef, undef, \[/m && $text_of_lzrprf =~ /^            \(\$stream, \$words, \$locked, \$kind, \$how\) = hls_fetched\(\$url, /m && $text_of_lzrprf =~ /^    my \$got = fixed\("you sent a report of a wrong block: /m && $text_of_lzrprf =~ /^    my \$got = fixed\('you sent a support request' /m && $text_of_lzrprf =~ /^    my \$got = fixed\("you read the answer to your support request: /m && $text_of_lzrprf =~ /^        \(\$got, \$why, \$from\) = fetch\(\$url, \$where, \{ method => \$method, /m && $text_of_lzrprf =~ /^sub live_fetched \{/m && $text_of_lzrprf =~ /^    my \(\$shown, \$fetched, \$wanted, \$decoded\) = pictured\(\$lines, \$paths, \$host, \$where, \$kept, undef, \$got\);$/m && $text_of_lzrprf =~ /^        window\("page \$TAB", \@\{ \(pictured\(\$lines, \$paths, \$host, \$where, \$kept, pictures_so_far\(\$host\)\)\)\[0\] \}, '\.'\);    # nothing is fetched/m && $text_of_lzrprf =~ /^        my \(\$shown\) = pictured\(@\{ \$P->\{early\} \}, undef, undef, pictures_so_far\(\$P->\{host\}\)\);$/m && $text_of_lzrprf =~ /^        my \(\$shown\) = pictured\(\$again\[0\], \$again\[2\], \$SHOWN->\{host\}, undef, undef, \$SHOWN->\{pictures\}\);$/m && $text_of_lzrprf =~ /^                \(\$shown\) = pictured\(\$checked, \$live->\{paths\}, \$live->\{host\}, undef, undef, \$live->\{pictures\}\);/m && $text_of_lzrprf =~ /^        my \(\$frame, \$with\) = sheeted\(\$named, \$host, \$where, \$kept\) or return idle\(\$UNWRITTEN\);$/m && $text_of_lzrprf =~ m{^        if \(\$event =~ /\^go \(\[\\x20-\\x7f\]\{1,2100\}\)\$/\) \{ typed\(\$1\) \}}m && $text_of_lzrprf =~ m{^sub typed \{\n(?:    (?!.*\b(?:fetch|visit|fixed|reach)\().*\n){1,8}\}\n}m && $text_of_lzrprf =~ m{^sub navigated \{\n(?:    (?!.*\b(?:fetch|visit|fixed|reach)\().*\n){1,8}\}\n}m && $text_of_lzrprf =~ /^sub go \{\n    my \@next = \@_;\n    \@WAY = \(\);\n    \$WENT = now\(\);  +# [^\n]*\n    while \(\@next\) \{\n        undef \$NEXT;\n        visit\(\@next\);\n/m && $text_of_lzrprf =~ /^    return idle\(\$says\) unless ask\(.* == 2;.*\n    idle\(.*fixed\(/m && $text_of_lzrprf =~ /^    return unless \$may eq 'yes';\n    return newer_looked\(/m && $text_of_lzrprf =~ /^    return newer_looked\(.*, 1\) if \$asked;\n/m && $text_of_lzrprf =~ /^sub newer_looked \{\n(?:    .*\n){4}    my \$got = fixed\(/m && $text_of_lzrprf =~ /^    return \$back->\(\) unless ask\("A newer release of .* == 2;\n    installed\(/m,
+check("@calls{'fetch', 'visit', 'fixed', 'reach', 'laid_out', 'pictured', 'sheeted', 'fonted', 'videoed', 'hls_fetched', 'prefetch_begin'}" eq '8 1 10 1 7 7 2 2 1 1 1' && $text_of_lzrprf =~ /^        my \$got = fixed\("the live debug link sent " \. /m && $text_of_lzrprf =~ /^            fixed\("the live debug link sent a picture of the window: /m && $text_of_lzrprf =~ /^    return if \(\$LINK\{local\} \/\/ 0\) == 2;    # this Mac only: no sender is started\n/m && $text_of_lzrprf =~ /^                my \(\$got, \$why, \$peer\) = fetch\(\$one->\{url\}, \$one->\{where\}, \$one->\{ask\}\);/m && $text_of_lzrprf =~ /^    beside_wanted\(\$url, \$host, \$got, \$kept, \$where\);/m && $text_of_lzrprf =~ /^sub beside_wanted \{ \$BESIDE_WANTED = \[\@_\]; prefetch_begin\(\@_\); return \}/m && $text_of_lzrprf =~ /^    my \@sheeted = sheeted\(\$named, \$host, \$where, \$kept\) or return;/m && $text_of_lzrprf =~ /^        my \(\$frame, \$with\) = sheeted\(\$named, \$host, \$where, \$kept\) or return idle\(\$UNWRITTEN\);/m && $text_of_lzrprf =~ /^    my \$got = fixed\('you chose to add ' \. join/m && $text_of_lzrprf =~ m{^        elsif \(\$event =~ /\^video \(0\|\[1-9\]\[0-9\]\?\)\$/ && \$1 < \$VIDEOS\) \{ videoed\(\$1\) \}    # \[C22\] }m && $text_of_lzrprf =~ /^    my \(\$got, \$why, \$from\) = fetch\(\$url, \$to, undef, undef, \[\$listed \? \$HLS_PLAYLIST : \$VIDEO_BYTES, \$VIDEO_SECONDS\], \$heard\);/m && $text_of_lzrprf =~ /^        my \(\$got, \$why\) = fetch\(\$address, \$to, undef, undef, \[/m && $text_of_lzrprf =~ /^            \(\$stream, \$words, \$locked, \$kind, \$how\) = hls_fetched\(\$url, /m && $text_of_lzrprf =~ /^    my \$got = fixed\("you sent a report of a wrong block: /m && $text_of_lzrprf =~ /^    my \$got = fixed\('you sent a support request' /m && $text_of_lzrprf =~ /^    my \$got = fixed\("you read the answer to your support request: /m && $text_of_lzrprf =~ /^        \(\$got, \$why, \$from\) = fetch\(\$url, \$where, \{ method => \$method, /m && $text_of_lzrprf =~ /^sub live_fetched \{/m && $text_of_lzrprf =~ /^    my \(\$shown, \$fetched, \$wanted, \$decoded\) = pictured\(\$lines, \$paths, \$host, \$where, \$kept, undef, \$got\);$/m && $text_of_lzrprf =~ /^    my \$sent = \$first \? \(pictured\(\$lines, \$paths, \$host, \$where, \$kept, pictures_so_far\(\$host\)\)\)\[0\] : undef;\n    my \$first_mark; .*\n    if \(\$first\) \{\n        window\("page \$TAB", \@\$sent, '\.'\); \$first_mark = \$WINDOW_LISTS;    # nothing is fetched/m && $text_of_lzrprf =~ /^        my \(\$shown\) = pictured\(@\{ \$P->\{early\} \}, undef, undef, pictures_so_far\(\$P->\{host\}\)\);$/m && $text_of_lzrprf =~ /^        my \(\$shown\) = pictured\(\$again\[0\], \$again\[2\], \$SHOWN->\{host\}, undef, undef, \$SHOWN->\{pictures\}\);$/m && $text_of_lzrprf =~ /^                \(\$shown\) = pictured\(\$checked, \$live->\{paths\}, \$live->\{host\}, undef, undef, \$live->\{pictures\}\);/m && $text_of_lzrprf =~ /^        my \(\$frame, \$with\) = sheeted\(\$named, \$host, \$where, \$kept\) or return idle\(\$UNWRITTEN\);$/m && $text_of_lzrprf =~ m{^        if \(\$event =~ /\^go \(\[\\x20-\\x7f\]\{1,2100\}\)\$/\) \{ typed\(\$1\) \}}m && $text_of_lzrprf =~ m{^sub typed \{\n(?:    (?!.*\b(?:fetch|visit|fixed|reach)\().*\n){1,8}\}\n}m && $text_of_lzrprf =~ m{^sub navigated \{\n(?:    (?!.*\b(?:fetch|visit|fixed|reach)\().*\n){1,8}\}\n}m && $text_of_lzrprf =~ /^sub go \{\n    my \@next = \@_;\n    \@WAY = \(\);\n    \$WENT = now\(\);  +# [^\n]*\n    while \(\@next\) \{\n        undef \$NEXT;\n        visit\(\@next\);\n/m && $text_of_lzrprf =~ /^    return idle\(\$says\) unless ask\(.* == 2;.*\n    idle\(.*fixed\(/m && $text_of_lzrprf =~ /^    return unless \$may eq 'yes';\n    return newer_looked\(/m && $text_of_lzrprf =~ /^    return newer_looked\(.*, 1\) if \$asked;\n/m && $text_of_lzrprf =~ /^sub newer_looked \{\n(?:    .*\n){4}    my \$got = fixed\(/m && $text_of_lzrprf =~ /^    return \$back->\(\) unless ask\("A newer release of .* == 2;\n    installed\(/m,
     'a request has six roads and no seventh: "visit", through "go" alone, for an address from the bar (or the search made of its words, "sub typed"), back, forward or reload ("sub navigated", an address the tab went to), a bookmark, the home page or a redirect you said yes to; "pictured" and "sheeted" from "visit" for the pictures of its page, on its host or another, and its style sheets on its own host ("pictured" once more from "relaid" and once from "live_answered", for a page kept running that drew again, each with the pictures kept and nothing to fetch; and once from "live_early", for the list a page hands over before its scripts run, with grey boxes and nothing to fetch, and once from "pictures_pumped", for that list drawn again when the pictures begun ahead are all decoded, nothing fetched by it); "fixed" five times, each behind a yes: a report, a report of a wrong block a filter list or the content shield made [C28], the look for a newer release, the signed manifest beside each installer of a newer release that look found [C25], the installer after "Install it"; "fixed" once from Add or remove LZR modules, behind its Restart, for the number of the published release whose installer adds a part (sub parts_fetched); "fixed" twice more, from the cogwheel\'s menu, for a support request you send and for the reading of its answer, both to the one support address of the release file; "fixed" twice more from the sender of the live debug link, which runs only while you switched the link on and never when it was asked for this Mac only [C31], for its lines and for a picture the window drew of itself, both to the one address of the link; "live_fetched", for an address a page kept running asked for [C19], and "prefetch_begin" from "visit" alone, for the scripts that page names, each fetched ahead with the very request the page makes [C19]; and "videoed", from a click on a video\'s place, for that one video of the page shown, which fetches once itself and, for an HLS stream, once more for each playlist and segment of it from "hls_fetched", called from "videoed" alone [C22]; "fetch" is called from those six and from what "prefetch_begin" starts and "reach" from "fetch" alone', join(' ', map { "$_:$calls{$_}" } sort keys %calls));
 my ($window_js) = $text_of_lzrprf =~ /^sub window_text \{\n    return <<'END';\n(.*?)^END$/ms; $window_js .= $1 if defined $window_js && $text_of_lzrprf =~ /^sub window_trmnl_text \{\n    return <<'END';\n(.*?)^END$/ms;    # and the terminal's part of it [C29]
 my %functions; $functions{$_}++ for ($window_js // '') =~ /^function (\w+)\(/mg;
@@ -6188,8 +6233,8 @@ check(@text_views >= 5 && !@unchecked && !@kept_on && ($window_js // '') =~ /^  
 my %marks = map { $_ => 1 } $text_of_lzrprf =~ /^#   \[(C\d+)\]/mg;
 my ($head, $body) = split /^use strict;$/m, $text_of_lzrprf, 2;
 my %marked = map { $_ => 1 } ($body // '') =~ /\[(C\d+)\]/g;
-check($text_of_lzrprf =~ /^sub ask \{ my \(\$words, \@buttons\) = \@_; return asked\('ask ' \. .*, \@buttons\) \}\n/m && $text_of_lzrprf =~ /^sub asked \{.*\n(?:.*\n)*?    my \$until = now\(\) \+ \$ANSWER_SECONDS;\n    while \(\(my \$left = \$until - now\(\)\) > 0\) \{\n        my \$event = hear\(\$left\) \/\/ leave\(\);\n        return \$1 if \$event =~ \/\^button \$ASKED \(\[1-4\]\)\$\/ && \$1 <= \@buttons;\n        viewing\(\$event\);.*\n    \}\n    return 1;\n\}\n/m && $text_of_lzrprf =~ /asked\("redirect \$status\\t\$url\\t" \. \(\$to \/\/ ''\) \. "\\t\$why", 'Cancel', /,
-    'a question nobody answers in the window counts as its first button, the one that fetches, sends, replaces and keeps nothing, or keeps less: read in "sub asked", which "sub ask" hands its question to and the redirect modal uses with Cancel first, where the time running out returns 1, a press of a button the question does not have is not taken, and a closed window ends lzrprf (a test would have to wait 10 minutes)', 'read, not tried');
+check($text_of_lzrprf =~ /^sub ask \{ my \(\$words, \@buttons\) = \@_; return asked\('ask ' \. .*, \@buttons\) \}\n/m && $text_of_lzrprf =~ /^sub asked \{.*\n(?:.*\n)*?    my \$until = now\(\) \+ \$ANSWER_SECONDS;\n    while \(\(my \$left = \$until - now\(\)\) > 0\) \{\n        my \$event = hear\(\$left\) \/\/ leave\(\);\n        return \$1 if \$event =~ \/\^button \$ASKED \(\[1-4\]\)\$\/ && \$1 <= \@buttons;\n(?:        if \(\$event =~ \/\^button \/\) \{ push \@LATER, \$event; next \}.*\n)?        viewing\(\$event\);.*\n    \}\n    return 1;\n\}\n/m && $text_of_lzrprf =~ /asked\("redirect \$status\\t\$url\\t" \. \(\$to \/\/ ''\) \. "\\t\$why", 'Cancel', /,
+    'a question nobody answers in the window counts as its first button, the one that fetches, sends, replaces and keeps nothing, or keeps less: read in "sub asked", which "sub ask" hands its question to and the redirect modal uses with Cancel first, where the time running out returns 1, a press of a button the question does not have is not taken (the answer to an earlier question still standing is kept for the main loop), and a closed window ends lzrprf (a test would have to wait 10 minutes)', 'read, not tried');
 check($text_of_lzrprf =~ /^            if \(length \$link->\[2\] && \$link->\[4\] <= \$link->\[5\] && vec\(\$write, fileno \$to, 1\)\) \{/m && $text_of_lzrprf =~ /^    while \(now\(\) < \$until && length \$got <= \$bytes \+ \$WROTE_ROOM && .*!grep \{ \$_->\[4\] > \$_->\[5\] \} \@links\) \{/m && $text_of_lzrprf =~ /^    my \$capped = !\$done && length \$got > \$bytes \+ \$WROTE_ROOM;/m && $text_of_lzrprf =~ /^    return \(undef, 'the answer is larger than lzrprf takes'\) if \$capped \|\| /m && $text_of_lzrprf =~ /^    return \(\$got, undef, \$peer, \$certs\) if \$done && \$how == 0 /m, 'what is carried between curl and the site stops at the allowance of each side: a side that sent more has nothing more passed on, and the request ends; and an answer is taken only when curl\'s output was read to its end, so one whose reading stopped on its length is refused whatever it holds, a line like the one curl writes before the certificates among it too; read in "sub fetch"', 'read, not tried');
 my ($in_time, $gone) = hears();
 check(defined $in_time && $in_time eq '' && !defined $gone, 'the two ends of a question are told apart: "sub hear" of lzrprf, run against a pipe of the test\'s own, gives an empty line when nothing is said in time, so "sub ask" answers 1, and nothing when the window is gone, so lzrprf ends', defined $in_time ? (defined $gone ? 'the same for both' : 'time over: an empty line; window gone: nothing') : 'time over: nothing, as if the window were gone');

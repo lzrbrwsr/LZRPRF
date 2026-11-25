@@ -358,8 +358,8 @@ function heard(line) {
         if (typeof listPatch != 'undefined' && listPatch) {
             var old = listFor == selected ? drawnLines : drawings[listFor] && drawings[listFor].lines, patch = listPatch;
             listPatch = null;
-            if (!old || patch[0] > old.length || patch[1] > old.length - patch[0]) { say('page refresh ' + listFor); again = false; return; }
-            lines = old.slice(0, patch[0]).concat(lines, old.slice(patch[0] + patch[1]));
+            var whole = patch.length == 1 ? runsOf(old, lines, patch[0]) : !old || patch[0] > old.length || patch[1] > old.length - patch[0] ? null : old.slice(0, patch[0]).concat(lines, old.slice(patch[0] + patch[1]));
+            if (!whole) { say('page refresh ' + listFor); again = false; return; } lines = whole;
         }
         if (listFor != selected && listFor >= 0 && listFor < tabs.length) {    // a list for a tab that is not in front: it becomes that tab's kept drawing, and the screen stays as it is
             var before = drawings[listFor];
@@ -369,7 +369,7 @@ function heard(line) {
             return;
         }
         drawnLines = lines;
-        try { draw(lines); } catch (fault) { drawnLines = []; unlaid(); page.string = $(''); listed([]); say('fault ' + String(fault).replace(/[^\x20-\x7e]/g, '?').slice(0, 200)); }
+        try { var drewAt = typeof linkId != 'undefined' && linkId ? Date.now() : 0; draw(lines); if (drewAt) say('link drew ' + (Date.now() - drewAt)); } catch (fault) { drawnLines = []; unlaid(); page.string = $(''); listed([]); say('fault ' + String(fault).replace(/[^\x20-\x7e]/g, '?').slice(0, 200)); }
         again = false;
         if (scrollWanted !== null) { pageScrollApply(scrollWanted); pageScrollTell(false); }    // the page's own place, which its drawing came with: shown from there, and said only where the view stops elsewhere
         else pageScrollTell(true);    // where this drawing is shown from: lzrprf hands a page only what it was not told already
@@ -380,7 +380,7 @@ function heard(line) {
     var aside = selected != perlTab;    // the window shows a tab lzrprf has not been told of yet: what lzrprf says of its own tab's bar, lock and arrows is said again once it is told
     if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
     if (word == 'picture') pictureBegun(rest); else if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
-    else if (word == 'patch') { var p = /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/.exec(rest); if (p) { listFor = +p[1]; listPatch = [+p[2], +p[3]]; list = []; again = true; } }
+    else if (word == 'patch' || word == 'runs') { var p = (word == 'patch' ? /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/ : /^(\d{1,2}) (\d{1,3})$/).exec(rest); if (p) { listFor = +p[1]; listPatch = word == 'patch' ? [+p[2], +p[3]] : [+p[2]]; list = []; again = true; } }    // runs: several stretches in one list (runsOf, 28-window-pointer.pl)
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
     else if (word == 'tabs') tabsTold(rest);
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
@@ -497,7 +497,7 @@ function place() {
     tabsView.frame = $.NSMakeRect(0, high - TABS_HIGH, wide, TABS_HIGH);
     belt.frame = $.NSMakeRect(0, row, wide, BAR_ROW);
     var inset = INCOGNITO ? 96 : 0;    // DECLARED(the incognito label: its mark, 22 points, and the word at 12 points, about 62, with a gap after)
-    bar.frame = $.NSMakeRect(pillAt + 42 + inset, row + 18, pillWide - 42 - 44 - inset, 20);
+    bar.frame = $.NSMakeRect(pillAt + 42 + inset, row + 18, pillWide - 42 - 44 - inset, 20); if (barCover) barCover.frame = bar.frame;
     star.frame = $.NSMakeRect(pillAt + pillWide - 40, row + 13, 30, 30);
     cog.frame = $.NSMakeRect(wide - 50, row + 13, 30, 30);
     if (faces) faces.frame = $.NSMakeRect(wide - 84, row + 13, 30, 30);
@@ -593,18 +593,18 @@ function laid(lines, first) {
     var previous = again ? sheet : null, old = previous || sheet;    // old: the page drawn until now, whose bitmaps a new page takes where a tile's place and rows are the same (a reload, a step within one site)
     if (!previous || Object.keys(inks).length > 256 || Object.keys(typefaces).length > 256) { inks = {}; typefaces = {}; }    // reuse ordinary pages; a changing page retains at most one checked frame plus 256 cached looks
     var size = /^L(\d+)x(\d+)$/.exec(lines[first]), next = { wide: +size[1], high: +size[2], ops: [], tiles: Object.create(null), saved: Object.create(null), buckets: {}, spanning: [] }, characters = 0;
-    var grey = $.NSColor.colorWithWhiteAlpha(0.55, 0.4), kept = {};    // the tiles of this page, by number: [wide, high, bitmap]
+    var grey = $.NSColor.colorWithWhiteAlpha(0.55, 0.4), kept = {}, roundNext = null;    // the tiles of this page, by number: [wide, high, bitmap]
     for (var at = first + 1; at < lines.length; at++) {
-        var line = lines[at], kind = line.charAt(0), saved = previous && previous.saved && previous.saved[line];
+        var line = lines[at], kind = line.charAt(0), saved = previous && previous.saved && previous.saved[line], roundFor = roundNext; if (kind != 'Q') roundNext = null;    // a rounded edge is for the very next line alone
         if (saved && /[RGVX]/.test(kind)) { next.ops.push(saved); next.saved[line] = saved; if (kind == 'X') characters += saved[8].length; continue; }
         var n = kind == 'X' ? line.slice(1).split(',', 3).map(Number) : line.slice(1).split(',').map(Number);
         if (kind == 'R') next.ops.push([n[1], n[3], 'R', n[0], n[2], colour(line.split(',')[4])]);    // [top, height, kind, left, width, what draws it, ...]
-        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(namedOp(line, grey));    // a picture placed by its name (28-window-pointer.pl)
+        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(roundedOp(namedOp(line, grey), roundFor)); else if (kind == 'Q') roundNext = n;    // a picture placed by its name, cut to the rounded edge a Q line before it gave (28-window-pointer.pl)
         else if (kind == 'V') next.ops.push([n[1], n[3], 'V', n[0], n[2], n[4]]);    // a video's place and its number: a play mark over its poster, drawn by videoMark, and the video once clicked
         else if (kind == 'M' || kind == 'K') {
-            var height = kind == 'M' ? n[5] : n[4], rows = lines.slice(at + 1, at + 1 + height), before = old && old.tiles && old.tiles[line];
+            var s = kind == 'K' && n[5] == 2 ? 2 : 1, height = kind == 'M' ? n[5] : n[4] * s, rows = lines.slice(at + 1, at + 1 + height), before = old && old.tiles && old.tiles[line];
             var same = before && before.rows.length == rows.length && before.rows.every(function (row, i) { return row === rows[i]; });
-            var image = same ? before.image : kind == 'M' ? picture(n[4], n[5], rows) : { wide: n[3], high: n[4], rows: rows, made: null };    // a tile is made from its rows the first time the view draws it (sub paint), so a page's first frame waits for the tiles it shows, not for all of them: decoding is 1.5 ms a tile, 40 ms for a page of 26 (measured 2026-11-24); lzrprf checked every row before it was handed over
+            var image = same ? before.image : kind == 'M' ? picture(n[4], n[5], rows) : { wide: n[3] * s, high: n[4] * s, rows: rows, made: null };    // a tile is made from its rows the first time the view draws it (sub paint), so a page's first frame waits for the tiles it shows, not for all of them: decoding is 1.5 ms a tile, 40 ms for a page of 26 (measured 2026-11-24); lzrprf checked every row before it was handed over
             var op = same ? before.op : kind == 'M' ? [n[1], n[3], 'M', n[0], n[2], image, n.length > 9 ? $.NSMakeRect(n[6] / 100, n[5] - (n[7] + n[9]) / 100, n[8] / 100, n[9] / 100) : $.NSZeroRect] : [n[2], n[4], 'M', n[1], n[3], image];    // an object-fit's part of the picture: its rows run down, the image's own space up
             next.tiles[line] = { rows: rows, image: image, op: op }; next.ops.push(op);
             if (kind == 'K') kept[n[0]] = [n[3], n[4], image];
@@ -655,10 +655,10 @@ function pageBack(look) {    // the room beside a laid page shows its colour: it
 }
 
 // The size of the page's view, in points, told to lzrprf as "view W H" when it changed: lzrprf
-// lays the page shown out again at that width (its sub relaid). Two whole numbers and nothing else.
+// lays the page shown out again at that width (its sub relaid). Two whole numbers, and 2 after them on a retina screen.
 function view() {
     if (typeof homeAvailable != 'undefined' && homeAvailable && !current && pageShown && liveOn && !listing) homeAsked(false);
-    var size = scroll.contentSize, z = zoomOf(selected), line = 'view ' + zoomWidth(size.width, z) + ' ' + zoomWidth(size.height, z);    // a page zoomed in is laid for a narrower page, zoomed out for a wider one
+    var size = scroll.contentSize, z = zoomOf(selected), line = 'view ' + zoomWidth(size.width, z) + ' ' + zoomWidth(size.height, z) + (typeof win != 'undefined' && win && win.backingScaleFactor > 1.5 ? ' 2' : '');    // a page zoomed in is laid for a narrower page, zoomed out for a wider one
     if (line == viewing) return;
     viewing = line;
     say(line);
@@ -1311,7 +1311,7 @@ function beltClicked(event) {
     if (lockAt(at)) return secureToggled();
     secureHidden();
     if (!pillHit(at)) return windowHeld(event);    // beside the pill, the few points around it that take its press (pillReach) and the buttons, the row moves the window
-    if (!bar.enabled) return;
+    if (!bar.enabled || barSelectsAll(bar)) return;    // the first press beside the field selects the whole address too (barSelectsAll, 28-window1-tabs.pl)
     win.makeFirstResponder(bar);
     var editor = bar.currentEditor;
     if (editor && !editor.isNil()) editor.selectedRange = $.NSMakeRange(at.x < bar.frame.origin.x ? 0 : bar.stringValue.length, 0);
@@ -3807,7 +3807,7 @@ function paint(dirty) {
             if (op[0] > bottom || op[0] + op[1] < top) return;
             if (op[2] == 'X') return op[5].drawAtPointWithAttributes($.NSMakePoint(op[3], op[7]), op[6]);
             var box = $.NSMakeRect(op[3], op[0], op[4], op[1]);
-            if (op[2] == 'M') return (op[5].rows ? op[5].made || (op[5].made = tile(op[5].wide, op[5].high, op[5].rows)) : op[5]).drawInRectFromRectOperationFractionRespectFlippedHints(box, op[6] || $.NSZeroRect, 2, 1, true, $());    // a tile is made here once, the first time it is drawn (sub laid)
+            if (op[2] == 'M') return clippedTo(op.round, function () { (op[5].rows ? op[5].made || (op[5].made = tile(op[5].wide, op[5].high, op[5].rows)) : op[5]).drawInRectFromRectOperationFractionRespectFlippedHints(box, op[6] || $.NSZeroRect, 2, 1, true, $()); });    // a tile is made here once, the first time it is drawn (sub laid)
             if (op[2] == 'V') return videoMark(box, op[5]);
             op[5].setFill;
             $.NSRectFillUsingOperation(box, 2);    // over what is under it, so a colour that is partly clear shows the page through it
@@ -4121,7 +4121,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'framed:': { types: ['void', ['id']], implementation: function (sender) { framed(); } },
     'windowWillStartLiveResize:': { types: ['void', ['id']], implementation: function (note) { sizing(true); } },
     'windowDidEndLiveResize:': { types: ['void', ['id']], implementation: function (note) { sizing(false); viewNow(); } },
-    'windowDidChangeBackingProperties:': { types: ['void', ['id']], implementation: function (note) { glassPlaced(); } },
+    'windowDidChangeBackingProperties:': { types: ['void', ['id']], implementation: function (note) { glassPlaced(); view(); } },    // a move to a screen of another scale: the page is drawn again at its pixels
     'windowDidEnterFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
     'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },

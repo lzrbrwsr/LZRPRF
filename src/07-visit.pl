@@ -195,8 +195,10 @@ sub visit {
     timed('laid');
     my $title = $TITLED;                    # the title the run that is shown wrote
     my $first = grep { /^I\d/ } @$lines;    # the page draws pictures: it is shown at once with a grey box in the place of each, and drawn again with them once they came
+    my $sent = $first ? (pictured($lines, $paths, $host, $where, $kept, pictures_so_far($host)))[0] : undef;
+    my $first_mark;                               # the count of lists sent once the first went: the second is a patch of it only while the window still holds it (no list sent in between)
     if ($first) {
-        window("page $TAB", @{ (pictured($lines, $paths, $host, $where, $kept, pictures_so_far($host)))[0] }, '.');    # nothing is fetched for this one: a picture begun ahead and here, or decoded for the page this tab showed before, stands in its place; every other place is grey
+        window("page $TAB", @$sent, '.'); $first_mark = $WINDOW_LISTS;    # nothing is fetched for this one: a picture begun ahead and here, or decoded for the page this tab showed before, stands in its place; every other place is grey
         $DRAWN = 1;
         timed('list');
     }
@@ -205,9 +207,9 @@ sub visit {
     window("page $TAB", '.') if !$shown && $first;    # a line of a picture could not be written: the page drawn at once is taken away again, as nothing of this answer would have been shown before
     return live_dropped($live, $UNWRITTEN) unless $shown;
     timed($first ? 'pictured' : 'list');
-    window(($first ? 'relaid' : 'page') . " $TAB", @$shown, '.');    # the tab a list is for is named, so a list that arrives once another tab was chosen in the window goes to that tab's kept drawing; the second drawing keeps the place the page is read at
+    $first ? window_changed(defined $first_mark && $first_mark == $WINDOW_LISTS ? $sent : undef, $shown) : window("page $TAB", @$shown, '.');    # the tab a list is for is named, so a list that arrives once another tab was chosen in the window goes to that tab's kept drawing; the second drawing keeps the place the page is read at
     $DRAWN = 1;
-    $SHOWN = { url => $url, got => $got, frame => $with_sheets, two => $two, host => $host, where => $where, pictures => $decoded, videos => $videos, sites => [grep { elsewhere($_, $host) } @PICTURED], wide => $LAID_WIDE, list => $shown, used => ++$LIST_USED };    # list: what was sent, sent again from here when the tab is chosen again (sub tab_shown)
+    $SHOWN = { url => $url, got => $got, frame => $with_sheets, two => $two, host => $host, where => $where, pictures => $decoded, videos => $videos, sites => [grep { elsewhere($_, $host) } @PICTURED], wide => $LAID_WIDE, scale => $VIEW_SCALE, list => $shown, used => ++$LIST_USED };    # list: what was sent, sent again from here when the tab is chosen again (sub tab_shown)
     lists_bounded();
     live_kept($live, $tab, $lines, $paths, $host, $decoded, $shown, $videos) if $live;    # the page goes on with this tab: clicks and keys in it reach it, and what it draws again is checked as this list was
     live_told();
@@ -304,7 +306,7 @@ sub contained {
     $READ_ASKED = 0;                      # this run has asked for nothing yet, whatever way it ends
     return (undef, 'changed') unless program_same();    # read again before every run: the program on the disk is the file this window began with, or nothing is laid out
     $keep = 0 unless defined $sheets;     # a picture run is never kept
-    my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
+    my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]" . ($VIEW_SCALE == 2 ? " 2" : "") . "\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
     $frame .= permit_page($url, \$got) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
     $frame .= jar_frame($url) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
     $frame .= '=live ' . length($got) . "\n" if $keep;
@@ -344,7 +346,7 @@ sub contained {
         waitpid $_, 0 for $feeder, $page;
         return (undef, 'unstarted');
     }
-    my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
+    my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
     if ($soon && $keep) { $started->{fed} = $frame . $got if $soon eq 'beside'; return (undef, undef, $started) }
     beside_begun($started, $sheets, $keep, $tool);    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
     return run_read($started, $keep, $sheets, $tool);
@@ -359,7 +361,7 @@ sub page_started {
     my $seal = run_seal() // return;      # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
     my $page = fork // return;
     if (!$page) {
-        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
+        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
         chdir '/';
         the_program($answer_out, $to_lzrprf);    # [C1]
     }
@@ -661,9 +663,9 @@ sub laid {
     no warnings 'utf8';
     my ($wide, $high) = $lines->[$from] =~ /^L${N}x$N$/ or return;
     return unless defined $LAID_WIDE && $wide == $LAID_WIDE && $high >= 1 && $high <= 200_000;    # laid at the width its =view frame asked for, and at no other
-    my $state = { wide => $wide, high => $high, text => 0, pixels => 0, rows => 0, row_bytes => 0, row_chars => 0, above => 0, count => {}, tile => {} };
+    my $state = { wide => $wide, high => $high, text => 0, pixels => 0, rows => 0, row_bytes => 0, row_chars => 0, above => 0, rounded => 0, count => {}, tile => {} };
     laid_run($lines, $from + 1, $#$lines, $state, $paths, $videos) or return;
-    return if $state->{rows};             # a picture with rows missing
+    return if $state->{rows} || $state->{rounded};    # a picture with rows missing, or a rounded edge with no picture after it
     $LAID_TALLY = $state;                 # what the list holds, for a splice of it checked by itself (sub live_patched)
     utf8::encode($_) for @$lines;
     return ($lines, $hosts, $paths, $said, $sheets, $videos);
@@ -672,7 +674,7 @@ sub laid {
 sub laid_run {                            # the lines $first to $last of a laid list, checked in order from where $state says the list stands, and $state brought to after them; X lines are put in their shown form in place
     my ($lines, $first, $last, $state, $paths, $videos) = @_;
     no warnings 'utf8';
-    my ($wide, $high, $text, $pixels, $rows, $row_bytes, $row_chars, $above, $count, $tile) = @$state{qw(wide high text pixels rows row_bytes row_chars above count tile)};    # $row_chars: how long a row of the tile above is, 0 under a picture; $above: whether a row of that tile was checked above the next
+    my ($wide, $high, $text, $pixels, $rows, $row_bytes, $row_chars, $above, $count, $tile, $rounded) = @$state{qw(wide high text pixels rows row_bytes row_chars above count tile rounded)};    # $row_chars: how long a row of the tile above is, 0 under a picture; $above: whether a row of that tile was checked above the next
     my %count = %$count;
     my %tile = %$tile;
     my $inside = sub { my ($x, $y, $w, $h) = @_; return $w >= 1 && $h >= 1 && $x + $w <= $wide && $y + $h <= $high };
@@ -688,9 +690,11 @@ sub laid_run {                            # the lines $first to $last of a laid 
             $rows--;
             next;
         }
-        my ($kind) = /^([RXGMIKJV])/ or return;
+        my ($kind) = /^([RXGMIKJVQ])/ or return;
+        return if $rounded && $kind ne 'I'; $rounded = 0;    # a rounded edge Q is said of the fetched picture on the next line, and of nothing else
         return unless ++$count{$kind} <= $LAID{$kind};
         if ($kind eq 'R') { return unless /^R$N,$N,$N,$N,[0-9a-f]{8}$/ && $inside->($1, $2, $3, $4) }
+        elsif ($kind eq 'Q') { return unless /^Q$N,$N,$N,$N((?:,[0-9]{1,5}){8})$/ && $3 >= 1 && $4 >= 1 && $1 + $3 <= 200000 && $2 + $4 <= 200000 && !grep { $_ > 20000 } split /,/, substr($5, 1); $rounded = 1 }    # its rounded edge: a box and the eight radii of its corners, px
         elsif ($kind eq 'G') { return unless /^G$N,$N,$N,$N$/ && $inside->($1, $2, $3, $4) }
         elsif ($kind eq 'V') { return unless /^V$N,$N,$N,$N,$N$/ && $inside->($1, $2, $3, $4) && $5 < @$videos }
         elsif ($kind eq 'I') { return unless /^I$N,$N,$N,$N,$N(?:,([1-4]),$N,$N,$N,$N)?$/ && $inside->($1, $2, $3, $4) && $5 < @$paths && (!defined $6 || 4 == grep { $_ >= 1 && $_ <= 199999 } $7, $8, $9, $10) }    # a fit and a position (sub fit_crop)
@@ -698,7 +702,7 @@ sub laid_run {                            # the lines $first to $last of a laid 
             return unless /^M$N,$N,$N,$N,$N,$N(?:,$N,$N,$N,$N)?$/ && $inside->($1, $2, $3, $4) && $5 >= 1 && $5 <= 1024 && $6 >= 1 && $6 <= 1024 && ($pixels += $5 * $6) <= $PIXELS;
             return if defined $7 && ($9 < 1 || $10 < 1 || $7 + $9 > 100 * $5 || $8 + $10 > 100 * $6);    # the part of the picture a fit draws lies in it
             ($rows, $row_bytes, $row_chars) = ($6, $5 * 4, 0);
-        } elsif ($kind eq 'K') { return unless /^K$N,$N,$N,$N,$N$/ && $1 < $LAID{K} && !exists $tile{$1} && ($tile{$1} = $cut->($2, $3)) eq "$4,$5"; ($rows, $row_chars, $above) = ($5, 1 + 4 * $4, 0) }    # a tile is not counted in $PIXELS: 32 at most is its bound
+        } elsif ($kind eq 'K') { return unless /^K$N,$N,$N,$N,$N(,2)?$/ && $1 < $LAID{K} && !exists $tile{$1} && ($tile{$1} = $cut->($2, $3)) eq "$4,$5"; my $s = $6 ? 2 : 1; ($rows, $row_chars, $above) = ($5 * $s, 1 + 4 * $4 * $s, 0) }    # a tile is not counted in $PIXELS: 32 at most is its bound
         elsif ($kind eq 'J') { return unless /^J$N,$N,$N$/ && defined $tile{$1} && $tile{$1} eq $cut->($2, $3) }
         else {
             my ($head, $x, $y, $size, $chars) = /^(X$N,$N,$N,[\@-O],[0-9a-f]{6},)(.{1,$RUN_TEXT})\z/s or return;
@@ -708,7 +712,7 @@ sub laid_run {                            # the lines $first to $last of a laid 
             $_ = $head . $chars;
         }
     }
-    @$state{qw(text pixels rows row_bytes row_chars above count tile)} = ($text, $pixels, $rows, $row_bytes, $row_chars, $above, \%count, \%tile);
+    @$state{qw(text pixels rows row_bytes row_chars above count tile rounded)} = ($text, $pixels, $rows, $row_bytes, $row_chars, $above, \%count, \%tile, $rounded);
     return 1;
 }
 

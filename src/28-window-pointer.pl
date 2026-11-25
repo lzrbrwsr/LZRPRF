@@ -38,6 +38,29 @@ function pictureKept(rows) {
     if (!spec[0]) return;
     try { pictureNames[spec[0]] = { image: picture(spec[1], spec[2], rows), bytes: spec[1] * spec[2] * 4, used: namedTick }; } catch (fault) { delete pictureNames[spec[0]]; }    // rows that are no picture: its places stay grey
 }
+// A picture's rounded edge (a Q line before its N: x, y, w, h and the horizontal and vertical radius of the
+// top-left, top-right, bottom-right and bottom-left corners, px of the laid page, whose y grows downward): a
+// path the picture is drawn inside, so a picture in a box with rounded corners has them, as the box has.
+function roundedOp(op, q) { if (q && op[2] == 'M') op.round = roundEdge(q); return op; }
+function roundEdge(q) {
+    var x = q[0], y = q[1], w = q[2], h = q[3], r = q.slice(4, 12).map(function (v) { return Math.max(0, v); }), k = 0.4477, p = $.NSBezierPath.bezierPath;
+    var f = Math.min(1, w / Math.max(1e-6, r[0] + r[2]), w / Math.max(1e-6, r[4] + r[6]), h / Math.max(1e-6, r[1] + r[7]), h / Math.max(1e-6, r[3] + r[5]));    // radii that would overlap scaled down together (CSS Backgrounds 3 5.5)
+    r = r.map(function (v) { return v * f; });
+    var at = function (a, b) { return $.NSMakePoint(a, b); }, curve = function (to, c1, c2) { p.curveToPointControlPoint1ControlPoint2(to, c1, c2); };
+    p.moveToPoint(at(x + r[0], y));
+    p.lineToPoint(at(x + w - r[2], y)); curve(at(x + w, y + r[3]), at(x + w - r[2] * k, y), at(x + w, y + r[3] * k));
+    p.lineToPoint(at(x + w, y + h - r[5])); curve(at(x + w - r[4], y + h), at(x + w, y + h - r[5] * k), at(x + w - r[4] * k, y + h));
+    p.lineToPoint(at(x + r[6], y + h)); curve(at(x, y + h - r[7]), at(x + r[6] * k, y + h), at(x, y + h - r[7] * k));
+    p.lineToPoint(at(x, y + r[1])); curve(at(x + r[0], y), at(x, y + r[1] * k), at(x + r[0] * k, y));
+    p.closePath;
+    return p;
+}
+function clippedTo(path, draw) {    // draw() inside path, when there is one; the clip ends with it
+    if (!path) return draw();
+    var context = $.NSGraphicsContext.currentContext;
+    context.saveGraphicsState;
+    try { path.addClip; draw(); } finally { context.restoreGraphicsState; }
+}
 function namedOp(line, grey) {    // the drawing of a line N: the kept bitmap in its place, as a line M with rows is drawn, or a grey box when the window does not hold it
     var parts = line.slice(1).split(','), n = parts.slice(1).map(Number), one = pictureNames[parts[0]];
     if (!one) { namedMissing = true; return [n[1], n[3], 'G', n[0], n[2], grey]; }
@@ -141,6 +164,26 @@ function reloadPlaced() {    // the place a new drawing is shown from, or null w
     if (keep.tab != selected || keep.address != current || Date.now() > keep.until || keep.last !== null && sheet && Math.round(canvas.visibleRect.origin.y) != keep.last) { reloadPlace = null; return null; }
     return keep;
 }
+
+// "runs TAB K" (sub window_changed): the list the window holds with K stretches of it changed at once. The
+// first K lines say each stretch, "FIRST DROP COUNT", in the order of the list and by places in the list
+// held; the lines after them are the new lines of every stretch, one after another. null for anything that
+// does not fit the list held: the caller then asks for the whole list ("page refresh").
+function runsOf(old, lines, k) {
+    var out = [], from = 0, at = k;
+    if (!old || k < 1 || k > lines.length) return null;
+    for (var i = 0; i < k; i++) {
+        var h = /^(\d{1,6}) (\d{1,6}) (\d{1,6})$/.exec(lines[i]);
+        if (!h) return null;
+        var first = +h[1], drop = +h[2], count = +h[3];
+        if (first < from || first + drop > old.length || at + count > lines.length) return null;
+        for (var n = from; n < first; n++) out.push(old[n]);
+        for (var m = 0; m < count; m++) out.push(lines[at + m]);
+        from = first + drop; at += count;
+    }
+    if (at != lines.length) return null;
+    for (var r = from; r < old.length; r++) out.push(old[r]);
+    return out;
+}
 END
 }
-
