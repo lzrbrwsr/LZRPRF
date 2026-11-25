@@ -26,18 +26,25 @@
 # and a page that keeps to its bottom as it grows is still told its new bottom.
 # The window is told a place of the page's own scroll at most once a frame
 # ($LIVE_FRAME_SECONDS); one sooner waits, and only the newest.
-# While the page has not answered a line yet, a
-# scroll waits, and only the newest waits: a page that is slow to answer is
-# not sent a line for every frame, and a click or key after it sends it
-# first, in its order.
-# Each is written to the page as "=click", "=key", "=text" or "=scroll", at
-# most $LIVE_INPUT bytes, and nothing else ever is; a tab with no page kept
-# running takes none.
+# The pointer: "move X Y" where it is over the page, at most once a frame;
+# "down X Y" and "up X Y" for the primary button pressed and let go there
+# (a down is a press of yours for [C12]); "out" when it left the page.
+# While the page has not answered a line yet, a scroll waits, and a move
+# waits, only the newest of each: a page that is slow to answer is not sent a
+# line for every frame, and a click, press or key after them sends them
+# first, in their order.
+# Each is written to the page as "=click", "=move", "=down", "=up", "=out",
+# "=key", "=text" or "=scroll", at most $LIVE_INPUT bytes, and nothing else
+# ever is; a tab with no page kept running takes none.
 sub live_input {                          # [C18]
     my ($what) = @_;
     return trmnl_input($what) if $TABS[$TAB]{trmnl};    # [C29] a terminal's tab: its keys go to its shell, in their fixed forms
     my $live = live_of($TABS[$TAB]) or return;
-    return if $what =~ /^(?:click|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
+    return if $what =~ /^(?:click|move|down|up|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
+    if ($what =~ /^move /) {
+        if ($live->{waiting}) { $live->{move_held} = $what; return }    # the newest place of the pointer waits for the page's answer (sub live_answered), as a scroll does
+        return live_wrote($live, $what);
+    }
     if ($what =~ /^text (.*)\z/s) {
         my $text = $1;
         return unless $live->{focus} && utf8::decode($text) && $text !~ /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Co}\p{Cs}\p{NChar}]|[^\x{0}-\x{10ffff}]/;
@@ -58,8 +65,9 @@ sub live_input {                          # [C18]
     }
     delete @$live{qw(scroll_echo scroll_echoed scroll_clamp)};    # only the window's next place after its echo can say where it stopped short, and after a click or a key the page's places are told again
     live_wrote($live, delete $live->{scroll_held}) if defined $live->{scroll_held};    # a scroll that waits goes first: the lines keep their order
+    live_wrote($live, delete $live->{move_held}) if defined $live->{move_held} && !$live->{ended};    # and the pointer's place that waits, so a press is where the pointer is
     return if $live->{ended};
-    $live->{pressed} = now() if $what =~ /^(?:click |key (?!Escape(?: |\z)))/;    # [C12] a press of yours: the page may sound for $SOUND_PRESS_SECONDS after it (sub live_sound); Escape is none, as in the engine
+    $live->{pressed} = now() if $what =~ /^(?:click |down |key (?!Escape(?: |\z)))/;    # [C12] a press of yours: the page may sound for $SOUND_PRESS_SECONDS after it (sub live_sound); Escape is none, as in the engine
     live_wrote($live, $what);
 }
 
@@ -145,6 +153,9 @@ sub live_scroll_left {                    # [C18] the seconds until a place of t
 #                       page's life. A =play goes to the sound process (sub sound_told) only within
 #                       $SOUND_PRESS_SECONDS of a click or a key lzrprf handed the page, and only for the tab shown
 #                       (sub live_sounded)
+#   =cursor NAME        the shape of the pointer over the page (CSS cursor), one of %CURSORS, in any place before
+#                       =again: the window is told "cursor T NAME" for the tab shown; a name not among them is
+#                       passed over as a line lzrprf does not know
 #   =again              then the page's lines, as a first list has them after its head: checked by sub checked
 #                       with the first list's =pictures paths, =videos and U lines in front, at the width it was laid at,
 #                       and drawn in place of the drawing before, its decoded pictures placed again
@@ -187,7 +198,7 @@ sub live_answered {                       # [C18]
         $live->{looked} = 0;
         $live->{waiting}-- if $live->{waiting};
         my @lines = split /\n/, $answer;
-        my ($stage, $focus, $go, $words, $scroll, $shown, @layers, @sounds) = (0);
+        my ($stage, $focus, $go, $words, $scroll, $shown, $cursor, @layers, @sounds) = (0);
         my $before_shown = $live->{shown};
         while (@lines && $lines[0] ne '=again' && $lines[0] !~ /^=patch /) {
             my $line = shift @lines;
@@ -209,6 +220,8 @@ sub live_answered {                       # [C18]
                 my $wrong = live_sound($live, $line, \@sounds);
                 return live_end($live, "it wrote a sound lzrprf does not take: $wrong") if $wrong;
             }
+            elsif ($line =~ /^=cursor ([a-z-]{1,16})$/ && $CURSORS{$1}) { $cursor = $1 }    # the cursor over the page, before =again, in any place among the lines above
+            elsif ($line =~ /^=keep ([^\x00-\x20\x7f]{1,16000})$/) { jar_kept_write($live, $1) }    # [C7] a cookie the page's script set, before =again in any place: judged by the jar against the page's own address (sub jar_kept_write)
             elsif ($line =~ /^=([a-z0-9-]{1,32})(?: [\x20-\x7e]{0,8192})?$/ && !$LIVE_KNOWN{$1}) { live_unknown($live, $1) }    # a line of a later application: passed over
             else { return live_end($live, 'it wrote a line of no form') }
         }
@@ -245,6 +258,7 @@ sub live_answered {                       # [C18]
         }
         if (defined $scroll) { delete $live->{scroll_held} }    # the page's own scroll is newer than any place of the window's that waited for this answer: the window is told it and shows it, and the page is not handed the older place
         elsif (!$live->{waiting} && defined $live->{scroll_held}) { live_wrote($live, delete $live->{scroll_held}); return if $live->{ended} }    # the newest place that waited for this answer, once it was read
+        if (!$live->{waiting} && defined $live->{move_held}) { live_wrote($live, delete $live->{move_held}); return if $live->{ended} }    # the pointer's newest place that waited for this answer
         $live->{focus} = $focus if defined $focus;
         if (defined $scroll && (my $end = $live->{scroll_clamp})) {    # past where the window stopped short, on an axis it stopped on: told, the window would stop short again and the page be handed that, once a frame
             my @to = split / /, $scroll;
@@ -261,6 +275,7 @@ sub live_answered {                       # [C18]
         elsif (@layers) { $live->{layers_lost} = 1 }    # the window is shown another tab: this page's layers are made again once it is shown (sub live_layers_again)
         live_sounded($live, @sounds) if @sounds;    # [C12] a tab not shown sounds nothing
         next unless $live->{tab} == $TABS[$TAB];    # a tab not selected draws when it is chosen again (sub relaid), and follows no address
+        window("cursor $TAB $cursor") if defined $cursor;    # the shape of the pointer over the page shown (CSS cursor)
         if ($shown) { live_scroll_told($live); $quick ? window("patch $TAB @$quick[0, 1]", @{ $quick->[2] }, '.') : live_window_patch($before_shown, $shown); $live->{unsent} = 0; $DRAWN = 1 }    # where it was read in the page is kept, and where its script scrolled it goes just before
         live_told();
         window('home ready') if @layers && $live->{home} && !$live->{home_ready}++;
@@ -451,12 +466,12 @@ sub live_patched {
     my ($live, $start, $drop, $new) = @_;
     my ($old, $tally) = ($live->{raw}, $live->{tally});
     return unless $tally && $live->{plain} && $old && $start >= 1 && $drop <= @$old - $start && ($old->[0] // '') =~ /^L([0-9]+)x/ && $1 == $live->{wide};
-    return if grep { /^[KJMI=]/ } @$new, @$old[$start .. $start + $drop - 1];
+    return if grep { /^[KJMNI=]/ } @$new, @$old[$start .. $start + $drop - 1];
     my $at = sub {                        # where the list stands at the start of its line $p: the rows still to come of the item it is in, a tile row's length, a picture row's bytes, whether a row of its tile stands above
         my ($p) = @_;
         for (my $i = 1; $i < $p;) {
             my ($w, $h) = $old->[$i] =~ /^K[0-9]+,[0-9]+,[0-9]+,([0-9]+),([0-9]+)$/;
-            my ($pw, $ph) = defined $w ? () : $old->[$i] =~ /^M[0-9]+,[0-9]+,[0-9]+,[0-9]+,([0-9]+),([0-9]+)$/;
+            my ($pw, $ph) = defined $w ? () : $old->[$i] =~ /^M[0-9]+,[0-9]+,[0-9]+,[0-9]+,([0-9]+),([0-9]+)(?:,[0-9]+,[0-9]+,[0-9]+,[0-9]+)?$/;
             my $rows = $h // $ph // 0;
             return ($i + $rows - $p + 1, defined $w ? 1 + 4 * $w : 0, defined $pw ? 4 * $pw : 0, defined $w && $p > $i + 1 ? 1 : 0) if $i + $rows >= $p;
             $i += 1 + $rows;

@@ -27,83 +27,15 @@ the reader to check against the code. Regenerate with `perl tools/doc-index --wr
 | - Temporary files. The page container writes no ... | - | C10 | `incognito` |
 | - What it does not cover: what sites ... | - | - | - |
 | A Tor window is an incognito window that ... | `tor_window_opened` | C17 | - |
-| 1. The Tor window opens first. lzrprf says ... | `tor_session_on` | - | `tor` |
-| 2. Then its modal opens in it, flown ... | `tor_on` | - | - |
-| 3. When Tor is ready (tor on), the ... | - | - | - |
-| 4. Stop Tor says tor off; lzrprf asks ... | `tor_session_asked`, `tor_on` | - | `torkeep`, `torstopkeep` |
-| 5. Stop Tor answers it: the modal shows ... | `tor_session_end` | - | `tor`, `torstop`, `torflow` |
-<!-- index end -->
-
-`lzrprf incognito`, or "New Incognito Window" (Shift-Command-N) in the app menu or the cog
-menu, opens a second window of its own whose whole state lives in one folder that is removed
-when it ends `[C16]`. It is told apart at a glance: it glows violet instead of cyan, the word
-"Incognito" and a mask stand left of the address, and its new tab page says what it keeps and
-what it does not.
-
-Where its state lives. `sub incognito_begun` makes a folder `lzrprf-i.<pid>.<12 hex>` with mode
-0700 in your own temporary folder: `TMPDIR` when it is a folder of yours that nobody else can
-read, else yours under `/private/var/folders/.../T` (`sub temp_folder`). The log of the window,
-its tabs, its history and every answer are in the memory of the process behind the window or in
-that folder; a search engine chosen there and the bookmarks bar shown or hidden there are held in
-memory for that window only.
-
-What it reads from `~/.lzrprf`, read only, and why each: `proven`, `untested` and `selftest.lock`
-(no page is shown before the self-test held `[C11]`; an incognito window never runs the test,
-because the test writes its result, and says to open a normal window once instead); `home` (the
-home page opens); `search` (searches go where you chose); `marksbar` (the bar as you keep it);
-`pictures` (pictures from other sites as you keep them); `bookmarks` (your bookmarks open). Everything else of a normal window is not read, and nothing
-is written there: the star, the bookmark modal, the import wizard and "make this the home page"
-are refused with "An incognito window writes nothing", shown greyed out with that tooltip. The
-cogwheel's "Enter licence code..." and "Support request..." only say that an incognito window
-keeps no licence code and sends no support request; lzrprf refuses their lines from it too
-(`sub licence_set`, `sub support_sent`, `sub support_read`), and `licence` and `support` are
-not read. Its closed tabs to reopen are held in memory, as in every window. A tab pulled out of
-it opens an incognito window, whose address goes on a pipe and never in the list of processes.
-It has no profile: it shows no Profiles icon, is told no profile, and lzrprf refuses every word
-of one from it (run `profileincog`).
-
-Every way out removes the folder. The process behind the window removes it in `sub leave`
-whether the window was quit, its last window closed, Command-Q pressed or the window's process
-ended; it does the same on SIGINT, SIGTERM, SIGHUP and SIGQUIT. A third process, the sweeper,
-started in its own session and deaf to those signals, waits until the window's process is gone
-and the process behind it has let go of the lock on `held`, then removes the folder too. Only
-`kill -9` of all three at once (a crash, a power cut) leaves it; `sub swept`, at every start of
-any lzrprf window, removes every `lzrprf-i.*` folder of yours whose window process is gone.
-`sub removed` removes nothing whose name is not exactly that form.
-
-What macOS could keep, and what was checked:
-
-- Saved application state (the windows macOS reopens at login, under
-  `~/Library/Saved Application State`). The window's container refuses every file write, so
-  `osascript` cannot write it; on top of that an incognito window registers, in memory only,
-  `NSQuitAlwaysKeepsWindows` false and `ApplePersistenceIgnoreState` true, and sets its window's
-  `restorable` to false. Checked on the development Mac on 2026-11-20 after incognito windows were
-  run off the screen: that folder holds nothing for `osascript`, `perl` or lzrprf, and
-  `~/Library/Caches` and `~/Library/Preferences` hold no `com.apple.osascript` entry.
-- Recent documents. The window opens no document and has no `NSDocumentController`, so it adds
-  nothing to the recent items list. The list's own folder
-  (`~/Library/Application Support/com.apple.sharedfilelist`) is closed to a terminal by macOS
-  privacy settings, so that it is unchanged was not read directly.
-- Temporary files. The page container writes no file at all `[C10]`, the window's container none,
-  and the process behind the window writes into the incognito folder only. `selftest` run
-  `incognito` checks that afterwards no `lzrprf-i.<its pid>.*` is left in the temporary folder
-  and that every file of the run's lzrprf folder is byte for byte what it was.
-- What it does not cover: what sites see (your internet address and what you send them), and the
-  macOS unified log, which records process starts and sandbox refusals as for any program.
-
-## The Tor window
-
-A Tor window is an incognito window that Tor alone carries `[C17]`. The onion of a window that is not
-one asks lzrprf for a Tor window apart from it (`sub tor_window_opened`); Tor never carries the first.
-The order, fixed since H-0073 (Henry, 2026-11-23: turning Tor on used to jump straight to the incognito
-window with no animation, because the modal was opened only by a press of the onion in the Tor window
-itself, which nobody made there):
-
-1. The Tor window opens first. lzrprf says `startup ready`, the window is put on the screen, and only
-   then does `sub tor_session_on` say `torsession connecting` (run `tor` checks that order).
-2. Then its modal opens in it, flown out of the onion (`function torShown`; while the window is not on
-   the screen yet, it looks again a moment later). Its five stations light from the client's own log
-   lines, `tor step N PERCENT WORDS`, read by `sub tor_on`: the real progress of Arti, not a timer.
+| 1. The Tor window opens first. lzrprf says `startup ready`, the window is put on the screen, and only
+   then does it say `torsession made` (`sub behind`). Nothing connects by itself (Henry, 2026-11-24,
+   HC-0858): Tor is started only by Connect to Tor in the window's LZRTNNL modal (run `torwait`: a Tor
+   window left alone says `made`, starts no client and fetches nothing). The modal flies out of the onion
+   (`function tnnlShown`; while the window is not on the screen yet, it looks again a moment later). It
+   holds Connect to Tor and a box, Use also VPN; "LZRTNNL: Tor, and a VPN of your own under it" below.
+2. Connect to Tor says `tor on`; then `sub tor_session_on` says `torsession connecting` and the modal of
+   Tor shows (`function torShown`). Its five stations light from the client's own log lines,
+   `tor step N PERCENT WORDS`, read by `sub tor_on`: the real progress of Arti, not a timer.
 3. When Tor is ready (`tor on`), the last station flares and the modal stays, with two buttons: OK
    closes it and Tor stays on; Stop Tor. While it connects the buttons are Stop Tor and Hide.
 4. Stop Tor says `tor off`; lzrprf asks first (`sub tor_session_asked`), also while Tor is still
@@ -115,3 +47,34 @@ itself, which nobody made there):
    `checked 0 0`, `released`, then its end of the pipe), never before; the window lights at most one each
    0.35 s so a stop done in milliseconds is still seen step by step (`function torPaced`), and closes only
    after the last (runs `tor`, `torstop`, and `torflow`, the modal's own functions run with no window).
+
+## LZRTNNL: Tor, and a VPN of your own under it
+
+LZRTNNL is the part of LZRBRWSR that holds Tor (Henry, 2026-11-24, HC-0858). It is installed only when
+you include it (the installer, or "Add or remove LZR modules"); left out, the onion is not shown and
+lzrprf refuses a Tor window (`sub tor_window_opened`, `sub part_on`). The decision, its sources and the
+design are in the LZRBRWSR repository's `architecture/lzrtnnl.md`; in short:
+
+- The order is you, then the VPN, then Tor ("Tor over VPN"). Your provider sees that you use Tor and
+  never where you go; Tor's first relay sees the VPN's address, never yours. Tor keeps its own circuits
+  and onion services; nothing comes after Tor.
+- The VPN is your own provider's WireGuard file, imported and activated in the WireGuard app, which you
+  install yourself. lzrprf bundles no VPN client and changes no setting of this Mac. The file is read
+  once (`sub tnnl_file`): its IPv4 address and its server are kept, its private key is overwritten in
+  memory and never kept, and a file whose AllowedIPs is not 0.0.0.0/0, or that names more than one
+  server, is refused (`sub tnnl_read`).
+- Connect to Tor with the box ticked first asks whether the VPN is active (`tnnl vpn look`): an
+  interface `utunN` that is up and holds the file's address (`sub tnnl_interface`). Only then is Tor
+  started, through a relay that opens each of Tor's connections bound to that interface alone
+  (`IP_BOUND_IF`, `sub tnnl_bound`), and the Tor client's container may reach the loopback alone, that
+  is the relay (`sub tnnl_container`). A connection that the interface cannot carry fails; it never
+  takes another route.
+- Every 2 s the interface is looked at again (`sub tnnl_watch`). When the VPN drops, or its address
+  moves, the relay and every connection it carries are ended, Tor stops (`sub tor_failed`) and stays
+  wanted, so nothing is fetched on the clear road until you connect again or close the window.
+- Names are never looked up by the relay (a SOCKS name is refused): Tor resolves at its exits, and the
+  DNS lines of the file are not used. IPv6 goes through the relay only when the file's AllowedIPs
+  carries `::/0`. The engine has no WebRTC.
+
+The package test (`scripts/test-package-parts.sh` of LZRBRWSR, step 26) shows each point with the
+loopback standing in for the VPN: `lzrprf tnnlconf`, `lzrprf tnnlrelay` and `lzrprf tnnldrop`.

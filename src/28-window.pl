@@ -113,9 +113,9 @@ function layersHost() {    // the view the layers stand in, over the laid page a
     // AppKit maps the root layer to this flipped view; do not flip the layer independently.
     layerRoot.masksToBounds = true;    // nothing of a layer outside the page's own place; both set after AppKit took the layer, which sets them its own way
     if (!layerHost.superview || layerHost.superview.isNil() || !layerHost.superview.isEqual(canvas)) canvas.addSubview(layerHost);
-    var b = canvas.bounds; layerHost.frame = b;
-    return layerHost;
+    layersFitted(); return layerHost;
 }
+function layersFitted() { if (layerHost && layerHost.superview && !layerHost.superview.isNil() && layerHost.superview.isEqual(canvas)) layerHost.frame = canvas.bounds; }    // the layers' view as large as the laid page's points, set again at every fit: layers made while a resize held the fit back (sizing) were given the size before, and masked to it the scene went blank
 
 function layersClear() {    // every layer let go, and those still to be made
     layerQueue = []; layerReadyOwed = false;
@@ -354,7 +354,7 @@ function heard(line) {
     if (list) {
         if (line != '.') return list.push(line);
         var lines = list;
-        list = null;
+        list = null; if (naming) return pictureKept(lines);    // the rows of a picture sent once (28-window-pointer.pl)
         if (typeof listPatch != 'undefined' && listPatch) {
             var old = listFor == selected ? drawnLines : drawings[listFor] && drawings[listFor].lines, patch = listPatch;
             listPatch = null;
@@ -378,12 +378,12 @@ function heard(line) {
     }
     var at = line.indexOf(' '), word = at < 0 ? line : line.slice(0, at), rest = at < 0 ? '' : line.slice(at + 1);
     var aside = selected != perlTab;    // the window shows a tab lzrprf has not been told of yet: what lzrprf says of its own tab's bar, lock and arrows is said again once it is told
-    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go (the sound process lets every sound go too, told by lzrprf [C12])
-    if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
+    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
+    if (word == 'picture') pictureBegun(rest); else if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
     else if (word == 'patch') { var p = /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/.exec(rest); if (p) { listFor = +p[1]; listPatch = [+p[2], +p[3]]; list = []; again = true; } }
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
     else if (word == 'tabs') tabsTold(rest);
-    else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy') trmnlCopied(rest);    // [C29] the text you copied in a terminal's tab
+    else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
     else if (word == 'install') installTold(rest);
     else if (word == 'checked') checkedTold(rest);
     else if (word == 'licence') licenceTold(rest);
@@ -391,7 +391,7 @@ function heard(line) {
     else if (word == 'sso') ssoTold(rest);
     else if (word == 'support') supportTold(rest);
     else if (word == 'tor') torTold(rest);
-    else if (word == 'torsession') torSessionTold(rest);
+    else if (word == 'torsession') { if (rest == 'made') tnnlShown(); else torSessionTold(rest); } else if (word == 'tnnl') tnnlTold(rest); else if (word == 'parts') partsTold(rest);    // LZRTNNL's modal, before Tor connects, and the modules installed (28-window2.pl)
     else if (word == 'tool') toolTold(rest);
     else if (word == 'game' && /^helper [01]$/.test(rest)) { gameHelper = gameStaged = rest == 'helper 1'; toolItems = null; if (modalOpen && modalKind == 'tool' && toolTab == 'other') toolChanged(); else if (toolView) toolView.needsDisplay = true; }    // H-0071: LZRDFNDR's satellite in the minigame, as lzrprf keeps it (gamehelper)
     else if (word == 'home' && rest == 'available') { homeAvailable = true; if (!current && free && !pageShown) homeAsked(false); }
@@ -430,7 +430,7 @@ function heard(line) {
     else if (word == 'layers') layersTold(rest);    // [C18] the layers of the page kept running
     else if (word == 'live') liveTold(rest);
     else if (word == 'video') videoTold(rest);
-    else if (word == 'scroll') pageScrollTo(rest);
+    else if (word == 'scroll') pageScrollTo(rest); else if (word == 'cursor') pointerShaped(rest);    // the pointer's shape over the page (28-window-pointer.pl)
     else if (word == 'quit') app.terminate($());
     told(word, rest);
 }
@@ -442,13 +442,11 @@ function heard(line) {
 // takes a press changed, so "busy" and "idle" cost the few views they change.
 function strip(parts, open, question) {
     var wasAsking = asking, wasFree = free;
-    zoomWords = null;    // lzrprf's new words stand; the zoom said a moment ago is not put back over them
     asking = question;
     free = !!open && !question;    // the tabs, the cogwheel and the bar take something only while lzrprf waits for it
     words.stringValue = $(briefNext !== null ? briefNext : parts[0] || '');
     words.toolTip = $(briefNext !== null ? parts[0] || '' : '');
     briefNext = null;
-    if (!question) noteShown(words.stringValue.js);    // no footer: lzrprf's few words are the note under the bar
     loadingSet(!open && !question);    // and while it works, the line along the bar
     first.title = $(parts[1] || ''); second.title = $(parts[2] || '');
     first.hidden = !question; second.hidden = !question || !parts[2];
@@ -460,7 +458,7 @@ function strip(parts, open, question) {
     stripBack.needsDisplay = true;
     if (free && !asking && pendingTab) {    // a press of the strip made while lzrprf was busy: said now, the tab it chose already shown
         var press = pendingTab;
-        pendingTab = null;
+        pendingTab = press.after || null;    // a press made behind a new tab already shown waits for the next moment lzrprf is free
         shares[selected] = shareNow();
         if (press.closed !== undefined) closing = press.closed;
         sent(press.line);
@@ -513,8 +511,8 @@ function place() {
     var pageTop = high - TOP;
     scroll.frame = $.NSMakeRect(0, tall, wide, Math.max(1, pageTop - tall));
     var icons = wide - 50 - (profilesOn ? 34 : 0);    // just right of the bar, left of the Profiles icon and the cogwheel: LZRDFNDR, then Tor
-    toolIcon.frame = $.NSMakeRect(icons - 64, row + 16, 26, 24);
-    torIcon.frame = $.NSMakeRect(icons - 32, row + 16, 26, 24);
+    toolIcon.frame = $.NSMakeRect(icons - (partOn('lzrtnnl') ? 64 : 32), row + 16, 26, 24); toolIcon.hidden = !partOn('lzrdfndr');    // a module that is not installed shows no icon (28-window2.pl)
+    torIcon.frame = $.NSMakeRect(icons - 32, row + 16, 26, 24); torIcon.hidden = !partOn('lzrtnnl');
     homeView.frame = $.NSMakeRect(0, tall, wide, Math.max(1, pageTop - tall));
     listScroll.frame = homeView.frame;
     pieces();
@@ -526,26 +524,15 @@ function place() {
     suggestPlaced();
     cogPlaced();
     wordsPlaced(); findPlaced();
-    notePlaced(); placeModal();
+    placeModal();
 }
 
-// No footer: what the strip said between questions, lzrprf's few words, the zoom and the tips, is a quiet note
-// in small grey letters under the address bar, in the belt round it, so it stands over no part of the page; it
-// is there for NOTE_SECONDS and then gone at once, as nothing of the window is made see-through over time. While
-// lzrprf works (it said busy, and asks nothing), a thin line grows along the bar's lower edge, quickly at first and
-// never to its end, and goes when lzrprf is idle again.
-var NOTE_SECONDS = 2, noteView = null, loadingAt = 0, LOADING_STEP = 0.1;    // DECLARED(2 s: a few words read once at a glance; 0.1 s: ten steps a second, a line the eye sees grow)
-function noteShown(text) {
-    text = String(text || '');
-    if (!noteView || !text || asking) return;
-    noteView.stringValue = $(text); noteView.toolTip = $(text);
-    noteView.hidden = false; notePlaced();
-    $.NSObject.cancelPreviousPerformRequestsWithTargetSelectorObject(hand, 'noteGone:', $());
-    hand.performSelectorWithObjectAfterDelay('noteGone:', $(), NOTE_SECONDS);    // a call made once, no timer left running
-}
-function noteGone() { if (noteView) noteView.hidden = true; }
-function notePlaced() { if (!noteView || !PILL) return; var row = root.frame.size.height - TABS_HIGH - BAR_ROW; noteView.frame = $.NSMakeRect(PILL.origin.x + 44, row, Math.max(40, PILL.size.width - 88), PILL.origin.y); }
-function wordsTold(text) { words.stringValue = $(text); noteShown(text); }    // a tip, or the zoom: the strip's words and the note
+// No footer, and no note under the bar (Henry, 2026-11-24: "we dont need that information"): what lzrprf says
+// between questions is in the log and in the lock's panel, the zoom shows in the page's size, and a tip is the
+// tooltip of its row. While lzrprf works (it said busy, and asks nothing), a thin line grows along the bar's lower
+// edge, quickly at first and never to its end, and goes when lzrprf is idle again.
+var loadingAt = 0, LOADING_STEP = 0.1;    // DECLARED(0.1 s: ten steps a second, a line the eye sees grow)
+function wordsTold(text) { words.stringValue = $(text); }    // a tip: the strip's words, seen with the next question's strip; the row's tooltip says it at once
 function loadingSet(on) {
     if (on == !!loadingAt) return;
     loadingAt = on ? Date.now() : 0;
@@ -603,7 +590,7 @@ function named(bold, italic, fixed) {
 // made ready here, and only drawn when the view draws, where what is outside what it draws
 // is passed over. A picture is made from its bytes as they are: they are pixels already.
 function laid(lines, first) {
-    var previous = again ? sheet : null;
+    var previous = again ? sheet : null, old = previous || sheet;    // old: the page drawn until now, whose bitmaps a new page takes where a tile's place and rows are the same (a reload, a step within one site)
     if (!previous || Object.keys(inks).length > 256 || Object.keys(typefaces).length > 256) { inks = {}; typefaces = {}; }    // reuse ordinary pages; a changing page retains at most one checked frame plus 256 cached looks
     var size = /^L(\d+)x(\d+)$/.exec(lines[first]), next = { wide: +size[1], high: +size[2], ops: [], tiles: Object.create(null), saved: Object.create(null), buckets: {}, spanning: [] }, characters = 0;
     var grey = $.NSColor.colorWithWhiteAlpha(0.55, 0.4), kept = {};    // the tiles of this page, by number: [wide, high, bitmap]
@@ -612,13 +599,13 @@ function laid(lines, first) {
         if (saved && /[RGVX]/.test(kind)) { next.ops.push(saved); next.saved[line] = saved; if (kind == 'X') characters += saved[8].length; continue; }
         var n = kind == 'X' ? line.slice(1).split(',', 3).map(Number) : line.slice(1).split(',').map(Number);
         if (kind == 'R') next.ops.push([n[1], n[3], 'R', n[0], n[2], colour(line.split(',')[4])]);    // [top, height, kind, left, width, what draws it, ...]
-        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]);
+        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(namedOp(line, grey));    // a picture placed by its name (28-window-pointer.pl)
         else if (kind == 'V') next.ops.push([n[1], n[3], 'V', n[0], n[2], n[4]]);    // a video's place and its number: a play mark over its poster, drawn by videoMark, and the video once clicked
         else if (kind == 'M' || kind == 'K') {
-            var height = kind == 'M' ? n[5] : n[4], rows = lines.slice(at + 1, at + 1 + height), before = previous && previous.tiles && previous.tiles[line];
+            var height = kind == 'M' ? n[5] : n[4], rows = lines.slice(at + 1, at + 1 + height), before = old && old.tiles && old.tiles[line];
             var same = before && before.rows.length == rows.length && before.rows.every(function (row, i) { return row === rows[i]; });
             var image = same ? before.image : kind == 'M' ? picture(n[4], n[5], rows) : { wide: n[3], high: n[4], rows: rows, made: null };    // a tile is made from its rows the first time the view draws it (sub paint), so a page's first frame waits for the tiles it shows, not for all of them: decoding is 1.5 ms a tile, 40 ms for a page of 26 (measured 2026-11-24); lzrprf checked every row before it was handed over
-            var op = same ? before.op : kind == 'M' ? [n[1], n[3], 'M', n[0], n[2], image] : [n[2], n[4], 'M', n[1], n[3], image];
+            var op = same ? before.op : kind == 'M' ? [n[1], n[3], 'M', n[0], n[2], image, n.length > 9 ? $.NSMakeRect(n[6] / 100, n[5] - (n[7] + n[9]) / 100, n[8] / 100, n[9] / 100) : $.NSZeroRect] : [n[2], n[4], 'M', n[1], n[3], image];    // an object-fit's part of the picture: its rows run down, the image's own space up
             next.tiles[line] = { rows: rows, image: image, op: op }; next.ops.push(op);
             if (kind == 'K') kept[n[0]] = [n[3], n[4], image];
             at += height;
@@ -635,7 +622,7 @@ function laid(lines, first) {
         if (op[1] > 16384) { next.spanning.push(i); return; }    // a tall background is indexed once, never in hundreds of buckets
         for (var b = Math.floor(op[0] / 256); b <= Math.floor((op[0] + op[1]) / 256); b++) (next.buckets[b] || (next.buckets[b] = [])).push(i);
     });
-    var share = restoring !== null ? restoring : again && sheet && sheet.high > 0 ? Math.min(1, Math.max(0, canvas.visibleRect.origin.y / sheet.high)) : 0;    // a tab chosen again is shown where it was read in it; a page laid out again at a new width where it was read, as a share of its height; a new page from its top
+    var kept = restoring === null ? reloadPlaced() : (reloadPlace = null), share = restoring !== null ? restoring : again && sheet && sheet.high > 0 ? Math.min(1, Math.max(0, canvas.visibleRect.origin.y / sheet.high)) : 0;    // a tab chosen again is shown where it was read in it; a page laid out again at a new width where it was read, as a share of its height; a new page from its top
     restoring = null;
     sheet = next; pageBack(false);
     if (again) videosPlaced(); else videosEnded();    // [C22] the same page at another width, or drawn again by its scripts, keeps its videos playing
@@ -648,9 +635,9 @@ function laid(lines, first) {
             if (next.ops[i]) touched.push(next.ops[i]);
         }
         touched.forEach(function (op) { canvas.setNeedsDisplayInRect($.NSMakeRect(0, op[0] - 2, next.wide, op[1] + 4)); });
-    } else { fit(); canvas.scrollPoint($.NSMakePoint(0, Math.round(share * sheet.high))); }
-    listed(lines.slice(0, first));
-    if (findOpen) findRun();
+    } else { fit(); canvas.scrollPoint($.NSMakePoint(0, kept ? kept.y : Math.round(share * sheet.high))); }
+    if (kept) kept.last = Math.round(canvas.visibleRect.origin.y); listed(lines.slice(0, first));    // where the view stands now: a shorter drawing stops short, and the next one is put at the place again
+    if (findOpen) findRun(); namedSettled();
     drawn(lines.length, characters);
 }
 
@@ -693,9 +680,9 @@ function viewNow() { $.NSObject.cancelPreviousPerformRequestsWithTargetSelectorO
 function fit(placed) {    // placed: for a new size of the window, which draws again only a page whose size changed
     if (!sheet || sizingNow) return;
     var room = scroll.contentSize.width, scale = fitScale(room, sheet.wide, zoomOf(selected)), was = canvas.frame.size, laid = canvas.bounds.size;
-    if (placed && was.width == sheet.wide * scale && was.height == sheet.high * scale && laid.width == sheet.wide && laid.height == sheet.high) return;
+    if (placed && was.width == sheet.wide * scale && was.height == sheet.high * scale && laid.width == sheet.wide && laid.height == sheet.high) return layersFitted();
     canvas.setFrameSize($.NSMakeSize(sheet.wide * scale, sheet.high * scale));
-    canvas.setBoundsSize($.NSMakeSize(sheet.wide, sheet.high));
+    canvas.setBoundsSize($.NSMakeSize(sheet.wide, sheet.high)); layersFitted();
     canvas.needsDisplay = true;
 }
 
@@ -704,7 +691,7 @@ function fit(placed) {    // placed: for a new size of the window, which draws a
 // drawn scaled to fill the room, so its text flows anew as in other browsers. lzrprf lays a page
 // at a step of 160 points and between 320 and 1600 wide (sub viewing), so a zoom shows as near as
 // those steps let it: at some widths 110 percent is laid as 100 is.
-var ZOOMS = [50, 67, 80, 90, 100, 110, 125, 150, 175, 200], zoomWords = null;
+var ZOOMS = [50, 67, 80, 90, 100, 110, 125, 150, 175, 200];
 function zoomOf(n) { return zooms[n] || 100; }
 function zoomNext(now, by) { var k = ZOOMS.indexOf(now); return !by || k < 0 ? 100 : ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, k + by))]; }    // the next step in or out, held at the ends; 0 is the page's own size
 function zoomWidth(points, zoom) { return Math.max(1, Math.round(points * 100 / zoom)); }    // the size a page is laid at for room of this many points
@@ -717,18 +704,7 @@ function zoomed(by) {
     var was = zoomOf(selected), now = zoomNext(was, by);
     while (zooms.length < tabs.length) zooms.push(100);
     zooms[selected] = now;
-    zoomSaid(now);
     if (now != was) { fit(); view(); }
-}
-function zoomSaid(now) {    // the zoom is said for a moment in the note under the bar (function noteShown), and the strip's words go back to what they were
-    if (zoomWords === null) zoomWords = [words.stringValue.js, words.toolTip.js];
-    wordsTold('Zoom ' + now + '%');
-    $.NSObject.cancelPreviousPerformRequestsWithTargetSelectorObject(hand, 'zoomShown:', $());
-    hand.performSelectorWithObjectAfterDelay('zoomShown:', $(), 1.5);    // DECLARED(1.5 s: read at a glance, once; a call made once, no timer left running)
-}
-function zoomShown() {
-    if (zoomWords !== null && /^Zoom \d+%$/.test(words.stringValue.js)) { words.stringValue = $(zoomWords[0]); words.toolTip = $(zoomWords[1]); }
-    zoomWords = null;
 }
 
 // Find in page (Cmd-F): a small bar at the top right of the page with its field, which match is
@@ -1128,7 +1104,7 @@ function tabSaid(line, closed, kept) {
     var chose = /^tab select (\d+)$/.exec(line), to = chose ? +chose[1] : undefined;
     if (chose && kept === undefined) kept = tabChosen(to); else if (closed !== undefined && takes() && tabClosed(closed)) { kept = true; closed = undefined; }
     if (kept && line.slice(0, 4) == 'tab ') line += ' kept';
-    if (!takes()) { pendingTab = { line: line, to: to, closed: closed }; return; }    // the newest press waits for lzrprf, and is never dropped
+    if (!takes()) { var press = { line: line, to: to, closed: closed }; if (pendingTab && pendingTab.made) { if (closed === undefined) pendingTab.after = press; } else pendingTab = press; return; }    // the newest press waits for lzrprf, and is never dropped; behind a new tab already shown, it is said after that tab
     shares[selected] = shareNow();
     if (closed !== undefined) closing = closed;
     sent(line);
@@ -1142,7 +1118,7 @@ function tabClosed(n) {    // the tab n out of the strip now, as lzrprf takes it
     return true;
 }
 
-function newTab() { if (!modalOpen && !asking && tabs.length < 32) { focusing = true; var now = takes(); tabSaid('tab new'); if (now) tabMade(); } }
+function newTab() { if (!modalOpen && !asking && tabs.length < 32 && !(pendingTab && pendingTab.made)) { focusing = true; var now = takes(); tabSaid('tab new'); if (now) tabMade(); else if (pendingTab && pendingTab.line == 'tab new') { tabMade(); pendingTab.made = true; } } }    // while lzrprf is busy too: the new tab is in the strip at once, and said when lzrprf is free
 function tabMade() {    // the new tab in the strip in this very frame, with the picture of a home, before lzrprf says so (tabsTold): it said so 20 to 140 ms later (measured 2026-11-23)
     keep(selected, keptNow()); [shares, drawings, zooms].forEach(function (all) { while (all.length <= tabs.length) all.push(all == zooms ? 100 : all == shares ? 0 : null); });
     tabs.push({ title: '', gen: ++tabGen }); selected = perlTab = tabs.length - 1; shownGen = tabs[selected].gen; tabsView.needsDisplay = true;
@@ -1239,7 +1215,7 @@ function tabAt(event) {    // the tab under the pointer, the number of tabs for 
 }
 
 function tabClicked(event) {
-    secureHidden();
+    if (firstAgain(event)) return; secureHidden();    // the band of the title bar: a press done once already (28-window1-tabs.pl)
     var dot = dotAt(pointIn(tabsView, event));
     if (dot == 0) return win.performClose($());
     if (dot == 1) return win.performMiniaturize($());
@@ -1253,67 +1229,10 @@ function tabClicked(event) {
 
 // The whole top of the window moves it: the frame, the strip of tabs beside the tabs, the bar's row
 // beside its buttons and its pill, the bookmarks bar beside its bookmarks. Pressed there and dragged,
-// the window follows; pressed twice, it zooms, as a title bar does.
+// the window follows; pressed twice, it zooms, as a title bar does. Only here: the views of the top say
+// no to macOS moving the window on its own (mouseDownCanMoveWindow), so a press on a tab moves the tab
+// alone (HC-0856; the tabs themselves, in 28-window1-tabs.pl).
 function windowHeld(event) { return event.clickCount == 2 ? win.performZoom($()) : win.performWindowDragWithEvent(event); }
-
-// A tab pressed and let go where it was pressed is chosen. Dragged along the strip it is moved among
-// the tabs: it follows the pointer, the others make room, and where it is let go it stays ("tab move").
-function slotOf(from, dx, wide, count) { return Math.max(0, Math.min(count - 1, Math.round((from * wide + dx) / wide))); }    // the place among count tabs that a tab dragged dx points from place "from" is over
-function placeOf(k, from, to) { return k == from ? to : from < to && k > from && k <= to ? k - 1 : to < from && k >= to && k < from ? k + 1 : k; }    // where the tab at place k stands once the one at "from" has gone to "to"
-function tabLeft(i, wide) {    // where a tab is drawn: at its place, or, while one is dragged, the held one under the pointer and the others where they would stand; pulled out, the others close up behind it
-    if (!drag) return TABS_X + i * wide;
-    if (i == drag.tab) return Math.max(TABS_X, Math.min(TABS_X + (tabs.length - 1) * wide, TABS_X + i * wide + drag.dx));
-    return TABS_X + placeOf(i, drag.tab, drag.out ? tabs.length - 1 : drag.slot) * wide;
-}
-
-// A tab pulled away from the strip, more than PULL_OUT points above or below where it was pressed,
-// and let go there becomes a window of its own, where it was let go: lzrprf is told "tab out N X Y W
-// H" and starts a second lzrprf for it (sub tab_out). While it is away it is drawn as the small
-// window it will be, a few points lower, at once. The only tab of a window moves the window instead.
-var PULL_OUT = 54;    // DECLARED(54 points: past the strip's 42 from any place in it, so a tab dragged along the strip never leaves it by a tremble)
-function pulledOut(dy) { return Math.abs(dy) > PULL_OUT; }
-function pulledFrame(f, start, at, i, wide) {    // the new window: this one's size, placed so the tab is under the pointer as it was here, the first of its strip
-    return [Math.round(at.x - (start.x - f.x) + i * wide), Math.round(at.y - (start.y - f.y)), Math.round(f.w), Math.round(f.h)].join(' ');
-}
-
-function tabHeld(i) {
-    var was = selected, kept = i != selected ? tabChosen(i) : null;    // chosen on the way down: the strip and the tab's kept drawing show in the frame of the press
-    var start = $.NSEvent.mouseLocation, wide = tabWide(), f = win.frame, from = { x: f.origin.x, y: f.origin.y, w: f.size.width, h: f.size.height }, at = start, follows = false;
-    for (;;) {    // until the button is let go: 6 is a drag of the left button, 2 its release
-        var next = win.nextEventMatchingMaskUntilDateInModeDequeue((1 << 6) | (1 << 2), $.NSDate.distantFuture, $('NSEventTrackingRunLoopMode'), true);
-        if (!next || next.isNil() || next.type == 2) break;
-        at = $.NSEvent.mouseLocation;
-        var dx = at.x - start.x, dy = at.y - start.y;
-        if (follows || tabs.length < 2 && pulledOut(dy)) { follows = true; win.setFrameOrigin($.NSMakePoint(from.x + dx, from.y + dy)); continue; }    // the only tab pulled out: the window follows the pointer
-        var out = pulledOut(dy) && takes();
-        if (!drag && (Math.abs(dx) < 5 && !out || !takes() || tabs.length < 2)) continue;    // DECLARED(5 points: a press that only trembles is a click, not a drag)
-        drag = { tab: i, dx: dx, slot: out ? i : slotOf(i, dx, wide, tabs.length), out: out };
-        tabsView.needsDisplay = true;
-        tabsView.displayIfNeeded;
-    }
-    var to = drag ? drag.slot : i, away = !!drag && drag.out;
-    drag = null;
-    tabsView.needsDisplay = true;
-    if (follows) { if (kept !== null) tabSaid('tab select ' + i, undefined, kept); return frameSaid(); }
-    if (!takes()) { if (kept !== null) tabSaid('tab select ' + i, undefined, kept); return; }    // lzrprf is busy: the tab chosen is said when it is free
-    if (away) { pulling = i; return tabSaid('tab out ' + i + ' ' + pulledFrame(from, start, at, i, wide)); }    // let go away from the strip: a window of its own; the strip lets it go once lzrprf says the tabs without it
-    var told = was;    // the tab lzrprf has chosen
-    if (to != i) {    // the strip shows the new order at once; lzrprf moves the tab and tells the tabs again
-        var one = tabs.splice(i, 1)[0];
-        tabs.splice(to, 0, one);
-        shares[selected] = shareNow();
-        while (shares.length < tabs.length) shares.push(0);
-        shares.splice(to, 0, shares.splice(i, 1)[0]);
-        while (drawings.length < tabs.length) drawings.push(null);
-        drawings.splice(to, 0, drawings.splice(i, 1)[0]);
-        told = placeOf(was, i, to);
-        selected = to;    // the tab held is the chosen one
-        pageScrollTabbed();
-        moving = true;
-        sent('tab move ' + i + ' ' + to);
-    }
-    if (to != told) tabSaid('tab select ' + to, undefined, !!kept);
-}
 
 // The bar's row: back, forward and reload at its left, then the bar, a pill of dark glass with the
 // lock at its start and the star at its end; a cyan beam glows along the pill's lower edge, and
@@ -1391,7 +1310,7 @@ function beltClicked(event) {
     if (nav >= 0) { secureHidden(); return navPressed(nav); }
     if (lockAt(at)) return secureToggled();
     secureHidden();
-    if (at.x < PILL.origin.x || at.x > PILL.origin.x + PILL.size.width || at.y < PILL.origin.y || at.y > PILL.origin.y + PILL.size.height) return windowHeld(event);    // beside the pill and the buttons, the row moves the window
+    if (!pillHit(at)) return windowHeld(event);    // beside the pill, the few points around it that take its press (pillReach) and the buttons, the row moves the window
     if (!bar.enabled) return;
     win.makeFirstResponder(bar);
     var editor = bar.currentEditor;
@@ -1403,7 +1322,7 @@ function navPressed(k) {
     if (!navOn(k)) return;
     if (k == 0 && listing == 'log') return logClosed();
     if (k == 0 && listing) { listing = null; return place(); }    // back from the bookmarks or the tabs page to what the tab shows
-    sent('nav ' + ['back', 'forward', 'reload'][k]);
+    reloadPlace = k == 2 && sheet && canvas && scroll.documentView.isEqual(canvas) ? { address: current, tab: selected, y: Math.round(canvas.visibleRect.origin.y), last: null, until: Date.now() + RELOAD_PLACE_MS } : null; sent('nav ' + ['back', 'forward', 'reload'][k]);    // a page loaded again is shown where it was read (reloadPlaced, 28-window-pointer.pl)
 }
 
 // The cogwheel: a thin line gear of eight teeth around a ring, light grey, with the beam's glow under
@@ -1453,7 +1372,7 @@ function cogItems() {
         ['Clear browsing history', '⇧⌘⌫', false, clearing, '', 'bin'],
         ['Make current page the home page', '', false, function () { if (takes()) sent('menu home'); }, '', 'house'],
         [logToggleWords(listing == 'log'), '', listing == 'log', function () { logPressed(); }, '', 'page'],
-        ['Check for updates', checkedWords(), false, INCOGNITO ? function () { wordsTold(UNKEPT_TIP); } : function () { if (takes()) say('update-check'); }, INCOGNITO ? UNKEPT_TIP : '', 'turn'],
+        ['Check for updates', checkedWords(), false, INCOGNITO ? function () { wordsTold(UNKEPT_TIP); } : function () { if (takes()) say('update-check'); }, INCOGNITO ? UNKEPT_TIP : '', 'turn'], ['Add or remove LZR modules...', '', modalOpen && modalKind == 'modules', INCOGNITO ? function () { wordsTold(UNKEPT_TIP); } : modulesOpened, INCOGNITO ? UNKEPT_TIP : '', 'plus'],
         [licenceMonth ? 'Support member licence' : 'Enter licence code...', licenceMonth ? 'since ' + licenceMonth : '', modalOpen && modalKind == 'licence', INCOGNITO ? function () { wordsTold(SUPPORT_TIP); } : licenceOpened, INCOGNITO ? SUPPORT_TIP : '', 'key'],
         ['Support request...', supportTicket != '-' ? 'answer kept' : '', modalOpen && modalKind == 'support', supportWhy() ? function () { wordsTold(supportWhy()); } : supportOpened, supportWhy(), 'bubble']].filter(function (one) { return one; });
 }
@@ -1607,12 +1526,12 @@ function paintCogMenu() {
 
 function clearing() {
     if (!takes()) return;
-    modal('Clear browsing history', 'Clear history empties the list of addresses each tab went to; the pages shown stay. Clear history and sessions also drops every page lzrprf keeps for a tab. The log is cleared by its own button.',
+    modal('Clear browsing history', 'Clear history empties the list of addresses each tab went to; the pages shown stay. Clear history and sessions also drops every page lzrprf keeps for a tab and every cookie of this window\'s sites. The log is cleared by its own button.',
         [['Cancel', closeModal], ['Clear history', function () { closeModal(); sent('menu clear-history'); }], ['Clear history and sessions', sessionsWarned]], 'small');
 }
 
 function sessionsWarned() {
-    modal('Clear history and sessions?', 'This will require logging in again on all pages. lzrprf sends no cookie to any site except a provider you connected in the Profiles list, whose sign-in this does not clear (Remove it there): what is cleared is the history and every page lzrprf keeps for a tab. Proceed?',
+    modal('Clear history and sessions?', 'This will require logging in again on all pages: the history, every page lzrprf keeps for a tab and every cookie of this window\'s sites are cleared. A provider you connected in the Profiles list keeps its sign-in (Remove it there). Proceed?',
         [['Cancel', closeModal], ['Proceed', function () { closeModal(); drawings = []; sent('menu clear-sessions'); }]], 'small');
 }
 
@@ -3036,7 +2955,7 @@ function torShown() {    // [C17] the Tor modal, only in a Tor window already on
     torTicking();
 }
 function torTitle() { return { starting: 'Connecting to Tor', on: 'Tor is ready', failed: 'Tor did not connect', stopping: 'Stopping Tor' }[torState] || 'Tor'; }
-function torChoices() { return torAsking || torState == 'stopping' ? [] : [['Stop Tor', torStopAsked], torState == 'on' ? ['OK', closeModal] : torState == 'failed' ? ['Try again', torStarted] : ['Hide', closeModal]]; }    // no button while lzrprf is asked or the stop runs
+function torChoices() { return torAsking || torState == 'stopping' ? [] : [['Stop Tor', torStopAsked], torState == 'on' ? ['OK', closeModal] : torState == 'failed' ? ['Try again', tnnlAgain] : ['Hide', closeModal]]; }    // no button while lzrprf is asked or the stop runs
 function torStarted() { torState = 'starting'; torStep = 0; torPct = 0; torWords = 'Starting the Tor client'; torLitAt = Date.now(); say('tor on'); torChanged(); }
 function torStopAsked() { torAsking = true; say('tor off'); torChanged(); }    // lzrprf asks first (sub tor_session_asked), and its question stands in this modal
 function torAsked(parts) {    // [C17] lzrprf's question of Stop Tor, in the modal: its first button (Cancel) returns to the modal of Tor, its second (Stop Tor) shows the stop
@@ -3167,7 +3086,7 @@ function modal(title, about, choices, kind) {
     supportScroll.hidden = kind != 'support';
     supportTick.hidden = kind != 'support';
     supportPreview.hidden = true;
-    wizardView.hidden = kind != 'wizard';
+    wizardView.hidden = kind != 'wizard'; partsShown(kind);
     pathField.hidden = true;
     veil.hidden = false;
     secureHidden();
@@ -3300,7 +3219,7 @@ function flightEnded() {
 function placeModal() {
     if (!veil) return;
     var all = root.frame, wide = all.size.width, high = all.size.height, M = 18, big = modalKind == 'big';    // M: the room around the panel its glow is drawn in
-    var wizard = modalKind == 'wizard', tech = modalKind == 'tech', tor = modalKind == 'tor', w = Math.min(big || modalKind == 'permit' ? 780 : wizard ? 660 : tech ? TECH_WIDE : tor ? 640 : modalKind == 'tool' ? TOOL_WIDE : modalKind == 'support' ? 640 : 580, wide - 48), h = big ? Math.min(welcoming ? 820 : 560, high - 48) : modalKind == 'permit' ? Math.min(620, high - 48) : tech ? Math.min(TECH_HIGH, high - 48) : wizard ? Math.min(470, high - 48) : modalKind == 'form' ? 330 : modalKind == 'tall' ? 310 : modalKind == 'flag' ? 340 : modalKind == 'engine' || modalKind == 'licence' || modalKind == 'profile' ? 330 : modalKind == 'support' ? Math.min(620, high - 48) : tor ? 320 : modalKind == 'tool' ? Math.min(TOOL_HIGH, high - 48) : 230;
+    var wizard = modalKind == 'wizard', tech = modalKind == 'tech', tor = modalKind == 'tor', w = Math.min(big || modalKind == 'permit' ? 780 : wizard ? 660 : tech ? TECH_WIDE : tor ? 640 : modalKind == 'tool' ? TOOL_WIDE : modalKind == 'support' ? 640 : 580, wide - 48), h = big ? Math.min(welcoming ? 820 : 560, high - 48) : modalKind == 'permit' ? Math.min(620, high - 48) : tech ? Math.min(TECH_HIGH, high - 48) : wizard ? Math.min(470, high - 48) : modalKind == 'form' ? 330 : modalKind == 'tall' ? 310 : modalKind == 'flag' ? 340 : modalKind == 'engine' || modalKind == 'licence' || modalKind == 'profile' ? 330 : modalKind == 'support' ? Math.min(620, high - 48) : tor ? 320 : modalKind == 'tool' ? Math.min(TOOL_HIGH, high - 48) : modalKind == 'modules' ? Math.min(400, high - 48) : modalKind == 'tnnl' ? Math.min(tnnlVpn ? 420 : 250, high - 48) : 230;
     veil.frame = $.NSMakeRect(0, 0, wide, high);
     panel.frame = $.NSMakeRect(Math.round((wide - w) / 2) - M, Math.round((high - h) / 2) - M, w + 2 * M, h + 2 * M);
     panel.needsDisplay = true;
@@ -3602,7 +3521,7 @@ function hoveredOver(view, event) {
     if (JSON.stringify(hover) != was) redrawn();
 }
 
-function tracked(view) { view.addTrackingArea($.NSTrackingArea.alloc.initWithRectOptionsOwnerUserInfo($.NSZeroRect, 0x1 | 0x2 | 0x20 | 0x200, view, $())); }    // entered and exited, moved, while the window is key, over the view as it is
+function tracked(view) { view.addTrackingArea($.NSTrackingArea.alloc.initWithRectOptionsOwnerUserInfo($.NSZeroRect, 0x1 | 0x2 | 0x80 | 0x200, view, $())); }    // entered and exited, moved, in front or not (Henry 2026-11-24: hovers need no focus), over the view as it is
 
 function colour(hex) {
     if (!inks[hex]) inks[hex] = $.NSColor.colorWithSRGBRedGreenBlueAlpha(parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255,
@@ -3627,8 +3546,8 @@ function face(flags, size, hex) {
 // Core Graphics' words, 3): the rows are joined and given to the system as an image of that many
 // pixels. No decoder reads them.
 function picture(wide, high, rows) {
-    var all = $.NSMutableData.dataWithCapacity(wide * high * 4);
-    rows.forEach(function (row) {
+    var all = wide % 3 ? $.NSMutableData.dataWithCapacity(wide * high * 4) : $.NSData.alloc.initWithBase64EncodedStringOptions($(rows.map(function (row) { return row.slice(1); }).join('')), 0);    // a row of a width in threes ends in no "=", so the rows joined are one base64 text, decoded by one call to the system: row by row a front page's 18 pictures took 629 ms, joined 59 ms (measured 2026-11-25)
+    if (all.isNil()) throw 'a picture is not base64'; if (wide % 3) rows.forEach(function (row) {
         var bytes = $.NSData.alloc.initWithBase64EncodedStringOptions($(row.slice(1)), 0);
         if (bytes.isNil()) throw 'a row of a picture is not base64';
         all.appendData(bytes);
@@ -3888,7 +3807,7 @@ function paint(dirty) {
             if (op[0] > bottom || op[0] + op[1] < top) return;
             if (op[2] == 'X') return op[5].drawAtPointWithAttributes($.NSMakePoint(op[3], op[7]), op[6]);
             var box = $.NSMakeRect(op[3], op[0], op[4], op[1]);
-            if (op[2] == 'M') return (op[5].rows ? op[5].made || (op[5].made = tile(op[5].wide, op[5].high, op[5].rows)) : op[5]).drawInRectFromRectOperationFractionRespectFlippedHints(box, $.NSZeroRect, 2, 1, true, $());    // a tile is made here once, the first time it is drawn (sub laid)
+            if (op[2] == 'M') return (op[5].rows ? op[5].made || (op[5].made = tile(op[5].wide, op[5].high, op[5].rows)) : op[5]).drawInRectFromRectOperationFractionRespectFlippedHints(box, op[6] || $.NSZeroRect, 2, 1, true, $());    // a tile is made here once, the first time it is drawn (sub laid)
             if (op[2] == 'V') return videoMark(box, op[5]);
             op[5].setFill;
             $.NSRectFillUsingOperation(box, 2);    // over what is under it, so a colour that is partly clear shows the page through it
@@ -4007,29 +3926,30 @@ function viewDrawn(view, paintIt) {
     } finally { $.NSGraphicsContext.restoreGraphicsState; }
 }
 
-ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: clickThrough({
     // The page's own menu: Copy, and nothing that looks anything up or opens anything.
     'menuForEvent:': { types: ['id', ['id']], implementation: function (event) {
         var menu = $.NSMenu.alloc.initWithTitle($(''));
         menu.addItemWithTitleActionKeyEquivalent($('Copy'), 'copy:', $(''));
         return menu;
     } }
-} });
+}) });
 
-ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29]
+ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
     // A laid page is measured from its top, as the application laid it out. It has no menu of its own.
     'isFlipped': { implementation: function () { return true; } },
     'drawRect:': { implementation: function (dirty) { viewDrawn('laid', function () { paint(dirty); }); } },
     'acceptsFirstResponder': { implementation: function () { return liveOn; } },    // the keyboard only for a page kept running
     'mouseDown:': { implementation: function (event) { pageClicked(event); } },
-    'acceptsFirstMouse:': { types: ['bool', ['id']], implementation: function (event) { return !current && liveOn; } },    // H-0074: the home page takes the press that brings its window forward, as the native home did; an incognito window is a process of its own that macOS does not bring forward, so every first press there was lost. A site's page does not
+    'acceptsFirstMouse:': { types: ['bool', ['id']], implementation: function (event) { return true; } },    // H-0074, and Henry 2026-11-24: the press that brings the window forward is the page's too, a site's page as the home (clickThrough, 28-window1-tabs.pl); an incognito window is a process of its own that macOS does not bring forward, so a first press there was lost
     'keyDown:': { implementation: function (event) { pageKey(event); } }
-}) });
+})) });
 
-ObjC.registerSubclass({ name: 'LzrprfFrame', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfFrame', superclass: 'NSView', methods: clickThrough({
+    'mouseDownCanMoveWindow': { types: ['bool', []], implementation: function () { return false; } },    // HC-0856: macOS never moves the window from a press here on its own; windowHeld moves it where nothing else is pressed
     'mouseDown:': { implementation: function (event) { pressSeen(event); frameClicked(event); } },    // it draws nothing: the glass and the beam are layers (glassPlaced)
     'resetCursorRects': { implementation: function () { frameCursors(); } }
-} });
+}) });
 
 ObjC.registerSubclass({ name: 'LzrprfHome', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('home', function () { paintHome(); }); } },
@@ -4039,13 +3959,13 @@ ObjC.registerSubclass({ name: 'LzrprfHome', superclass: 'NSView', methods: {
     'mouseExited:': { implementation: function (event) { hovered('home', null); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfList', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfList', superclass: 'NSView', methods: clickThrough({
     'isFlipped': { implementation: function () { return true; } },
     'drawRect:': { implementation: function (dirty) { viewDrawn('list', function () { paintList(dirty); }); } },
     'mouseDown:': { implementation: function (event) { listClicked(event); } },
     'mouseMoved:': { implementation: function (event) { hovered('list', event); } },
     'mouseExited:': { implementation: function (event) { hovered('list', null); } }
-} });
+}) });
 
 ObjC.registerSubclass({ name: 'LzrprfCogMenu', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('cogmenu', function () { paintCogMenu(); }); } },
@@ -4064,80 +3984,82 @@ ObjC.registerSubclass({ name: 'LzrprfCatch', superclass: 'NSView', methods: {
     'scrollWheel:': { implementation: function (event) { cogHidden(); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfLogIcon', superclass: 'NSButton', methods: {
+ObjC.registerSubclass({ name: 'LzrprfLogIcon', superclass: 'NSButton', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('logicon', function () { paintIcon(logs, logGlyph, hover.logIcon, logs.enabled, false); }); } },
     'mouseEntered:': { implementation: function (event) { hovered('logIcon', event); } },
     'mouseExited:': { implementation: function (event) { hovered('logIcon', null); } }
-} });
+}) });
 
-ObjC.registerSubclass({ name: 'LzrprfTechIcon', superclass: 'NSButton', methods: {
+ObjC.registerSubclass({ name: 'LzrprfTechIcon', superclass: 'NSButton', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('techicon', function () { paintIcon(techs, techGlyph, hover.techIcon, !modalOpen, techOpen); }); } },
     'mouseEntered:': { implementation: function (event) { hovered('techIcon', event); } },
     'mouseExited:': { implementation: function (event) { hovered('techIcon', null); } }
-} });
+}) });
 
 
-ObjC.registerSubclass({ name: 'LzrprfTorIcon', superclass: 'NSButton', methods: {
+ObjC.registerSubclass({ name: 'LzrprfTorIcon', superclass: 'NSButton', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('toricon', function () { torIconDrawn(torIcon); }); } },
     'mouseEntered:': { implementation: function (event) { hovered('torIcon', event); } },
     'mouseExited:': { implementation: function (event) { hovered('torIcon', null); } }
-} });
+}) });
 
-ObjC.registerSubclass({ name: 'LzrprfToolIcon', superclass: 'NSButton', methods: {
+ObjC.registerSubclass({ name: 'LzrprfToolIcon', superclass: 'NSButton', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('toolicon', function () { toolIconDrawn(toolIcon); }); } },
     'mouseEntered:': { implementation: function (event) { hovered('toolIcon', event); } },
     'mouseExited:': { implementation: function (event) { hovered('toolIcon', null); } }
-} });
+}) });
 
 
-ObjC.registerSubclass({ name: 'LzrprfTool', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfTool', superclass: 'NSView', methods: clickThrough({
     'isFlipped': { implementation: function () { return true; } },
     'drawRect:': { implementation: function (dirty) { viewDrawn('tool', function () { paintTool(); }); } },
     'mouseDown:': { implementation: function (event) { toolClicked(event); } }
-} });
+}) });
 
 ObjC.registerSubclass({ name: 'LzrprfTorBeam', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('torbeam', function () { torBeamDrawn(torView); }); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfSuggest', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfSuggest', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('suggest', function () { paintSuggest(); }); } },
     'mouseDown:': { implementation: function (event) { suggestClicked(event); } },
     'mouseMoved:': { implementation: function (event) { hovered('suggest', event); } },
     'mouseExited:': { implementation: function (event) { hovered('suggest', null); } }
-} });
+}) });
 
-ObjC.registerSubclass({ name: 'LzrprfWizard', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfWizard', superclass: 'NSView', methods: clickThrough({
     'isFlipped': { implementation: function () { return true; } },
     'drawRect:': { implementation: function (dirty) { viewDrawn('wizard', function () { paintWizard(); }); } },
     'mouseDown:': { implementation: function (event) { wizClicked(event); } },
     'mouseMoved:': { implementation: function (event) { hovered('wiz', event); } },
     'mouseExited:': { implementation: function (event) { hovered('wiz', null); } }
-} });
+}) });
 
-ObjC.registerSubclass({ name: 'LzrprfFind', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfFind', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('find', function () { paintFind(); }); } },
     'mouseDown:': { implementation: function (event) { findClicked(event); } }
-} });
+}) });
 
 ObjC.registerSubclass({ name: 'LzrprfSecure', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('secure', function () { paintSecure(); }); } },
     'mouseDown:': { implementation: function (event) { } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfTabs', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfTabs', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('tabs', function () { paintTabs(); }); } },
+    'mouseDownCanMoveWindow': { types: ['bool', []], implementation: function () { return false; } },    // HC-0856: macOS never moves the window from a press here on its own; windowHeld moves it where nothing else is pressed
     'mouseDown:': { implementation: function (event) { pressSeen(event); tabClicked(event); } },
     'mouseMoved:': { implementation: function (event) { hovered('tabs', event); } },
     'mouseExited:': { implementation: function (event) { hovered('tabs', null); } }
-} });
+}) });
 
-ObjC.registerSubclass({ name: 'LzrprfBelt', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfBelt', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('belt', function () { paintBelt(); }); } },
+    'mouseDownCanMoveWindow': { types: ['bool', []], implementation: function () { return false; } },    // HC-0856: macOS never moves the window from a press here on its own; windowHeld moves it where nothing else is pressed
     'mouseDown:': { implementation: function (event) { pressSeen(event); beltClicked(event); } },
     'mouseMoved:': { implementation: function (event) { hovered('belt', event); } },
     'mouseExited:': { implementation: function (event) { hovered('belt', null); } }
-} });
+}) });
 
 ObjC.registerSubclass({ name: 'LzrprfCog', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('cog', function () { paintCog(); }); } },
@@ -4147,26 +4069,27 @@ ObjC.registerSubclass({ name: 'LzrprfCog', superclass: 'NSView', methods: {
     'mouseExited:': { implementation: function (event) { hovered('cog', null); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfFaces', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfFaces', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('faces', function () { paintFaces(); }); } },
     'mouseDown:': { implementation: function (event) { pressSeen(event); facesClicked(); } },
     'mouseEntered:': { implementation: function (event) { hovered('faces', event); } },
     'mouseExited:': { implementation: function (event) { hovered('faces', null); } }
-} });
+}) });
 
-ObjC.registerSubclass({ name: 'LzrprfStar', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfStar', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('star', function () { paintStar(); }); } },
     'mouseDown:': { implementation: function (event) { pressSeen(event); starClicked(); } },
     'mouseEntered:': { implementation: function (event) { hovered('star', event); } },
     'mouseExited:': { implementation: function (event) { hovered('star', null); } }
-} });
+}) });
 
-ObjC.registerSubclass({ name: 'LzrprfMarks', superclass: 'NSView', methods: {
+ObjC.registerSubclass({ name: 'LzrprfMarks', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('marks', function () { paintMarks(); }); } },
+    'mouseDownCanMoveWindow': { types: ['bool', []], implementation: function () { return false; } },    // HC-0856: macOS never moves the window from a press here on its own; windowHeld moves it where nothing else is pressed
     'mouseDown:': { implementation: function (event) { pressSeen(event); marksClicked(event); } },
     'mouseMoved:': { implementation: function (event) { hovered('marks', event); } },
     'mouseExited:': { implementation: function (event) { hovered('marks', null); } }
-} });
+}) });
 
 ObjC.registerSubclass({ name: 'LzrprfBack', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('back', function () { paintBack(); }); } }
@@ -4250,10 +4173,8 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'zoomIn:': { types: ['void', ['id']], implementation: function (sender) { zoomed(1); } },
     'zoomOut:': { types: ['void', ['id']], implementation: function (sender) { zoomed(-1); } },
     'zoomReset:': { types: ['void', ['id']], implementation: function (sender) { zoomed(0); } },
-    'zoomShown:': { types: ['void', ['id']], implementation: function (sender) { zoomShown(); } },
-    'noteGone:': { types: ['void', ['id']], implementation: function (sender) { noteGone(); } },
     'loadingTicked:': { types: ['void', ['id']], implementation: function (sender) { loadingTicked(); } }, 'layersPumped:': { types: ['void', ['id']], implementation: function (sender) { layersPumped(); } },
-    'clearing:': { types: ['void', ['id']], implementation: function (sender) { clearing(); } },
+    'clearing:': { types: ['void', ['id']], implementation: function (sender) { clearing(); } }, 'cookieSite:': { types: ['void', ['id']], implementation: function (sender) { cookieSite(); } },
     'homing:': { types: ['void', ['id']], implementation: function (sender) { if (takes()) sent('menu home'); } },
     'back:': { types: ['void', ['id']], implementation: function (sender) { navPressed(0); } },
     'forward:': { types: ['void', ['id']], implementation: function (sender) { navPressed(1); } },
@@ -4284,9 +4205,9 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
         if (data.length == 0) { behindGone(); return; }    // lzrprf is gone: so is its window, unless the installer's modal is open
         try {
             if (!NEWLINE) NEWLINE = $('\n').dataUsingEncoding(4);
-            var start = +held.length;    // a length and a place in bytes come from the bridge as text: each is made a number before it is added to
-            held.appendData(data);
-            var end = held.rangeOfDataOptionsRange(NEWLINE, 1, $.NSMakeRange(start, held.length - start));    // 1: from the end
+            held.appendData(data);    // a length and a place in bytes come from the bridge as text: each is made a number before it is added to
+            while (+data.length >= 16384 && +held.length < 8388608 && held.rangeOfDataOptionsRange(NEWLINE, 0, $.NSMakeRange(+held.length - 1, 1)).length == 0) { data = from.availableData; if (data.length == 0) break; held.appendData(data); }    // a full read that ends inside a line: the rest of that line is on its way (lzrprf writes whole lines, in one write a list), so it is read here and now, up to 8 MiB at a time, and the lines are made text once for all of it. Read by read, each with its own turn of the window's loop and its own text, a front page's 22 MB of picture rows took the window over a second for every list (measured in the real browser, 2026-11-25); so read, 0.2 s
+            var end = held.rangeOfDataOptionsRange(NEWLINE, 1, $.NSMakeRange(0, +held.length));    // 1: from the end
             if (end.length > 0) {
                 var upto = +end.location, whole = held.subdataWithRange($.NSMakeRange(0, upto));
                 held = $.NSMutableData.dataWithData(held.subdataWithRange($.NSMakeRange(upto + 1, held.length - upto - 1)));
@@ -4348,7 +4269,7 @@ function menus() {
      ['Edit', [['Undo', 'undo:', 'z', false], ['Redo', 'redo:', 'Z', false], ['Cut', 'cut:', 'x', false], ['Copy', 'copy:', 'c', false], ['Paste', 'paste:', 'v', false], ['Select All', 'selectAll:', 'a', false],
         ['Find...', 'finding:', 'f', true], ['Find Next', 'findNext:', 'g', true], ['Find Previous', 'findPrevious:', 'g', true, CMD | SHIFT]]],
      ['View', [['Zoom In', 'zoomIn:', '+', true], ['Zoom In', 'zoomIn:', '=', true, CMD, 0, true], ['Zoom Out', 'zoomOut:', '-', true], ['Actual Size', 'zoomReset:', '0', true]]],
-     ['Go', [['Address', 'bar:', 'l', true], ['Back', 'back:', '[', true], ['Forward', 'forward:', ']', true], ['Reload', 'reload:', 'r', true], ['Clear Browsing History...', 'clearing:', String.fromCharCode(8), true, CMD | SHIFT], ['Log', 'log:', '', true]]],
+     ['Go', [['Address', 'bar:', 'l', true], ['Back', 'back:', '[', true], ['Forward', 'forward:', ']', true], ['Reload', 'reload:', 'r', true], ['Clear Browsing History...', 'clearing:', String.fromCharCode(8), true, CMD | SHIFT], ['Clear Cookies of This Site...', 'cookieSite:', '', true], ['Log', 'log:', '', true]]],
      ['Bookmarks', [['Bookmark This Tab...', 'markThis:', 'd', true], ['Show Bookmarks Bar', 'marksBar:', 'b', true, CMD | SHIFT], ['Bookmark Manager', 'bookmarks:', 'b', true, CMD | OPTION], ['Import Bookmarks...', 'importing:', '', true]]],
      ['Tab', [['New Tab', 'newTab:', 't', true], ['Close Tab', 'closeTab:', 'w', true], ['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
         ['Select Next Tab', 'nextTab:', String.fromCharCode(0xF703), true, CMD | OPTION], ['Select Previous Tab', 'previousTab:', String.fromCharCode(0xF702), true, CMD | OPTION],

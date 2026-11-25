@@ -127,9 +127,9 @@ The limits, said plainly:
   printed, appended, `licence` (the support member licence code you entered, as it was given
   to you, until you remove it) and `support` (the reference and the key of the support request
   you sent last, so its answer can be read, and never its words, until "Forget it" or the next
-  request), `procnotes` (the notes you wrote to programs in LZRDFNDR's Show all processes, one line a program, its path and your words, readable by you alone; an empty note removes its line, and an incognito window writes none), and the folder `profiles` once you made a second profile or named the first: a
+  request), `procnotes` (the notes you wrote to programs in LZRDFNDR's Show all processes, one line a program, its path and your words, readable by you alone; an empty note removes its line, and an incognito window writes none), `trmnl` (the terminal tabs and views you saved with Save tabs and views in LZRTRMNL: their order, the one shown, each split and its size, the focused pane and each pane's working folder, never what was typed or shown and never a title, readable by you alone, until Forget saved tabs and views; an incognito or Tor window opens no terminal), and the folder `profiles` once you made a second profile or named the first: a
   folder for each profile with its own `name`, `keep`, log, `home`, `search`, `bookmarks`,
-  `marksbar` and `pictures`, and the file `first` with the first profile's name (see "Profiles"). An incognito
+  `marksbar`, `pictures` and `trmnl`, and the file `first` with the first profile's name (see "Profiles"). An incognito
   window writes and reads neither licence nor support, and offers neither. The closed tabs
   to reopen and each tab's zoom are held in memory only. It also holds files lzrprf needs to
   work, none with an address you typed:

@@ -95,7 +95,7 @@ sub approval_key_current {                # [C25] an approval key whose line end
     my ($key) = @_;
     return 1 unless $key =~ / valid-until /;
     my ($y, $m, $d) = $key =~ / valid-until ([0-9]{4})-([0-9]{2})-([0-9]{2})\z/ or return 0;
-    my $until = eval { Time::Local::timegm(0, 0, 0, $d, $m - 1, $y) } // return 0;
+    require Time::Local; my $until = eval { Time::Local::timegm(0, 0, 0, $d, $m - 1, $y) } // return 0;
     return time < $until + 86400 ? 1 : 0;
 }
 
@@ -111,7 +111,7 @@ sub manifest_read {                       # [C25] a manifest in its one form, as
         my ($word) = $at == 2 ? 'signed' : 'expires';
         my @t = $lines[$at] =~ /\A$word ([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})Z\z/ or return (undef, $bad);
         return (undef, $bad) unless $t[1] >= 1 && $t[1] <= 12 && $t[2] >= 1 && $t[2] <= 31 && $t[3] < 24 && $t[4] < 60 && $t[5] < 60;
-        push @when, eval { Time::Local::timegm($t[5], $t[4], $t[3], $t[2], $t[1] - 1, $t[0]) } // return (undef, $bad);
+        require Time::Local; push @when, eval { Time::Local::timegm($t[5], $t[4], $t[3], $t[2], $t[1] - 1, $t[0]) } // return (undef, $bad);
     }
     my %files;
     for my $line (@lines[4 .. $#lines]) {
@@ -253,7 +253,7 @@ sub newer_looked {
 # and "lzrprf try" only when its folder holds a file "welcome".
 my @PROTECTS = (
     'Page scripts: the scripts of a page run sealed in its container, with no network, no file of yours and no other program, so no tracking code, fingerprinting or hidden miner runs either.',
-    'Being followed: every site gets the same request from every computer, with no cookie and nothing kept from an earlier visit, except the sign-in of a provider you connected, which goes to the sites of that provider alone.',
+    'Being followed: every site gets the same request from every computer, with nothing kept from an earlier visit but its own cookies, kept apart under each site you visit it from so no site follows you across others, and the sign-in of a provider you connected, which goes to the sites of that provider alone.',
     'Pages reaching your Mac: each page is drawn in a sealed container with no network, no file of yours and no other program.',
     'Hidden requests: nothing is fetched that you did not ask for, and every address is in your log before it is fetched.',
 );
@@ -325,6 +325,7 @@ sub welcome {
 # and ends nothing (signal XFSZ).
 my %INK = (31 => 'r', 32 => 'g', 33 => 'y', 34 => 'b', 35 => 'm', 36 => 'c', 37 => 'w', 91 => 'r', 92 => 'g', 93 => 'y', 94 => 'b', 95 => 'm', 96 => 'c', 97 => 'w');    # the colours of a terminal, as one letter each
 my $INSTALL_LOG;                          # install.txt in the state folder (sub shared) while an installer runs
+my $INSTALL_PARTS;                        # the parts an install was asked for in Add or remove LZR modules (sub parts_fetched): its installer's word parts=, or none and it keeps the record
 sub installed {
     my ($there, $installer, $same, $signed) = @_;    # $signed: the manifest release_signed read for $there [C25]
     my %run = (phase => 'fetch', held => '');    # phase: fetch until the installer is started, run while it runs, after once it ended
@@ -355,6 +356,7 @@ sub installed {
 sub install_run {
     my ($run, $there, $installer, $same, $signed) = @_;
     window('install begin');
+    require IO::Handle;                  # for autoflush and flush, loaded for an install alone
     sysopen($INSTALL_LOG, "${\ shared()}/install.txt", O_WRONLY | O_CREAT | O_APPEND | O_NOFOLLOW, 0600) or undef $INSTALL_LOG;
     $INSTALL_LOG->autoflush(1) if $INSTALL_LOG;    # each line reaches install.txt as it comes: a run that ends without its own end still leaves every line it was given
     my @is = $INSTALL_LOG ? stat $INSTALL_LOG : ();
@@ -406,7 +408,7 @@ sub install_run {
         close $from;
         POSIX::setsid();                  # a session of its own: a signal to the group of lzrprf behind this window does not reach the installer, and the installer's own group signals do not reach lzrprf
         chdir $folder or POSIX::_exit(127);
-        become(undef, $to, $to, '/usr/bin/env', '-i', 'PATH=/usr/bin:/bin:/usr/sbin:/sbin', "HOME=$HOME", 'TERM=dumb', '/bin/sh', 'install.sh', 'auto');
+        become(undef, $to, $to, '/usr/bin/env', '-i', 'PATH=/usr/bin:/bin:/usr/sbin:/sbin', "HOME=$HOME", 'TERM=dumb', '/bin/sh', 'install.sh', 'auto', $INSTALL_PARTS ? "parts=$INSTALL_PARTS" : ());
     }
     @$run{qw(phase from until)} = ('run', $from, now() + $INSTALL_SECONDS) if defined $child;
     print STDOUT "install runs\n" if defined $child;    # the installer was started: from here on the window knows it may go on without lzrprf
@@ -501,7 +503,7 @@ sub install_guarded {                     # one line into install.txt once lzrpr
 # place it ran from, which the installer has replaced by then. Nothing else
 # is started, and "lzrprf try" starts nothing.
 sub restarted {
-    busy('The install is done.');
+    busy($_[0] // 'The install is done.');
     while (defined(my $line = hear())) {
         next unless $line eq 'restart';
         my ($app) = $PROGRAM =~ m{^(.*\.app)/Contents/MacOS/};
@@ -558,7 +560,7 @@ sub install_end {                         # how the install ended, said in the m
         print {$INSTALL_LOG} "$plain\n" if $INSTALL_LOG;
     };
     print STDOUT 'install end ' . ($done ? 'done' : 'failed') . " $words\n";
-    if ($INSTALL_LOG) { $INSTALL_LOG->flush; $^O eq 'darwin' ? fcntl($INSTALL_LOG, 51, 0) : $INSTALL_LOG->sync; close $INSTALL_LOG; undef $INSTALL_LOG }
+    if ($INSTALL_LOG) { require IO::Handle; $INSTALL_LOG->flush; $^O eq 'darwin' ? fcntl($INSTALL_LOG, 51, 0) : $INSTALL_LOG->sync; close $INSTALL_LOG; undef $INSTALL_LOG }
     record('the install ' . ($done ? 'is done' : "failed: $words"));
     return;
 }
@@ -567,14 +569,19 @@ sub body_of {                             # the body of an answer 200, as curl g
     my ($got) = @_;
     my ($head, $body) = $got =~ m{\AHTTP/1\.1 200 [^\r\n]*\r\n(.*?)\r\n\r\n(.*)\z}s or return;
     return $body unless $head =~ /^transfer-encoding:[ \t]*chunked[ \t]*\r?$/mi;
-    my $whole = '';
-    pos($body) = 0;                       # read where the last chunk ended, never a copy of the rest: a site's thousands of one-byte chunks cost no more than one chunk of their size
-    while ($body =~ /\G([0-9a-fA-F]{1,8})[^\r\n]*\r\n/gc) {
-        my ($n, $at) = (hex $1, pos $body);
+    my ($whole, $end) = ('', length $body);
+    pos($body) = 0;                       # read where the last chunk ended, never a copy of the rest
+    while ($body =~ /\G([0-9a-fA-F]{1,8})([^\r\n]*)\r\n/gc) {
+        my ($size, $more, $n, $at) = ($1, $2, hex $1, pos $body);
         return $whole unless $n;
-        return unless length($body) >= $at + $n + 2 && substr($body, $at + $n, 2) eq "\r\n";
+        return unless $end >= $at + $n + 2 && substr($body, $at + $n, 2) eq "\r\n";
         $whole .= substr($body, $at, $n);
         pos($body) = $at + $n + 2;
+        next if $n > 64 || length $more || utf8::is_utf8($body);    # a run is read as octets, so only a body of octets, as curl gives it
+        my $from = pos $body;             # small chunks with the same size line in a row (a site's thousands of one-byte chunks): the regex engine checks all their frames at once and unpack takes their bytes, not one turn of this loop each
+        next unless $body =~ /\G(?:\Q$size\E\r\n.{$n}\r\n)+/gcs;
+        my $count = (pos($body) - $from) / (length($size) + $n + 4);
+        $whole .= pack "C*", unpack("x$from (x" . (length($size) + 2) . "C${n}x2)$count", $body);
     }
     return;
 }

@@ -23,6 +23,7 @@ the reader to check against the code. Regenerate with `perl tools/doc-index --wr
 | WORD is page or container, NUMBER is the ... | - | - | `page` |
 | What the maker's server keeps of it cannot ... | - | - | - |
 | Everyone on the same update of macOS has ... | - | - | - |
+| An error of lzrprf's own while it takes ... | `unheard`, `behind` | - | `behindfault` |
 <!-- index end -->
 
 When the application did not give a page, the window says one of eight fixed phrases (`%FAULT`
@@ -69,3 +70,10 @@ question, and the line behind the Log button.
 
 Everyone on the same update of macOS has the same build. A rare build, such as a test build,
 narrows down who could have sent a report. The question shows the build before you choose.
+
+An error of lzrprf's own while it takes up a line of the window or of a page kept running (`sub unheard`, called from
+`sub behind`) never ends the window. The page of the tab shown is ended, the log keeps a line naming what was being
+taken up and the error, and the tab says that the page was ended and that the window and its other tabs go on. A copy
+of lzrprf made by fork that meets such an error ends at once and never goes on as the one behind the window. Only
+after `$BEHIND_FAULTS` such errors in one window does lzrprf end after all. Until 2026-11-24 any such error ended
+lzrprf, and the window followed it (Henry's report of yle.fi: the whole browser went). Run `behindfault`.

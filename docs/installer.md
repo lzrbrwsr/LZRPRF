@@ -22,6 +22,12 @@ the reader to check against the code. Regenerate with `perl tools/doc-index --wr
 | --- | --- | --- | --- |
 | install.sh in this repository is the installer that ... | - | - | - |
 | The first line saves the installer from the ... | - | - | - |
+| The installer asks, at its start, for each ... | - | - | - |
+| - sh install.sh parts=lzrbrwsr,lzrtnnl chooses without asking; parts=lzrbrwsr ... | - | - | - |
+| - Started in auto (lzrprf's update) or with ... | - | - | - |
+| - The program of a part left out ... | `paired`, `part_left_out` | - | - |
+| - What you chose is written last, under ... | `parts_read`, `parts_set`, `parts_fetched`, `installed` | - | - |
+| The package test pins each choice (scripts/test-package-parts.sh of ... | - | - | - |
 | Everything that is installed stands in two places: ... | - | - | - |
 | what is compared who compares the line ... | - | - | - |
 | the installer, before it runs your own shell ... | - | - | - |
@@ -86,6 +92,38 @@ installer would simply say yes; so it only shows its SHA-256 and says where the 
 is. What the comparison shows: the site and this repository serve the same installer, so
 somebody who changed one would have had to change the other too, in public. It does not show
 that the installer is good. For that, read it: it is plain text.
+
+## The parts you include
+
+The installer asks, at its start, for each part of LZRBRWSR whether to include it (Henry, 2026-11-24,
+HC-0858). LZRBRWSR itself, the browser with its profiles and settings, is always installed: the window,
+and the settings where the others are switched later, are its own. Then, one by one: LZRDFNDR (the tool
+that shows and stops what runs on this Mac), LZRTRMNL (the terminal tab), LZRTNNL (Tor, with an
+optional VPN of your own) and LZRGM (the minigame). Enter takes the answer in capitals: on a first
+install every part, over an earlier install what that one chose.
+
+- `sh install.sh parts=lzrbrwsr,lzrtnnl` chooses without asking; `parts=lzrbrwsr` is the browser alone.
+  A name that is no part stops the installer before anything changes.
+- Started in auto (lzrprf's update) or with no terminal, the parts of the last install are kept.
+- The program of a part left out (`arti` for LZRTNNL, `core-lzrbrwsr-trmnl` for LZRTRMNL) is taken out
+  of the checked download before it is put in place. The download and its checksums are the same for
+  everyone; lzrprf takes the absence of such a program for what was installed (`sub paired`,
+  `sub part_left_out`). LZRDFNDR and LZRGM are inside the program and lzrprf: left out, they stay on
+  the disk, switched off and shown nowhere.
+- What you chose is written last, under the installer's lock, to `~/.lzrprf/parts`: the line
+  `lzrbrwsr parts 1`, then one part a line (`sub parts_read`). "Add or remove LZR modules" in the
+  window writes the same record (`sub parts_set`); a part added there whose program is not on the disk
+  runs this installer of the published release through the signed road of an update, with the parts
+  as its word (`sub parts_fetched`, `sub installed`).
+
+With LZRTRMNL, `lzr`, its command, is put on the PATH of new terminals without sudo: a launcher in
+`~/.lzrprf/path`, and one marked line in `~/.zprofile` and `~/.zshrc` (and `~/.bash_profile` when your
+login shell is bash) that adds that folder, never twice. An install without LZRTRMNL takes the launcher
+and the lines away; switching LZRTRMNL off in "Add or remove LZR modules" takes the launcher away, and
+the next install the lines. Staging's launcher is `lzr-stg` in `~/.lzrprf-stg/path`, so the two never
+shadow each other. When the installed lzrprf has no lzr yet, the launcher says so in one line.
+
+The package test pins each choice (`scripts/test-package-parts.sh` of LZRBRWSR, step 25).
 
 ## Two places, and exactly what they are worth
 

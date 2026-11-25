@@ -104,8 +104,8 @@ sub live_turn {
 #       BODYLEN  0 to $LIVE_FETCH_UP, and 0 for GET and HEAD
 #       TYPE     "-", or for a POST one of text/plain,
 #                application/x-www-form-urlencoded and application/json
-#       DEST     what the answer is for: data, script, module, worker or
-#                frame; a line without it is data, as before [C26]
+#       DEST     what the answer is for: data, script, module, worker,
+#                frame or image; a line without it is data, as before [C26]
 #       URL      printable, at most 8192 bytes
 #
 # A script, module or worker of a site whose scripts are not allowed is not
@@ -147,6 +147,14 @@ sub live_turn {
 sub live_asked {                          # [C19] the request at the front of what the page wrote: nothing when there is none, 0 while it is not all there, else [its line, its body, the bytes it takes], or [its line] when it is of no form
     my ($live) = @_;
     my $permit = substr($live->{held}, 0, 8) eq '=permit ';    # [C26] a question whether a script may run: one line, no body
+    if (substr($live->{held}, 0, 7) eq '=early ') {    # the page as it is before its scripts run: one line "=early BYTES", then that many bytes of a list, answered with nothing (sub live_early)
+        my $end = index $live->{held}, "\n";
+        return $end < 0 && length $live->{held} <= 32 ? 0 : [''] if $end < 0 || $end > 32;
+        my ($size) = substr($live->{held}, 0, $end) =~ /^=early ([1-9][0-9]{0,7})\z/ or return [''];
+        return [''] if $size > $PAGE_BYTES;
+        return 0 if length($live->{held}) < $end + 1 + $size;
+        return ['=early', substr($live->{held}, $end + 1, $size), $end + 1 + $size];
+    }
     return unless $permit || substr($live->{held}, 0, 7) eq '=fetch ';
     my $end = index $live->{held}, "\n";
     if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
@@ -158,17 +166,47 @@ sub live_asked {                          # [C19] the request at the front of wh
     return [$line, substr($live->{held}, $end + 1, $size), $end + 1 + $size];
 }
 
+# The page before its scripts run. A run that has the network writes, once and
+# before it reads its scripts, the list of the page as its markup and its
+# style sheets alone lay it ("=early", the application's src/page/mod.rs).
+# It is checked as every list is (sub checked) and drawn at once, with a grey
+# box in the place of each picture, and nothing is fetched for it: what you
+# read is on the screen while the page's scripts are fetched and run, and the
+# run's own first list is drawn over it when it comes. Only on a visit, for
+# the page being read, never a home, and once a run. Measured 2026-11-25 on
+# yle.fi: its first list came 1.1 s after the address was typed, 0.9 s of
+# that its scripts.
+sub live_early {
+    my ($live, $body) = @_;
+    timed('early-here ' . length $body) if $TIMED;
+    return if $live->{until} || $live->{home} || $live->{early}++ || $OUTRUN;
+    my ($tally, $titled, @fonts) = ($LAID_TALLY, $TITLED, @FONTS_NAMED);    # what sub checked says again: this list is not the run's own
+    my ($lines, $hosts, $paths) = checked($body);
+    ($LAID_TALLY, $TITLED, @FONTS_NAMED) = ($tally, $titled, @fonts);
+    timed('early-checked ' . ($lines ? scalar @$lines : 'unfit')) if $TIMED;
+    return unless $lines && @$lines;
+    window("page $TAB", @{ (pictured($lines, $paths, $live->{host}, undef, undef, pictures_so_far($live->{host})))[0] }, '.');    # nothing is fetched for this one
+    $DRAWN = 1;
+    timed('list-early');
+    prefetch_go('', $live->{url}, 'found') if $PREFETCH_NAMED && %FINDING;    # and what the page names on other hosts, looked up since its run began (sub prefetch_later): since release 101 that is after sub ahead_fonts, which began them before, so yle.fi's two fonts were asked for by the page first, one after the other, 200 ms its scripts waited (measured 2026-11-25); here and not before the list, where waiting for a name held the first drawing 20 ms
+    pictures_ahead($lines, $paths, $live->{host});    # its pictures begin now, while its scripts run
+    return;
+}
+
 my %LIVE_PASSED = map { $_ => 1 } qw(content-type access-control-allow-origin access-control-allow-credentials access-control-allow-methods access-control-allow-headers access-control-expose-headers);    # [C19] the headers a page is handed of an answer: its type, and what the CORS check of its engine reads
 
 sub live_fetched {                        # [C19]
+    timed('live-asked') if $TIMED;
+    pictures_pumped();
     my ($live, $asked) = @_;
     my ($line, $body, $took) = @$asked;
     return live_end($live, 'it wrote a line of no form') unless defined $took;
     substr($live->{held}, 0, $took, '');
     $live->{looked} = 0;
+    return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';
     return live_replied($live, 0, '', '') if $live->{home};    # the local home has no network door, including absolute script requests    # [C26]
-    my ($method, $size, $type, $dest, $as, $to) = $line =~ m{^=fetch (GET|HEAD|POST) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame) )?(?:as ([a-z]{1,16}) )?([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form');
+    my ($method, $size, $type, $dest, $as, $to) = $line =~ m{^=fetch (GET|HEAD|POST) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?(?:as ([a-z]{1,16}) )?([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form');
     return live_end($live, 'it wrote a line of no form') if $method ne 'POST' && ($size || $type ne '-');
     $dest //= 'data';                     # [C26] a line of an application from before the destination word
     return live_end($live, 'it wrote a line of no form') if defined $as && !identity_word($as);    # [C7] D19: an identity lzrprf holds no header set for is no request at all
@@ -213,12 +251,20 @@ sub live_fetched {                        # [C19]
     $why = "the page asked for more than $LIVE_FETCH_MOST addresses" if ++$live->{fetches} > $LIVE_FETCH_MOST;
     if (!$why) { my $shield = shield_said($url); $why = shield_why($shield) if $shield ne 'allow' }    # [C28] before any DNS lookup, including requests while a page is still being read
     my $where;
-    ($where, $why) = $TOR_WANTED ? tor_where($host) : find($host) unless $why;    # [C17] with Tor on, nothing is looked up on this computer
-    $why = 'that host is not on the public internet' if !$why && $where && $PEER eq '-' && grep { $_->{own} } @$where;    # [C8] no question is asked for a page's request: it is refused
+    my $sent_ask = { method => $method, type => $type, body => $body, origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => scalar(sso_cookie($url, $live->{host})), top => $allowed eq 'sandbox' ? undef : $live->{url}, as => $as, dest => $dest, from => $live->{host} };
+    prefetch_go($url, $live->{url}) if !$why && $dest =~ /^(?:script|module)$/;    # [C19] its first external script shows the page runs them: the others it names are fetched ahead now
+    my @ahead = $why ? () : prefetch_take($url, $sent_ask, $live->{until});    # [C19] this very request, fetched ahead while the page was read (sub prefetch_begin): judged, looked up and written down before it was made
+    timed(join q{ }, "asked $$", @ahead ? "ahead" : "now", $dest // "plain", $host eq $live->{host} ? "own" : "other", $url =~ m{([A-Za-z0-9.-]{1,24})\z}) if $TIMED;    # "lzrprf try" with "times": which of the page's requests were here already (scripts/load-timeline.pl)
+    record("$url was fetched ahead for the page: " . ($ahead[1] ? "failed: $ahead[1]" : 'answered: ' . length($ahead[0]) . " bytes from $ahead[2]"), $kept) or return live_replied($live, 0, '', '') if @ahead;
+    ($why, $where) = ($ahead[1], 1) if @ahead;
+    ($where, $why) = $TOR_WANTED ? tor_where($host) : find($host) unless $why || @ahead;    # [C17] with Tor on, nothing is looked up on this computer
+    $why = 'that host is not on the public internet' if !@ahead && !$why && $where && $PEER eq '-' && grep { $_->{own} } @$where;    # [C8] no question is asked for a page's request: it is refused
     my ($got, $from);
-    if (!$why) {
+    ($got, $from) = @ahead[0, 2] if @ahead && !$why;
+    if (!$why && !@ahead) {
         record("$url -> lzrprf connects " . ($TOR_WANTED ? "through Tor, one circuit for $host" : 'to the first that answers of: ' . join(', ', map { $_->{text} } @$where)), $kept) or return live_replied($live, 0, '', '');    # [C5] written down first, connected second
-        ($got, $why, $from) = fetch($url, $where, { method => $method, type => $type, body => $body, origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => scalar(sso_cookie($url, $live->{host})), as => $as, dest => $dest, from => $live->{host} });    # [C6] [C7] cookies only of a provider you connected, and only from a page of that provider's own family (sub sso_cookie)
+        ($got, $why, $from) = fetch($url, $where, { method => $method, type => $type, body => $body, origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => scalar(sso_cookie($url, $live->{host})), top => $allowed eq 'sandbox' ? undef : $live->{url}, as => $as, dest => $dest, from => $live->{host} });    # [C6] [C7] cookies only of a provider you connected, and only from a page of that provider's own family (sub sso_cookie)
+        prefetch_keep($url, $sent_ask, $got, $from) if !$why && $allowed eq 'sandbox' && !$live->{until};    # [C19] kept for the page's next layout in this visit, only while it is read
     }
     sso_heard($url, $got, $live->{host}) unless $why;    # [C7] as in visit, for a page of the provider's own family alone
     if (!$why) {

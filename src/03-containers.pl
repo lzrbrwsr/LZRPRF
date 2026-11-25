@@ -58,7 +58,7 @@ END
 # shell set them and became "env -i", which became sandbox-exec: two
 # programs started for every container, three containers a page. Since then
 # lzrprf sets them itself (sub limited, which says why that is as strong).
-my $PAGE_LIMITS = { bytes => 0, told => [qw(LZRPRF_CONTAINED LZRPRF_SEAL)], set => [qw(LZRPRF_PICTURE LZRPRF_TOOL LZRPRF_JUDGE LZRPRF_TOR LZRPRF_HOME)] };    # the bytes one file may hold; the variables told always, and those told only when they hold something
+my $PAGE_LIMITS = { bytes => 0, told => [qw(LZRPRF_CONTAINED LZRPRF_SEAL)], set => [qw(LZRPRF_EARLY LZRPRF_TIMES LZRPRF_PICTURE LZRPRF_TOOL LZRPRF_JUDGE LZRPRF_JAR LZRPRF_TOR LZRPRF_HOME)] };    # the bytes one file may hold; the variables told always, and those told only when they hold something
 
 # What curl's container is allowed on top of it: one socket file, behind which
 # lzrprf holds the connection to the site, and the list of certificate
@@ -380,6 +380,7 @@ sub seal {
     POSIX::close($_) for @numbers;
 }
 
+sub the_program { become($_[0], $_[1], $TRY ? \*STDERR : undef, $PAGE_LIMITS, contain('', $PROGRAM), @ARGUMENTS); }    # [C1] the one line that starts the application: in the page container, with its limits, for a page and for the cookie jar
 sub become {                              # this process turns into @command; a descriptor that is not given leads nowhere
     my ($in, $out, $err, @command) = @_;
     my $limits = ref $command[0] ? shift @command : undef;    # a container's limits, first, when @command starts one (sub limited)
@@ -462,15 +463,47 @@ sub said_all {
     return @text;
 }
 
+# A program started as said() starts one, and read later by said_read beside
+# others: so programs that need nothing of each other run at the same time.
+sub said_started {                        # [what it writes, its number], or nothing when it could not be started
+    my (@command) = @_;
+    pipe(my $from, my $to) or return undef;    # undef, not nothing: the caller's list keeps one place for each program
+    my $child = fork // return undef;
+    if (!$child) { close $from; become(undef, $to, undef, @command) }    # become() closes every other descriptor, the other programs' pipes among them
+    close $to;
+    return [$from, $child];
+}
+
+sub said_read {                           # for each started program, read side by side within the same seconds: [what it printed, whether it ended by itself without an error], in the order given
+    my ($seconds, @runs) = @_;
+    my @from = map { $_ ? $_->[0] : undef } @runs;
+    my @text = map { '' } @runs;
+    my @whole = map { 0 } @runs;
+    my $until = now() + $seconds;
+    while ((my $left = $until - now()) > 0 && grep { defined } @from) {
+        my $ready = '';
+        vec($ready, fileno $_, 1) = 1 for grep { defined } @from;
+        select($ready, undef, undef, $left > 1 ? 1 : $left) > 0 or next;
+        for my $at (grep { defined $from[$_] && vec($ready, fileno $from[$_], 1) } 0 .. $#from) {
+            my $got = sysread($from[$at], $text[$at], 65536, length $text[$at]);
+            next if !defined $got && $!{EINTR};
+            $whole[$at] = 1 if defined $got && !$got;
+            undef $from[$at] if !$got || length $text[$at] >= 4 * 1024 * 1024;
+        }
+    }
+    return map { $runs[$_] ? [$text[$_], ended($runs[$_][1], $whole[$_] ? 2 : 0) == 0 && $whole[$_]] : ['', 0] } 0 .. $#runs;
+}
+
 sub ended {                               # waits this long for a process to end, then ends it; returns how it ended
     my ($pid, $patience) = @_;
-    my $until = now() + $patience;
+    my ($until, $nap) = (now() + $patience, 0.001);
     while (1) {
         my $gone = waitpid $pid, POSIX::WNOHANG();
         return $? if $gone == $pid;
         return -1 if $gone < 0;
         last if now() >= $until;
-        select undef, undef, undef, 0.02;
+        select undef, undef, undef, $nap;
+        $nap = $nap < 0.01 ? $nap * 2 : 0.02;    # a program that closed its output is gone a moment later: looked at again 1, 2, 4, 8 and 16 ms on, then every 20 ms (a first look 20 ms on cost each said() up to 20 ms)
     }
     kill 'KILL', $pid;
     waitpid $pid, 0;
@@ -510,19 +543,28 @@ print "other program refused\n";
 END
 
 sub holds {
-    my $listen = IO::Socket::INET->new(Listen => 4, LocalAddr => '127.0.0.1', LocalPort => 0) or return 0;
+    my $listen; socket($listen, AF_INET, SOCK_STREAM, 0) && bind($listen, pack_sockaddr_in(0, inet_aton('127.0.0.1'))) && listen($listen, 4) or return 0;
+    my $port = (unpack_sockaddr_in(getsockname($listen) // return 0))[0];
     my $folder = (abs_path($DIR) // return 0) . "/tries.$$";    # the folder's real path, as the decoder container names it (sub decoding)
     mkdir $folder or return 0;
     put("$folder/here", O_EXCL, 'a file of yours') or return 0;
-    my @tries = ('-e', $TRIES, $listen->sockport, $folder, $$);
+    my $apart = "$DIR/tries.free.$$";    # the tries outside, in a folder of their own: what they make there ("made", "out.png") is never in the way of a try inside, which would then fail for that and not by its container
+    mkdir $apart or return 0;
+    put("$apart/here", O_EXCL, 'a file of yours') or return 0;
+    my @tries = ('-e', $TRIES, $port, $folder, $$);
+    my $free = said_started('/usr/bin/perl', '-e', $TRIES, $port, $apart, $$);    # outside every container it needs no number, so it runs while a shell is measured
     shell_measured();                     # before the tries, so they hold with the number every later container is given
-    my ($inside) = said(10, $PAGE_LIMITS, contain('', '/usr/bin/perl'), @tries);    # started as a page is started, limits and all
-    my ($decoder) = do { local $ENV{LZRPRF_TMPDIR} = "$folder/t/"; said(10, decoding($folder, '/usr/bin/perl', @tries)) };    # [C21] and as the system's decoder is, for a picture beside the file it tries: in, out.png and t are its, "here" and "made" are not
-    my ($sips, undef, $gated, $gate_well) = do { local $ENV{LZRPRF_TMPDIR} = "$folder/t/"; (said(10, decoding($folder, $SIPS, '--version')), said(10, decoding($folder, '/usr/bin/perl', '-e', $GATE, $SIPS, '--version'))) };    # [C3] [C21] sips says its version in the decoder container, and behind the gate, sent no byte (its input leads nowhere), it never starts
-    my ($outside) = said(10, '/usr/bin/perl', @tries);
-    unlink "$folder/here", "$folder/made", "$folder/out.png";
-    my $named = decoder_named($folder);    # [C21] the one system service the decoder may ask for, and no other
-    rmdir $folder;
+    my @run = (said_started($PAGE_LIMITS, contain('', '/usr/bin/perl'), @tries));    # started as a page is started, limits and all
+    {
+        local $ENV{LZRPRF_TMPDIR} = "$folder/t/";
+        push @run, said_started(decoding($folder, '/usr/bin/perl', @tries));    # [C21] and as the system's decoder is, for a picture beside the file it tries: in, out.png and t are its, "here" and "made" are not
+        push @run, said_started(decoding($folder, $SIPS, '--version')), said_started(decoding($folder, '/usr/bin/perl', '-e', $GATE, $SIPS, '--version'));    # [C3] [C21] sips says its version in the decoder container, and behind the gate, sent no byte (its input leads nowhere), it never starts
+    }
+    my $named = decoder_named($folder);    # [C21] the one system service the decoder may ask for, and no other; asked while the tries run beside it
+    my @said = said_read(10, @run, $free);    # [what it printed, whether it ended well] each
+    my ($inside, $decoder, $sips, $outside, $gated, $gate_well) = ((map { $_->[0] } @said[0, 1, 2, 4]), @{ $said[3] });    # each started at once and read side by side, none waiting for another (342 ms one after another, measured 2026-11-24)
+    unlink map { ("$_/here", "$_/made", "$_/out.png") } $folder, $apart;
+    rmdir $_ for $folder, $apart;
     my @what = ('network', 'read', 'write', 'hard link', 'signal', 'memory', 'second process');
     my $refused = join('', map { "$_ refused\n" } @what, 'other program');
     my $gate_held = $sips =~ /^sips-\d+\n\z/ && $gated eq '' && !$gate_well;    # [C3] [C21] the gate ended as it does with no byte, not well, and sips said nothing
@@ -534,20 +576,15 @@ sub holds {
 # container, the system is asked by the process's number, as for every
 # process (sub inside), whether it may ask for that service, and whether it
 # may ask for the clipboard's (com.apple.pasteboard.1), which it must not:
-# so the one rule lets one name through, and not every name. The system's
+# so the one rule lets one name through, and not every name. The one that
+# answers for every process ($WITNESS) is asked, with the two names after
+# the number, so no second program is started for it (one was, until
+# 2026-11-24: 121 ms of every start). The system's
 # function takes the name after a list of arguments of any length, which on
 # Apple silicon stands in memory after eight in registers: the five zeros
 # put it there. That is the arm64 calling convention, and only that: lzrprf
 # runs on Apple silicon alone, and on an Intel Mac the name would be read
 # from a register and the question would name nothing.                   # [C21]
-my $NAMED = <<'END';
-ObjC.import('Foundation');
-ObjC.bindFunction('sandbox_check', ['int', ['int', 'char *', 'int', 'int', 'int', 'int', 'int', 'int', 'char *']]);
-function run(argv) {
-    var pid = +argv[0];
-    return ['com.apple.coremedia.videodecoder', 'com.apple.pasteboard.1'].map(function (name) { return $.sandbox_check(pid, 'mach-lookup', 2, 0, 0, 0, 0, 0, name); }).join(' ');
-}
-END
 sub decoder_named {
     my ($folder) = @_;
     my @command = decoding($folder, '/usr/bin/perl', '-e', 'sysread STDIN, my $x, 1') or return 0;
@@ -555,10 +592,10 @@ sub decoder_named {
     my $child = fork // return 0;
     if (!$child) { $ENV{LZRPRF_TMPDIR} = "$folder/t/"; close $go; become($wait, undef, undef, @command) }
     close $wait;
-    my ($said) = inside($child) ? said(10, $SCRIPT, '-l', 'JavaScript', '-e', $NAMED, $child) : ('');
+    my $said = inside($child) ? named_asked($child, 'com.apple.coremedia.videodecoder', 'com.apple.pasteboard.1') : '';
     close $go;
     ended($child, 2);
-    return $said eq "0 1\n";
+    return $said eq '0 1';
 }
 
 # The second part is made for every process. The system keeps, for each
@@ -577,7 +614,7 @@ sub decoder_named {
 # asks for six by name from the real window.                              # [C3]
 my $WITNESS = <<'END';
 ObjC.import('Foundation');
-ObjC.bindFunction('sandbox_check', ['int', ['int', 'char *', 'int']]);
+ObjC.bindFunction('sandbox_check', ['int', ['int', 'char *', 'int', 'int', 'int', 'int', 'int', 'int', 'char *']]);
 function run() {
     var from = $.NSFileHandle.fileHandleWithStandardInput, to = $.NSFileHandle.fileHandleWithStandardOutput, held = '';
     while (true) {
@@ -585,8 +622,9 @@ function run() {
         if (data.length == 0) return;
         held += $.NSString.alloc.initWithDataEncoding(data, 4).js;
         for (var at; (at = held.indexOf('\n')) >= 0; held = held.slice(at + 1)) {
-            var pid = parseInt(held.slice(0, at), 10);
-            var refused = ['network-outbound', 'file-write-create', 'process-fork', 'mach-lookup', 'lsopen', 'appleevent-send', 'user-preference-write', 'signal'].map(function (what) { return $.sandbox_check(pid, what, 0); });
+            var asked = held.slice(0, at).split(' '), pid = parseInt(asked[0], 10);
+            var refused = asked.length > 1 ? asked.slice(1).map(function (name) { return $.sandbox_check(pid, 'mach-lookup', 2, 0, 0, 0, 0, 0, name); })
+                : ['network-outbound', 'file-write-create', 'process-fork', 'mach-lookup', 'lsopen', 'appleevent-send', 'user-preference-write', 'signal'].map(function (what) { return $.sandbox_check(pid, what, 0, 0, 0, 0, 0, 0, null); });
             to.writeData($(pid + ' ' + refused.join(' ') + '\n').dataUsingEncoding(4));
         }
     }
@@ -601,7 +639,7 @@ sub witnessed {                           # the one that answers is running, sta
     become($asked, $told, undef, $SCRIPT, '-l', 'JavaScript', '-e', $WITNESS) unless $witness;
     $witness_of = $$;
     close $_ for $asked, $told;
-    $to_witness->autoflush(1);
+    select((select($to_witness), $| = 1)[0]);    # autoflush, without loading IO::Handle at every start
     return 1;
 }
 
@@ -615,14 +653,7 @@ sub witnessed {                           # the one that answers is running, sta
 sub inside {                              # true when the system says that this process is contained; it is asked for ten seconds from its first question, and then the answer is no
     my ($pid, $window) = @_;
     my $contained = $window ? qr/^\Q$pid\E 1 1 1 1 1 1 1 1\n\z/ : qr/^\Q$pid\E 1 1 1 1 [01] [01] [01] [01]\n\z/;    # the page and fetch containers refuse everything; what the last four say of them is not what holds them
-    my $lost = sub {                      # the one that answers did not answer: it is ended, so that no late answer of its is ever read as the answer to a later question
-        return 0 if $witness_of != $$;    # by the process that started it alone: a picture's run beside others asks lzrprf's and ends nothing of lzrprf's
-        kill 'KILL', $witness;
-        waitpid $witness, 0;
-        close $_ for $to_witness, $from_witness;
-        undef $witness;
-        return 0;
-    };
+    my $lost = \&witness_lost;
     witnessed() or return 0;
     return 0 if !kill(0, $pid) && $!{ESRCH};    # a process that is gone is said to refuse everything (measured 2026-11-21, an ended one too): nothing of it can be asked, and no is the answer, at once
     my $until;                            # ten seconds from the first question, never counting the wait for the turn: on a busy computer, pages asked about side by side spent two seconds in that wait alone and a contained page was refused (seen 2026-11-21 in two installs)
@@ -639,5 +670,30 @@ sub inside {                              # true when the system says that this 
         select undef, undef, undef, 0.002;    # not yet: the process is still being put into its container, which takes about 25 ms; asked again 2 ms on, so the answer comes no more than 2 ms after it is true (10 ms cost a page 5 ms a container, measured 2026-11-24)
     }
     return 0;
+}
+
+sub witness_lost {                        # the one that answers did not answer: it is ended, so that no late answer of its is ever read as the answer to a later question
+    return 0 if $witness_of != $$;        # by the process that started it alone: a picture's run beside others asks lzrprf's and ends nothing of lzrprf's
+    kill 'KILL', $witness;
+    waitpid $witness, 0;
+    close $_ for $to_witness, $from_witness;
+    undef $witness;
+    return 0;
+}
+
+sub named_asked {                         # [C21] what the system says of the process by its number, for each service's name: 0 it may look it up, 1 it may not, joined by a space; '' when no answer came
+    my ($pid, @names) = @_;
+    return '' if !@names || grep { !/\A[A-Za-z0-9.]{1,100}\z/ } @names;
+    witnessed() or return '';
+    open my $turn, '<', $SELF or return '';    # one question at a time, as in sub inside
+    flock $turn, LOCK_EX or return '';
+    print $to_witness "$pid @names\n" or return witness_lost();
+    my $ready = '';
+    vec($ready, fileno $from_witness, 1) = 1;
+    select($ready, undef, undef, 2.5) > 0 or return witness_lost();
+    my $says = readline($from_witness) // return witness_lost();
+    flock $turn, LOCK_UN;
+    my ($answer) = $says =~ /^\Q$pid\E ([01](?: [01])*)\n\z/ or return '';
+    return split(/ /, $answer) == @names ? $answer : '';
 }
 

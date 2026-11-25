@@ -23,14 +23,15 @@ the reader to check against the code. Regenerate with `perl tools/doc-index --wr
 | All of this is drawn by lzrprf's window, ... | `outrun` | - | - |
 | - Tabs. Each tab keeps its own page ... | `tabbed`, `tab_shown`, `relaid` | C9 | - |
 | - Reopening a closed tab. Cmd-Shift-T, or "Reopen ... | `tab_reopened`, `closed_kept` | C4 C5 | - |
-| - A tab pulled out. A tab dragged ... | `tab_out`, `pulled_command`, `opened_with`, `started` | C4 C5 | `incognito`, `taboutmost` |
+| - A tab pulled out. A tab dragged ... | `tab_out`, `pulled_command`, `opened_with`, `started` | C4 C5 | `incognito`, `taboutmost`, `tabslots` |
+| - Dragging a tab moves the tab, never ... | - | - | `window`, `tabslots` |
 | - Zoom. Cmd-plus (or Cmd-=), Cmd-minus and Cmd-0, ... | `viewing`, `relaid` | - | - |
 | - Find in page. Cmd-F opens a small ... | - | - | - |
 | - The home page. The cogwheel's "Make current ... | `menu`, `home` | C4 C5 | - |
 | - Bookmarks. The star opens lzrprf's own modal: ... | `marks_read`, `mark_saved`, `pictures_elsewhere`, `marks_into_bar`, `order_set` | C4 | - |
 | - Importing bookmarks. The cogwheel's "Import bookmarks..." opens ... | `import_profile_name`, `plain_name`, `import_reader`, `lz4_block`, `plist_binary`, `import_kept`, `import_allowed`, `import_kept_out`, `import_unshown`, `import_html`, `address`, `mark_written`, `import_plan`, `import_go` | C15 C10 C4 | `importnames`, `importunnamed` |
 | - Address suggestions. While you type in the ... | - | C4 | - |
-| - No footer. Nothing stands at the window's ... | - | - | - |
+| - No footer. Nothing stands at the window's ... | `parts_told`, `parts_set`, `parts_fetched`, `contained` | - | - |
 | - Clearing. "Clear browsing history" empties the addresses ... | - | C7 | - |
 | - Redirects. An answer 301, 302, 303, 307 ... | `redirected`, `asked`, `unfit`, `redirect_noted`, `redirects_decide` | C7 | - |
 | - The game page opens LZRDFNDR. The program's ... | `live_answered` | - | `liveopen`, `liveopenno` |
@@ -62,7 +63,10 @@ window grew shows the page's own background colour at once (the colour of the pa
 rectangle, or what its right edge shows), never white; the page is fitted once, at the
 release. A drag that pauses for 120 ms tells lzrprf its size already, so the page is laid out
 at that width while the button is held, and a release there costs only the swap; a newer
-width ends a layout still running for an older one, one run at a time (`sub outrun`).
+width ends a layout still running for an older one, one run at a time (`sub outrun`). The
+view the page's layers stand in is set to the laid page's size at every fit (`layersFitted`):
+layers that arrive while the button is held, before the fit, would otherwise keep the size
+before, and masked to it the home page showed nothing once the window was made larger again.
 
 - **Tabs.** Each tab keeps its own page as lzrprf keeps the page shown: its address, the
   answer, the style sheets it was laid out with and its pictures, its title, the addresses it
@@ -81,9 +85,9 @@ width ends a layout still running for an older one, one run at a time (`sub outr
   their page and come back with nothing fetched; an older one keeps its address, its title and
   the addresses it went to, and its address is visited again, written in the log first `[C4]`
   `[C5]`. A tab with no address is not held, and "Clear browsing history" forgets them all.
-- **A tab pulled out.** A tab dragged more than 54 points above or below where it was pressed
-  leaves the strip and is drawn as the small window it becomes. Let go there, it opens as a
-  window of its own, of this window's size, placed so the tab stays under the pointer: the
+- **A tab pulled out.** A tab dragged more than 54 points above or below where it was pressed,
+  or out past any side of the window, leaves the strip and is drawn as the small window it
+  becomes. Let go there, it opens as a window of its own, of this window's size, placed so the tab stays under the pointer: the
   window says `tab out N X Y W H`, and lzrprf starts a second lzrprf as it was started itself,
   `perl lzrprf run --open "X Y W H" /path/to/program` (`incognito` from an incognito window,
   and `--profile ID` before `--open` from a profile's window, so the tab stays in its profile),
@@ -100,7 +104,17 @@ width ends a layout still running for an older one, one run at a time (`sub outr
   reopen. When no process could be started, the tab stays. One window opens at most 32
   windows from its tabs and profiles together in its life, as many as it holds tabs, so a window process that was
   taken over cannot have lzrprf start processes without end: the 33rd tab pulled out stays,
-  and lzrprf says why (run `taboutmost`). The only tab of a window moves the window instead.
+  and lzrprf says why (run `taboutmost`). The only tab of a window is drawn away so too while the
+  window stays; let go away, that tab already is a window of its own, so the window itself is put
+  there, once, at the release: its page goes with it, neither fetched nor laid out again, and no
+  `tab out` is said (run `tabslots`).
+- **Dragging a tab moves the tab, never the window** (HC-0856). The strip of tabs, the bar's row,
+  the bookmarks bar and the frame each say no to macOS moving the window from a press on them
+  (`mouseDownCanMoveWindow`): the strip stands in the window's title bar, where a view of AppKit's
+  own lets macOS move the window from any press, so a tab dragged along the strip moved the whole
+  window with it. The window is moved only where nothing else is pressed: beside the tabs, beside
+  the bar's buttons and pill, beside the bookmarks, and on the frame; pressed twice there, it
+  zooms (run `window`, its line `winmove`, and `tabslots`).
 - **Zoom.** Cmd-plus (or Cmd-=), Cmd-minus and Cmd-0, in the View menu, zoom the page of the
   tab shown in steps of 50, 67, 80, 90, 100, 110, 125, 150, 175 and 200 percent, held at the
   ends; Cmd-0 goes back to 100. Each tab has its own zoom, held in the window's memory and not
@@ -110,7 +124,7 @@ width ends a layout still running for an older one, one run at a time (`sub outr
   at widths in steps of 160 points, between 320 and 1600, so a site cannot read the window's
   exact size, and the window draws the laid page scaled to fill its room. So a step can be laid
   out as its neighbour is: at some widths 110 percent is laid as 100 is, and only drawn larger.
-  The zoom (`Zoom 110%`) is said for a moment in the note under the bar.
+  Nothing says the zoom in words: the page's size shows it.
 - **Find in page.** Cmd-F opens a small bar over the top right corner of the page, with its
   field, which match of how many is shown (`3 of 17`), previous, next and close. It looks
   through the text of the page shown, capitals and small letters alike, marks every match (at
@@ -239,11 +253,19 @@ width ends a layout still running for an older one, one run at a time (`sub outr
   asked; between questions the page reaches down to the edge. How the site answered the page
   shown, its status, the time all of it took and how much came (`200 · 412 ms · 89 kB`), is the
   first row of the panel the lock left of the bar opens (`secure brief`); everything lzrprf says
-  is a line of the log, and its few words, the zoom and the tips are a quiet note in small grey
-  letters under the address bar for 2 seconds, over no part of the page; while lzrprf works a thin
-  line grows along the bar's lower edge (`function noteShown`, `function loadingSet`, window test
-  `note`). LZRDFNDR's icon, then Tor's, stand just right of the bar, left of the
-  Profiles icon and the cogwheel (window test `footer`). "Show log" in the cogwheel's menu opens
+  is a line of the log, and a tip is the tooltip of its row. Nothing is written under the address
+  bar (Henry, 2026-11-24: no note there, "we dont need that information"); while lzrprf works a thin
+  line grows along the bar's lower edge (`function loadingSet`, window test `note`). LZRDFNDR's
+  icon, then Tor's, stand just right of the bar, left of the
+  Profiles icon and the cogwheel (window test `footer`); each only while its part is installed
+  (`function partOn`, from lzrprf's `parts on ...`, `sub parts_told`). "Add or remove LZR modules..."
+  in the cogwheel's menu opens a modal with a box for each part: LZRBRWSR, ticked and greyed (the
+  window and these settings are its own), LZRDFNDR, LZRTRMNL, LZRTNNL and LZRGM. Once a box differs
+  from what is installed, "Restart with these modules" says `parts set NAME ...`: lzrprf writes the
+  record the installer writes (`sub parts_set`, `~/.lzrprf/parts`), takes away the program of a part
+  left out, and LZRBRWSR starts again with the new set; a part whose program is not there is added
+  only through the signed road of an update (`sub parts_fetched`). An incognito window changes no
+  module. LZRTRMNL and LZRGM left out are not on the home page either (`sub contained`). "Show log" in the cogwheel's menu opens
   the log on a page of its own over the page shown, which stays as it is under it: this
   window's lines, the newest first, then the last of the log kept on this computer; its Close
   button, "Hide log" or the back arrow closes it again. The last row of the lock's panel, "What

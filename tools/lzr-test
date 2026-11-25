@@ -1,0 +1,216 @@
+#!/usr/bin/perl
+# The tests of lzr, LZRTRMNL's command ("lzrprf lzr"): its help and its errors, and each command of lzr
+# processes acted on processes this test started itself, from a copy of sleep in its own folder (and once
+# from /bin/sleep, to see it refused as a program of the system). It ends no process it did not start:
+# every process it ends at the close is one whose number it was handed when it started it, asked of ps
+# again first. lzr's state folder is the runner slot's home (LZRPRF_SELFTEST_HOME), never yours.
+# Run: sh scripts/test-run.sh lzr --wait   (managed-projects/lzrbrwsr/scripts/test-lzr.sh, in a runner slot)
+# SYNC: managed-projects/lzrprf/src/15-lzr-a-commands.pl ; managed-projects/lzrprf/src/15-lzr-b-processes.pl ;
+#       managed-projects/lzrprf/src/15-lzr-c-analyze.pl ; managed-projects/lzrbrwsr/architecture/lzr.md
+# LOG-FORMAT-EXEMPT(test results printed to its caller; no production logs)
+use strict;
+use warnings;
+use File::Copy 'copy';
+use JSON::PP ();
+use POSIX ();
+use Time::HiRes ();
+
+my $lzrprf = shift // die "usage: lzr-test /path/to/lzrprf\n";
+my $home = $ENV{LZRPRF_SELFTEST_HOME} // '';
+die "lzr-test: runs only in a runner slot, whose home lzrprf takes for yours (LZRPRF_SELFTEST_HOME=/private/tmp/lzr-run/slot-N/home)\n" unless $home =~ m{\A/private/tmp/lzr-run/slot-[0-9]+/home\z} && -d $home;
+my $dir = ($ENV{TMPDIR} // '/private/tmp') =~ s{/*\z}{}r . "/lzr-test.$$";
+mkdir $dir, 0700 or die "lzr-test: cannot make $dir: $!\n";
+my $napper = "$dir/napper";               # /bin/sleep, copied where no program of the system stands
+copy('/bin/sleep', $napper) && chmod(0755, $napper) or die "lzr-test: cannot copy /bin/sleep: $!\n";
+run('/usr/bin/codesign', '-f', '-s', '-', $napper) or die "lzr-test: codesign could not sign the copy of sleep ad hoc\n";    # a copy of a program of the system keeps Apple's launch rule, that it runs only where the system put it: signed ad hoc, it is a program like yours (no key, no keychain)
+my %started;
+my ($failed, $count) = (0, 0);           # every process this test started: its number => its program
+my $T0 = Time::HiRes::time();
+
+sub stamp { my $t = Time::HiRes::time(); return POSIX::strftime('%Y-%m-%dT%H:%M:%S', gmtime $t) . sprintf('.%03dZ', ($t - int $t) * 1000) }
+sub check {
+    my ($ok, $what, $seen) = @_;
+    $count++;
+    $failed++ unless $ok;
+    print stamp(), ' ', ($ok ? 'ok' : 'not ok'), " - $what", (!$ok && defined $seen ? "\n    seen: " . ($seen =~ s/\n/\n          /gr) : ''), "\n";
+    return $ok;
+}
+
+# lzr, as a terminal's shell would start it: its exit, its output and its errors. Its input is the text given, or nothing.
+sub lzr {
+    my ($input, @words) = @_;
+    my ($out, $err) = ("$dir/out.$count", "$dir/err.$count");
+    pipe(my $read, my $write) or die "lzr-test: pipe: $!\n";
+    my $pid = fork // die "lzr-test: fork: $!\n";
+    unless ($pid) {
+        close $write;
+        open STDIN, '<&', $read or POSIX::_exit(127);
+        open STDOUT, '>', $out or POSIX::_exit(127);
+        open STDERR, '>', $err or POSIX::_exit(127);
+        @ENV{qw(COLUMNS LINES)} = (100, 30);    # the size lzr draws its view at outside a terminal
+        { no warnings; exec '/usr/bin/perl', $lzrprf, 'lzr', @words; }
+        POSIX::_exit(127);
+    }
+    close $read;
+    print $write $input if defined $input;
+    close $write;
+    my $until = Time::HiRes::time() + 60;
+    while (waitpid($pid, POSIX::WNOHANG()) == 0) {
+        if (Time::HiRes::time() > $until) { kill 'KILL', $pid; waitpid $pid, 0; return (-1, slurp($out), slurp($err) . "\n(lzr-test ended it after 60 seconds)") }
+        Time::HiRes::sleep(0.02);
+    }
+    return ($? >> 8, slurp($out), slurp($err));
+}
+sub run { my $ran = fork // return 0; unless ($ran) { open STDOUT, '>', '/dev/null'; open STDERR, '>', '/dev/null'; { no warnings; exec @_; } POSIX::_exit(127) } waitpid $ran, 0; return $? == 0 }    # a program of the system, to its end: whether it ended well
+sub slurp { open my $in, '<:raw', $_[0] or return ''; local $/; return scalar <$in> // '' }
+
+# A process of this test's own: the program, started by a child that ends at once, so launchd takes it
+# and nothing of this test is its parent (an ended one is no zombie of this test's). Its number comes back on a pipe.
+sub start {
+    my ($program, @args) = @_;
+    pipe(my $read, my $write) or die "lzr-test: pipe: $!\n";
+    my $child = fork // die "lzr-test: fork: $!\n";
+    unless ($child) {
+        close $read;
+        POSIX::setsid();
+        my $pid = fork // POSIX::_exit(1);
+        if ($pid) { print $write "$pid\n"; close $write; POSIX::_exit(0) }
+        close $write;
+        open STDIN, '<', '/dev/null'; open STDOUT, '>', '/dev/null'; open STDERR, '>', '/dev/null';
+        { no warnings; exec $program, @args; }
+        POSIX::_exit(127);
+    }
+    close $write;
+    my $pid = <$read>;
+    waitpid $child, 0;
+    chomp $pid if defined $pid;
+    die "lzr-test: $program did not start\n" unless defined $pid && $pid =~ /\A[1-9][0-9]*\z/;
+    $started{$pid} = $program;
+    for (my $until = Time::HiRes::time() + 5; Time::HiRes::time() < $until && ps($pid, 'comm=') ne $program;) { Time::HiRes::sleep(0.02) }    # until it is the program, not the child that became it
+    return $pid;
+}
+
+# What ps says of one process by its number; nothing when it is gone. ps is started with its output on a file.
+sub ps {
+    my ($pid, $what) = @_;                # -ww: the whole of it, however long
+    my $file = "$dir/ps.out";
+    my $ran = fork // die "lzr-test: fork: $!\n";
+    unless ($ran) { open STDOUT, '>', $file or POSIX::_exit(127); open STDERR, '>', '/dev/null'; { no warnings; exec '/bin/ps', '-ww', '-o', $what, '-p', $pid; } POSIX::_exit(127) }
+    waitpid $ran, 0;
+    return slurp($file) =~ s/\A\s+|\s+\z//gr;
+}
+sub keeper_of { my ($pid) = @_; return ps($pid, 'args=') =~ /\Acore-lzrprf-contain ([0-9a-z]{5})(?:\s|\z)/ ? $1 : '' }    # the ID a keeper of lzr's holds, by its name (macOS shows the rest of the place its name was written in after it)
+sub alive { my ($pid) = @_; return ps($pid, 'pid=') eq $pid }
+sub gone_within { my ($pid, $seconds) = @_; for (my $until = Time::HiRes::time() + $seconds; Time::HiRes::time() < $until; Time::HiRes::sleep(0.05)) { return 1 unless alive($pid) } return !alive($pid) }
+sub json { my ($text) = @_; return eval { JSON::PP::decode_json($text) } }
+sub row_of { my ($pid) = @_; my ($code, $out) = lzr(undef, 'processes', 'all', '--json'); my $rows = json($out) // []; return (grep { $_->{pid} == $pid } @$rows)[0] }
+sub listed { my ($code, $out, $err) = lzr(undef, 'processes', '--json'); return json($out) // { said => "$code $out$err" } }    # what lzr processes --json says, or what it said instead
+
+END {                                     # what this test started and is still running: ended, each asked of ps first by its own number
+    my $code = $?;
+    if (opendir my $boxes, "$home/.lzrprf/contained") {
+        for my $id (grep { /\A[0-9a-z]{5}\z/ } readdir $boxes) {
+            my ($keeper) = slurp("$home/.lzrprf/contained/$id") =~ /^keeper (\d+)$/m;
+            kill 'TERM', $keeper if $keeper && keeper_of($keeper) eq $id;    # the keeper this test's contain started: it ends its program
+        }
+    }
+    for my $pid (sort keys %started) { kill 'KILL', $pid if ps($pid, 'comm=') eq $started{$pid} }
+    $? = $code;
+}
+
+# 1. The command line: every command listed, help everywhere, the nearest command for a wrong one.
+my ($code, $out, $err) = lzr(undef);
+check(!!($code == 0 && $out =~ /^COMMANDS$/m && $out =~ /^  processes\b/m && $out =~ /^  help\b/m && $out =~ /^  version\b/m), 'lzr alone lists its commands, help among them, and ends 0', "$code\n$out$err");
+for my $path ('processes', 'processes list', 'processes all', 'processes analyze', 'processes kill', 'processes deactivate', 'processes reactivate', 'processes contain', 'processes release', 'help', 'version') {
+    my @asked = map { [lzr(undef, @$_)] } ['help', split / /, $path], [(split / /, $path), '--help'], [(split / /, $path), '-h'];
+    check(!!((!grep { $_->[0] != 0 || $_->[1] ne $asked[0][1] } @asked) && $asked[0][1] =~ /\Alzr \Q$path\E: / && $asked[0][1] =~ /^USAGE$/m && $asked[0][1] =~ /^EXAMPLES$/m), "lzr help $path, lzr $path --help and -h say the same help", join("\n--\n", map { "$_->[0] $_->[1]$_->[2]" } @asked));
+}
+($code, $out, $err) = lzr(undef, 'ps', 'ls', '--help');
+check(!!($code == 0 && $out =~ /\Alzr processes list: /), 'the aliases ps and ls name processes and list', "$code\n$out$err");
+($code, $out, $err) = lzr(undef, 'procesess');
+check(!!($code == 2 && $err =~ /"procesess" is not a command of lzr\. Did you mean "lzr processes"\?/ && $err =~ /Run "lzr help"/), 'a command typed wrong is refused with 2 and the nearest command', "$code\n$err");
+($code, $out, $err) = lzr(undef, 'processes', 'kil', '4242');
+check(!!($code == 2 && $err =~ /Did you mean "lzr processes kill"\?/ && $err =~ /Run "lzr help processes"/), 'a subcommand typed wrong is refused with the nearest subcommand', "$code\n$err");
+($code, $out, $err) = lzr(undef, 'processes', '--colour');
+check(!!($code == 2 && $err =~ /--colour is not a flag of lzr/), 'a flag lzr has not is refused with 2', "$code\n$err");
+($code, $out, $err) = lzr(undef, 'processes', 'kill');
+check(!!($code == 2 && $err =~ /needs an ID/), 'a command that acts on a process asks for its ID', "$code\n$err");
+($code, $out, $err) = lzr(undef, 'processes', '4242');
+check(!!($code == 2 && $err =~ /say what to do with 4242/), 'an ID alone is asked what to do with', "$code\n$err");
+
+# 2. The lists and the IDs.
+my $listed = listed();
+check(!!(ref $listed->{deactivated} eq 'ARRAY' && !@{ $listed->{deactivated} } && ref $listed->{contained} eq 'ARRAY' && !@{ $listed->{contained} }), 'lzr processes, in a fresh home, lists nothing deactivated and nothing contained', JSON::PP->new->canonical->encode($listed));
+($code, $out, $err) = lzr(undef, 'processes');
+check(!!($code == 0 && $out =~ /^Deactivated by LZRDFNDR \(0\)$/m && $out =~ /^Contained by LZRDFNDR \(0\)$/m), 'lzr processes shows its two lists as text', "$code\n$out$err");
+my $first = start($napper, '600');
+my $row = row_of($first);
+my $again = row_of($first);
+check(!!($row && $row->{id} =~ /\A(?=.*[0-9])[0-9a-hjkmnp-tv-z]{5}\z/ && $again && $again->{id} eq $row->{id} && $row->{program} eq $napper && defined $row->{rss_kib}), 'lzr processes all lists a process with a five-letter ID that stays the same, its program and its memory', JSON::PP->new->canonical->encode([$row, $again]));
+($code, $out) = lzr(undef, 'processes', 'all', '--json');
+my $rows = json($out) // [];
+my %ids = map { $_->{id} => 1 } @$rows;
+check(!!(@$rows > 10 && keys %ids == @$rows), 'every process has an ID of its own', scalar(@$rows) . ' processes, ' . keys(%ids) . ' IDs');
+($code, $out, $err) = lzr(undef, 'processes', 'all', '--mine', '--sort', 'name');
+check(!!($code == 0 && $out =~ /^\S{5}\s+$first\s/m), 'lzr processes all --mine --sort name lists this test\'s process as text', "$code\n$err");
+
+# 3. kill: refused without a word, said with --dry-run, done with --yes; a program of the system refused.
+my $id = $row ? $row->{id} : 'none0';
+($code, $out, $err) = lzr(undef, 'processes', 'kill', $id);
+check(!!($code == 1 && $err =~ /cannot ask first/ && alive($first)), 'kill outside a terminal, without --yes, does nothing and says why', "$code\n$out$err");
+($code, $out, $err) = lzr(undef, 'processes', 'kill', $id, '--dry-run');
+check(!!($code == 0 && $out =~ /Nothing was done/ && $out =~ /of a processor/ && alive($first)), 'kill --dry-run shows the process\'s processor and memory and does nothing', "$code\n$out$err");
+($code, $out, $err) = lzr(undef, 'processes', $id, 'kill', '--yes');
+check(!!($code == 0 && $out =~ /now: [0-9.]+% of a processor, memory / && $out =~ /may start again/ && gone_within($first, 5)), 'lzr processes ID kill --yes shows its use at that moment and ends it', "$code\n$out$err");
+my $system = start('/bin/sleep', '600');
+($code, $out, $err) = lzr(undef, 'processes', $system, 'kill', '--yes');
+check(!!($code == 1 && $err =~ /a program of the system/ && alive($system)), 'a program of the system, started by this test, is not ended, and lzr says why', "$code\n$out$err");
+($code, $out, $err) = lzr(undef, 'processes', $system, 'deactivate', '--yes');
+check(!!($code == 1 && $err =~ /program of the system/ && alive($system)), 'nor deactivated', "$code\n$out$err");
+kill 'KILL', $system if ps($system, 'comm=') eq '/bin/sleep';
+
+# 4. deactivate: closed now, closed again when seen, kept in the list; reactivate undoes it.
+my $c = start($napper, '600');
+($code, $out, $err) = lzr(undef, 'processes', $c, 'deactivate', '--yes');
+check(!!($code == 0 && $out =~ /^Deactivated: \Q$napper\E \(ID [0-9a-z]{5}\)\.$/m && gone_within($c, 5)), 'deactivate closes the program\'s process and keeps the program off', "$code\n$out$err");
+$listed = listed();
+my ($off) = grep { $_->{what} eq $napper } @{ $listed->{deactivated} // [] };
+check(!!($off && $off->{kind} eq 'program' && $off->{id} =~ /\A[0-9a-z]{5}\z/), 'lzr processes lists the program as deactivated, with an ID', JSON::PP->new->canonical->encode($listed));
+my $d = start($napper, '601');
+($code, $out, $err) = lzr(undef, 'processes');
+check(!!($code == 0 && $err =~ /LZRDFNDR|ended|asked to end/ && gone_within($d, 5)), 'a deactivated program started again is closed when LZRDFNDR next looks', "$code\n$out$err");
+($code, $out, $err) = lzr(undef, 'processes', 'reactivate', $off ? $off->{id} : 'none0', '--yes');
+my $e = start($napper, '602');
+$listed = listed();
+check(!!($code == 0 && $out =~ /Reactivated: \Q$napper\E/ && !@{ $listed->{deactivated} // [1] } && alive($e)), 'reactivate takes it off the list, and it runs again', "$code\n$out$err");
+
+# 5. contain: ended and started again in the container, as a child of its keeper, which the system says is
+# contained; release ends it.
+my $f = start($napper, '603');
+($code, $out, $err) = lzr(undef, 'processes', $f, 'contain', '--yes');
+my ($box) = @{ listed()->{contained} // [] };
+my $kept = $box ? slurp("$home/.lzrprf/contained/$box->{id}") : '';
+my ($keeper) = $kept =~ /^keeper (\d+)$/m;
+my $child = $box ? $box->{pid} : undef;
+check(!!($code == 0 && $out =~ /^Contained: \Q$napper\E runs as process \d+, and the system says it is in the container/m && !alive($f)), 'contain ends the process and says the system has its new one in the container', "$code\n$out$err");
+check(!!($box && $box->{state} eq 'running' && $box->{contained} == 1 && $child && $keeper && ps($child, 'ppid=') eq $keeper && keeper_of($keeper) eq $box->{id} && ps($child, 'comm=') eq $napper && $kept =~ /^arg 603$/m),
+    'the contained process runs the same program with the same arguments, as the child of its keeper', JSON::PP->new->canonical->encode($box) . "\n$kept" . ($child && $keeper ? 'ps: ' . join(' | ', ps($child, 'ppid='), keeper_of($keeper), ps($child, 'comm=')) : ''));
+($code, $out, $err) = lzr(undef, 'processes', 'release', $box ? $box->{id} : 'none0', '--yes');
+my @after = ($child && gone_within($child, 8) ? 1 : 0, $keeper && gone_within($keeper, 8) ? 1 : 0, JSON::PP->new->canonical->encode(listed()->{contained}));
+check(!!($code == 0 && $out =~ /^Released: /m && $after[0] && $after[1] && $after[2] eq '[]'), 'release ends the contained process and its keeper, and takes it off the list', "$code\n$out$err" . "child gone, keeper gone, listed: @after\n" . ($keeper ? ps($keeper, 'stat=') : ''));
+
+# 6. analyze: frames with the box and both graphs; closed by its Close button or by q.
+my $g = start($napper, '604');
+($code, $out, $err) = lzr(undef, 'processes', $g, 'analyze', '--frames', '3', '--interval', '0.2');
+check(!!($code == 0 && $out =~ /^\| Program\s+\Q$napper\E/m && $out =~ /^\| Owner\s+\S+ \(uid $<\), you/m && $out =~ /^\| Signed\s+/m && $out =~ /^\| LZRDFNDR\s+neither deactivated nor contained/m && $out =~ /^CPU /m && $out =~ /^Memory .* footprint now/m && $out =~ /\[ Close \]$/m && ($out =~ tr/\f//) == 3),
+    'analyze --frames 3 draws three frames of the box and the two graphs, with its Close button', "$code\n" . substr($out, 0, 3000) . $err);
+($code, $out, $err) = lzr("\e[<0;10;1M\e[<0;95;1M", 'processes', $g, 'analyze', '--frames', '200', '--interval', '0.2');
+check(!!($code == 0 && $out =~ /Closed with its Close button\. Process $g runs on\./ && ($out =~ tr/\f//) < 50), 'a press on its Close button closes the view (and a press beside it does not)', "$code\n" . substr($out, -400) . $err);
+($code, $out, $err) = lzr('q', 'processes', $g, 'analyze', '--frames', '200', '--interval', '0.2');
+check(!!($code == 0 && $out =~ /Closed with q\./), 'q closes the view', "$code\n" . substr($out, -400) . $err);
+kill 'KILL', $g if ps($g, 'comm=') eq $napper;
+($code, $out, $err) = lzr(undef, 'processes', $g, 'analyze');
+check(!!($code == 1 && $err =~ /no process has the number $g now/), 'a process that ended has no ID any more, and lzr says so', "$code\n$err");
+
+printf "%s %s %d of %d checks of lzr passed in %.1f s\n", stamp(), $failed ? 'FAILED:' : 'PASSED:', $count - ($failed // 0), $count, Time::HiRes::time() - $T0;
+exit($failed ? 1 : 0);

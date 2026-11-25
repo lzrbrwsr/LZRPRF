@@ -146,7 +146,7 @@ sub keep_as {                             # the settings file, written beside th
     my ($mode, $days) = @_;
     unlink "$DIR/keep.new";
     sysopen(my $out, "$DIR/keep.new", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600) or return 0;
-    print($out $mode eq 'nothing' ? "nothing\n" : "$mode $days\n") && $out->flush or return 0;
+    require IO::Handle; print($out $mode eq 'nothing' ? "nothing\n" : "$mode $days\n") && $out->flush or return 0;
     return 0 unless ($^O eq 'darwin' ? defined fcntl($out, 51, 0) : $out->sync) && close $out;
     rename "$DIR/keep.new", "$DIR/keep" or return 0;
     synced();
@@ -244,7 +244,7 @@ sub put {                                 # lines into a plain file of yours tha
     sysopen(my $out, $file, O_WRONLY | O_CREAT | O_NOFOLLOW | $how, 0600) or return 0;
     my @is = stat $out;
     return 0 unless -f _ && $is[3] == 1 && $is[4] == $<;
-    print($out map { /\n\z/ ? $_ : "$_\n" } @lines) && $out->flush or return 0;
+    require IO::Handle; print($out map { /\n\z/ ? $_ : "$_\n" } @lines) && $out->flush or return 0;
     return 0 unless $^O eq 'darwin' ? defined fcntl($out, 51, 0) : $out->sync;    # 51 is F_FULLFSYNC: through the disk's own cache
     return close $out;
 }

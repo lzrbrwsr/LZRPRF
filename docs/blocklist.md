@@ -45,7 +45,11 @@ illegal content, and nothing it runs can get around that `[C23]`. The window and
 the same sentence: "This address is on a list of child sexual abuse material or other illegal
 content, so LZRBRWSR does not open it." The window adds where help is found in confidence,
 Stop It Now (https://www.stopitnow.org.uk), and where such material is reported, the Internet
-Watch Foundation (https://report.iwf.org.uk).
+Watch Foundation (https://report.iwf.org.uk). When the onion part refused the address, the window
+also says that it is on Ahmia's list of child sexual abuse material sites, that the list can contain
+mistakes (a site that only names such terms, such as some Tor hidden wikis, can be on it), and to
+report a wrong entry to Ahmia (https://ahmia.fi/about/) and to LZRBRWSR at the release file's
+`report` address; the log says the one sentence alone.
 
 **What is blocked.** Every address is held to the list before anything else is done with it:
 what you type into the bar or search for (the search address would carry it), a bookmark, the

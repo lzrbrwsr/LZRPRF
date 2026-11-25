@@ -23,6 +23,7 @@ Subs are cited by name. To find their lines, run `perl tools/sub-map` (see AUDIT
 | power | marks | where it runs | the act |
 | --- | --- | --- | --- |
 | The tool: processes and launchd jobs | `[C20]` | outside every container | open the tool; tick a row and confirm |
+| lzr, LZRTRMNL's command: kill, deactivate, contain, analyze | `[C20]` | outside every container; a contained process in `$CONTAINER` | type an `lzr processes` command in LZRTRMNL; answer y, or add `--yes` |
 | The installer of a newer release | `[C4]` `[C5]` `[C25]` | outside every container | a yes to looking for releases; then Install it |
 | The Tor client | `[C6]` `[C17]` | `$TOR_CONTAINER` | Tor on |
 | The bookmark reader | `[C15]` | `$IMPORT_ALLOWED` | open the import wizard; choose a browser |
@@ -63,6 +64,48 @@ Subs are cited by name. To find their lines, run `perl tools/sub-map` (see AUDIT
   `~/.lzrprf/procnotes` after its log line (`sub tool_note`). Nothing of it is sent anywhere and
   nothing is changed; a process is changed only as a ticked row. Copy info copies what lzrprf
   gathered of one process to the clipboard on a press. Run `toolall` shows it.
+
+## lzr, LZRTRMNL's command: processes `[C20]`
+
+- **Subs:** `sub lzr_main`, `sub lzr_bin`, `sub lzr_processes`, `sub lzr_look`, `sub lzr_why_not`,
+  `sub lzr_program_why_not`, `sub lzr_jobs_of`, `sub lzr_asked`, `sub lzr_seen`, `sub lzr_watch`,
+  `sub lzr_due`, `sub lzr_kill`, `sub lzr_deactivate`, `sub lzr_reactivate`, `sub lzr_deactivated`,
+  `sub lzr_keep_deactivated`, `sub lzr_contain`, `sub lzr_keeper`, `sub lzr_keeper_is`,
+  `sub lzr_release`, `sub lzr_contained`, `sub lzr_write_contained`, `sub lzr_argv`,
+  `sub lzr_footprint`, `sub lzr_sample`, `sub lzr_analyze`, `sub lzr_about`. The changes go through
+  the tool's own `sub tool_may`, `sub tool_stop`, `sub tool_quiet` and `sub tool_wake`, and a
+  contained start goes through `sub contain`.
+- **Programs:** `/bin/ps` and `/bin/launchctl` (read: `launchctl print`), `/usr/bin/codesign`
+  (through `sub tool_signed`), `/usr/bin/sandbox-exec` (through `sub contain`). `/usr/bin/perl` is
+  named in the three-line script `~/.lzrprf/bin/lzr` that `sub lzr_bin` writes, so the terminal's
+  shell finds `lzr`. lzr also uses two answers of macOS about a process of the person's own:
+  `proc_pid_rusage` (its footprint) and sysctl `KERN_PROCARGS2` (its arguments). It never asks for
+  more than any user may see.
+- **Why:** LZRDFNDR from the terminal (`managed-projects/lzrbrwsr/architecture/lzr.md`): what it
+  deactivated and contains, every process with a short ID, a live view of one, and kill,
+  deactivate and contain for a process of the person's own.
+- **The act:** a look starts when the person types `lzr processes`, `lzr processes all` or
+  `lzr processes ID analyze`. A change starts only when the person types it by name (kill,
+  deactivate, reactivate, contain, release) and answers y to its question, or adds `--yes`. Each
+  change is written in the log first.
+- **Changes it can make:** signal TERM to a process of the person's own, then KILL three seconds
+  later if it did not end (`sub tool_stop`, `sub lzr_kill`); `launchctl disable` then
+  `launchctl bootout` for a job of the account that runs a program deactivated or contained
+  (`sub tool_quiet`); `launchctl enable` then `launchctl bootstrap` (`sub tool_wake`). It can also
+  start a program of the person's own again, with the arguments it ran with, in the page container
+  (`$CONTAINER`). That start has an empty environment, no byte written into a file and no memory
+  dump, and runs as the child of a keeper, `core-lzrprf-contain ID` (`sub lzr_keeper`), which ends
+  it at once unless the system says it is contained (`sub inside`).
+- **Never:** in an incognito window; another user's process; a process or program of the system,
+  of Apple or of LZRBRWSR; lzrprf, lzr, or what started them; with a password; task_for_pid, or any
+  question that needs privilege or raises a prompt.
+- **Repeat without a new act:** programs the person deactivated are kept in
+  `~/.lzrprf/deactivated`. Each of their processes is ended whenever lzrprf sees one: at every
+  `lzr processes` command, and every 10 seconds while a window is open (`$LZR_SEEN`,
+  `sub lzr_watch` from `sub tool_watch`). This repeats the earlier deactivate, and `reactivate`
+  undoes it. Contained processes are kept in `~/.lzrprf/contained/`, one file each.
+- **Runs:** `tools/lzr-test`, through the runner's lzr suite (`sh scripts/test-run.sh lzr`), acts
+  only on processes it started itself, with the slot as home.
 
 ## The installer of a newer release `[C4]` `[C5]` `[C25]`
 
@@ -120,6 +163,18 @@ Subs are cited by name. To find their lines, run `perl tools/sub-map` (see AUDIT
   then ends the client.
 - **Runs:** `tor`, `torfail`, `torkeep`, `videotor`, `blockedtor`. A stand-in client relays SOCKS5. `torfail`
   shows that when Tor does not connect, nothing is fetched through Tor or directly.
+
+## LZRTNNL: Tor through a VPN of your own `[C6]` `[C17]`
+
+- **Subs:** `sub tnnl_file`, `sub tnnl_read`, `sub tnnl_look`, `sub tnnl_interface`, `sub tnnl_relay`, `sub tnnl_serve`, `sub tnnl_carried`, `sub tnnl_bound`, `sub tnnl_watch`, `sub tnnl_ready`, `sub tnnl_lines`, `sub tnnl_container`.
+- **Program:** `/sbin/ifconfig -v`, read only, for the interface that holds the VPN's address and its index.
+- **Why:** Tor over a VPN, failing closed. A relay of lzrprf's own, on the loopback, is the Tor client's
+  outbound proxy and opens each of its connections with `IP_BOUND_IF` set to the VPN's interface: when the
+  VPN drops, a connection fails instead of taking the plain route. The client's container reaches the
+  loopback alone. The decision and its sources: `../lzrbrwsr/architecture/lzrtnnl.md`.
+- **The act:** in a Tor window's LZRTNNL modal, Use also VPN, the WireGuard file chosen in an Open panel, then
+  Connect to Tor. lzrprf keeps the file's address and server, never its private key.
+- **Runs:** the package test's `lzrprf tnnlconf`, `lzrprf tnnlrelay` and `lzrprf tnnldrop` (scripts/test-package-parts.sh of LZRBRWSR, step 26).
 
 ## The bookmark reader `[C15]`
 
@@ -184,7 +239,9 @@ Subs are cited by name. To find their lines, run `perl tools/sub-map` (see AUDIT
 ## The terminal (LZRTRMNL) `[C29]`
 
 - **Subs:** `sub trmnl_opened`, `sub trmnl_started`, `sub trmnl_shell`, `sub trmnl_input`,
-  `sub trmnl_viewed`, `sub trmnl_pasted`, `sub trmnl_copied`, `sub trmnl_titled`, `sub trmnl_replied`, `sub trmnl_wrote`, `sub trmnl_read`, `sub trmnl_block`, `sub trmnl_end`.
+  `sub trmnl_viewed`, `sub trmnl_pasted`, `sub trmnl_copied`, `sub trmnl_titled`, `sub trmnl_replied`, `sub trmnl_wrote`, `sub trmnl_read`, `sub trmnl_block`, `sub trmnl_end`;
+  its panes, tabs and bar (`24-trmnl-panes.pl`): `sub trmnl_workspace`, `sub trmnl_pressed`, `sub trmnl_act`, `sub trmnl_split`,
+  `sub trmnl_pane_closed`, `sub trmnl_tab_added`, `sub trmnl_tab_closed`, `sub trmnl_saved`, `sub trmnl_kept`, `sub trmnl_cwd`.
 - **Programs:** your login shell, the one the system names for your account when `/etc/shells` lists it,
   started by `sub trmnl_shell` as you, outside every container, on a pseudo-terminal of the system
   (`/dev/ptmx`), with `-l`, in your home folder, with nine variables and no descriptor of lzrprf's. Its
@@ -198,24 +255,32 @@ Subs are cited by name. To find their lines, run `perl tools/sub-map` (see AUDIT
   window said, and only from the local home. Never in an incognito or Tor window. After that, only your
   keys and your paste reach the shell. The window reads the clipboard only on your paste (Cmd-V), and
   writes it only on your copy (Cmd-C), with the text you selected; a program's OSC 52 is passed over.
-- **Runs:** none in `selftest` yet. Measured headless on macOS 27.2: see
+  A pane is split, closed or focused, and a terminal tab added or closed, only by your press, your
+  right press's menu, the bar's File and View, or one of the terminal's own keys; each split starts
+  another login shell the same way, in the folder of the shell it was split from. Save tabs and views
+  writes the file `trmnl` of this profile's folder (the tabs, splits, sizes and each shell's working
+  folder, which the system tells lzrprf of a process of yours, never what was typed or shown), and
+  opening LZRTRMNL again starts a new login shell for each saved pane, in its folder.
+- **Runs:** none in `selftest` yet. The panes, tabs, menus, keys, Save and an exact restore are held by
+  `tests/trmnl_panes.rs` of the browser. Measured headless on macOS 27.2: see
   `managed-projects/lzrbrwsr/architecture/lzrtrmnl.md` in the repository the browser is built from.
 
 ## Every system program lzrprf names
 
 | program | subs | when |
 | --- | --- | --- |
-| `/usr/bin/perl` | the start of the file, `find`, `proven`, `incognito_opened`, `pulled_command`, `profile_command`, `tor_window_opened`, `import_reader`, `decoder_named`, `system_decoded`, `system_converted`, `holds`, `run`, `tor_on`, `limited` | lzrprf re-runs itself by the system's perl. `find` looks up a host after its line is in the log `[C5]`, outside the containers. `proven` runs `selftest` after a yes to testing `[C11]`. The four `*_command`/`*_opened` subs start a new window after New Incognito Window, a tab pulled out, a profile opened, or Tor asked for in a window that is not a Tor window `[C17]`. The rest start a contained program, which `decoding` and `converting` are handed. `limited` starts one only when lzrprf holds more memory than a container may: a perl that sets that limit and becomes `sandbox-exec` (`$ROOM_SET`). |
-| `/usr/bin/sandbox-exec` | `contain`, `run`, `tor_on`, `trmnl_started` | every contained start |
-| `/usr/bin/osascript` | `run`, `witnessed`, `decoder_named`, `sounding` | the window, in `$WINDOW_CONTAINER` `[C10]`; the sound process, in `$SOUND_CONTAINER` `[C12]`; and the question whether a process is contained (`$WITNESS`, started by `witnessed` and asked by `inside`; `$NAMED` for the decoder) `[C3]` |
-| `/usr/bin/curl` | `fetch` | each request, in `$FETCH` `[C3]` `[C6]` `[C7]` |
+| `/usr/bin/perl` | the start of the file, `lzr_bin`, `find`, `proven`, `incognito_opened`, `pulled_command`, `profile_command`, `tor_window_opened`, `import_reader`, `decoder_named`, `system_decoded`, `system_converted`, `holds`, `run`, `tor_on`, `limited` | lzrprf re-runs itself by the system's perl. `lzr_bin` writes the script by which LZRTRMNL's shell runs `lzrprf lzr` on the system's perl `[C20]`. `find` looks up a host after its line is in the log `[C5]`, outside the containers. `proven` runs `selftest` after a yes to testing `[C11]`. The four `*_command`/`*_opened` subs start a new window after New Incognito Window, a tab pulled out, a profile opened, or Tor asked for in a window that is not a Tor window `[C17]`. The rest start a contained program, which `decoding` and `converting` are handed. `limited` starts one only when lzrprf holds more memory than a container may: a perl that sets that limit and becomes `sandbox-exec` (`$ROOM_SET`). |
+| `/usr/bin/sandbox-exec` | `contain`, `run`, `tor_on`, `trmnl_started` | every contained start (lzr's contain too, through `contain`) |
+| `/usr/bin/osascript` | `run`, `witnessed`, `sounding` | the window, in `$WINDOW_CONTAINER` `[C10]`; the sound process, in `$SOUND_CONTAINER` `[C12]`; and the question whether a process is contained (`$WITNESS`, started by `witnessed` and asked by `inside`, and by `named_asked` for the decoder's two names) `[C3]` |
+| `/usr/bin/curl` | `curl_started` | each request, in `$FETCH`, started by `fetch` or a moment before it (`curl_for`) `[C3]` `[C6]` `[C7]` |
 | `/usr/bin/sips` | `system_decoded`, `holds` | see the decoder |
 | `/usr/bin/avconvert` | `system_converted` | see the converter |
 | `/usr/bin/ssh-keygen` | `signature_checked` (asked by `signature_holds`) | a release's two signatures, in `$VERIFIER` `[C25]` |
-| `/bin/ps` | `tool_look`, `tool_stop`, `shell_held`; the limits strings `$SOUND_LIMITS`, `$TRMNL_LIMITS` | the tool `[C20]`; one shell reads its own memory size once as a window begins, and every container is limited to it and 2 GiB more (`sub limited`); the sound and terminal shells read their own |
-| `/bin/launchctl` | `tool_look`, `tool_off`, `tool_wake`, `tool_watch` | the tool `[C20]` |
+| `/bin/ps` | `tool_look`, `tool_stop`, `tool_procs`, `lzr_look`, `lzr_alive`, `lzr_sample`, `lzr_analyze`, `lzr_keeper`, `lzr_keeper_is`, `shell_held`; the limits strings `$SOUND_LIMITS`, `$TRMNL_LIMITS` | the tool and lzr `[C20]`; one shell reads its own memory size once as a window begins, and every container is limited to it and 2 GiB more (`sub limited`); the sound and terminal shells read their own |
+| `/bin/launchctl` | `tool_look`, `tool_off`, `tool_wake`, `tool_watch`, `lzr_jobs_of` | the tool and lzr `[C20]` |
 | `/usr/bin/plutil` | `tool_file` | reads a launchd property list for the tool `[C20]` |
 | `/usr/bin/codesign` | `tool_signed` | reads who signed a program, for the tool `[C20]` |
+| `/sbin/ifconfig` | `tnnl_interface` | `ifconfig -v`, read only: the interface of the VPN chosen for LZRTNNL, and its index |
 | `/sbin/route` | `route_asked` (run by `route` and `find`) | `route -n get`, read only: whether an address leads into the person's own network `[C8]` |
 | `/usr/bin/env` | `install_run`; the limits strings `$SOUND_LIMITS`, `$TRMNL_LIMITS` | the installer, after Install it `[C25]`; the sound and terminal shells, their limits set, become `env -i` with lzrprf's own names alone, which starts `sandbox-exec` |
 | `/bin/sh` | `install_run`, `shell_held`, `signature_checked`, `sounding`, `tool_signed`, `tor_on`, `trmnl_started` | sets the limits of the sound and terminal containers, and redirections, before a program starts; measures a shell once; runs the installer |

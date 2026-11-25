@@ -50,7 +50,7 @@ digits lzrprf draws from `/dev/urandom` when it makes the profile, and never any
 name, once you give it one, is the file `profiles/first` (`sub profile_renamed`).
 
 What is per profile, each in that profile's folder: `keep`, the log and its locks, `home`,
-`search`, the folder `bookmarks`, `marksbar`, `pictures`, the window's frame, Tor's folder `tor`, and the
+`search`, the folder `bookmarks`, `marksbar`, `pictures`, LZRTRMNL's saved tabs and views `trmnl`, the window's frame, Tor's folder `tor`, and the
 folders `tries.NUMBER` and `way.NUMBER` while its window runs. History, the closed tabs to reopen
 and each tab's zoom are held in the memory of the window's own process, and every profile's
 window is a process of its own, so they are per profile too. A profile's window reads and writes

@@ -12,7 +12,7 @@ sub viewing {
     my ($event) = @_;
     my ($wide, $high) = $event =~ /^view ([1-9][0-9]{0,4}) ([1-9][0-9]{0,4})$/ or return;
     @TRMNL_VIEW = ($wide, $high);
-    trmnl_sized($TABS[$TAB]{trmnl}) if $TABS[$TAB]{trmnl};    # [C29] a terminal fills the page as it is, not as a page is laid
+    trmnl_relaid($TABS[$TAB]) if $TABS[$TAB]{trmnl};    # [C29] a terminal fills the page as it is, not as a page is laid: its panes laid out again in it
     ($wide, $high) = map { my $step = $VIEW_STEP[$_]; $step * int(($_ ? $high : $wide) / $step + 0.5) } 0, 1;
     @VIEW = ($wide < $VIEW_WIDE[0] ? $VIEW_WIDE[0] : $wide > $VIEW_WIDE[1] ? $VIEW_WIDE[1] : $wide, $high < $VIEW_HIGH[0] ? $VIEW_HIGH[0] : $high > $VIEW_HIGH[1] ? $VIEW_HIGH[1] : $high);
     delete $_->{scroll_clamp} for @LIVE;    # [C18] the window's page has another size, so its end is somewhere else: where it stopped short of a page's place says nothing now
@@ -57,6 +57,8 @@ sub relaid {
         live_end($kept, 'it was laid out anew at another width', 1) if $kept;    # the new run is the page kept running now, laid at the width shown
         live_kept($again[5], $TABS[$TAB], $again[0], $again[2], $SHOWN->{host}, $SHOWN->{pictures}, $shown, $again[6]) if $again[5];
     }
+    $CURL_WANTED = 1;
+    if ($SHOWN) { $SPARE_WANTED = $SHOWN->{url} } else { spare_dropped() }    # a process for the page shown's next run, at the next quiet moment (sub spare_work); none waits for a page that is not shown
     live_told();
 }
 
@@ -85,6 +87,7 @@ sub tabbed {
         trmnl_end($TABS[$n], 'its tab was closed') if $TABS[$n]{trmnl};    # [C29]    # at once: a closed tab's page is not waited for, and the window is not kept waiting the moment it took to end by itself (17 to 40 ms a close, measured 2026-11-23)
         noted(($pulled ? 'you pulled a tab out into a new window' : 'you closed a tab') . (length($TABS[$n]{url} // '') ? ": $TABS[$n]{url}" : ''));
         my ($gone) = splice @TABS, $n, 1;
+        undef $PICTURES_BEFORE if $PICTURES_BEFORE && $PICTURES_BEFORE->{tab} == $gone;    # a closed tab keeps nothing for a first list
         closed_kept($gone, $n) unless $pulled;
         @TABS = (fresh_tab()) unless @TABS;
         $TAB-- if $TAB > $n || $TAB > $#TABS;
@@ -179,15 +182,22 @@ sub tab_shown {
 # is cleared by its own button and by nothing else (sub log_shown).
 # "menu clear-sessions" does that and also drops every page lzrprf keeps for a
 # tab, its answer and its pictures: all that lzrprf holds of what a site sent.
-# lzrprf sends no cookie and keeps none [C7], so no site knows you again
-# through it either way; the window warns, as asked, that pages would need a
-# new login. "menu home" makes the selected tab's address the home page, when
+# It empties the cookie jar too [C7], its file with it: no site knows you
+# again through lzrprf, but for a provider you connected; the window warns, as asked, that pages would need a
+# new login. "menu forget-cookies" clears the cookies of the shown tab's site alone. "menu home" makes the selected tab's address the home page, when
 # it is one lzrprf fetches (sub address), in one plain file of yours, home,
 # one line, written beside it and then given its name. The window asks before
 # a clearing; what it could do by itself is clear, and keep one address that
 # came from the bar.
 sub menu {
     my ($what) = @_;
+    if ($what eq 'forget-cookies') {      # [C7] the cookies of the shown tab's site, under every site they were set under
+        my ($url, $host) = address($TABS[$TAB]{url} // '');
+        return idle('No cookie was cleared: this tab shows no site.') unless $url && length $TABS[$TAB]{url};
+        my $gone = jar_forget($url);
+        noted("you cleared the cookies of $host: $gone");
+        return idle("The cookies of $host were cleared: $gone. Reload the page to see it without them.");
+    }
     if ($what eq 'bookmarks-bar') {        # shown or hidden, kept in one plain file of yours, marksbar
         my $on = !marks_bar();
         if ($INCOGNITO) { $HELD_BAR = $on ? 1 : 0; window('marksbar ' . ($on ? 'on' : 'off')); return idle(($on ? 'The bookmarks bar is shown' : 'The bookmarks bar is hidden') . ' in this incognito window only: it writes nothing.') }    # [C16]
@@ -228,7 +238,8 @@ sub menu {
     my @live = @LIVE;
     live_end($_, 'the sessions were cleared') for @live;    # a page kept running holds what its site sent, too
     undef $SHOWN;
-    tab_shown("The history and the sessions were cleared: $count " . ($count == 1 ? 'address' : 'addresses') . ', and every page lzrprf kept for a tab. lzrprf sends no cookie to any site but a provider you connected in the Profiles list, and that sign-in is not cleared here: Remove it there to sign out. The log is cleared by its own button.');
+    my $cookies = jar_clear();            # [C7] every cookie of this window's kind, and its file
+    tab_shown("The history and the sessions were cleared: $count " . ($count == 1 ? 'address' : 'addresses') . ", every page lzrprf kept for a tab, and every cookie of this window's sites ($cookies). A provider you connected in the Profiles list keeps its sign-in, which is not cleared here: Remove it there to sign out. The log is cleared by its own button.");
 }
 
 # Back, forward and reload: the addresses this tab went to, as sub visit keeps
@@ -308,7 +319,7 @@ sub secured {
     my ($status) = ($got // '') =~ /\A(HTTP\/[0-9.]+ [0-9]{3}[^\r\n]{0,80})/;
     my @lines = ('# Connection', 'Address: ' . $plain->($url, 2100), 'Server: ' . $plain->($from // 'unknown'),
         'Encryption: TLS 1.2 or newer, HTTP/1.1; the certificate checked against the roots lzrprf holds', 'Answer: ' . $plain->($status // 'unknown'),
-        'Cookies: ' . (do { my ($host) = ($url // '') =~ m{\Ahttps://([^/:]+)}; my $key = sso_on() ? sso_of($host) : undef; defined $key && sso_state($key) ne 'none' ? 'only those of ' . sso_providers()->{$key}[0] . ', which you connected in this profile, sent to its own sites and kept until you remove it' : 'none sent and none kept by lzrprf' }), '# Redirects on the way here');
+        'Cookies: ' . (do { my ($host) = ($url // '') =~ m{\Ahttps://([^/:]+)}; my $key = sso_on() ? sso_of($host) : undef; defined $key && sso_state($key) ne 'none' ? 'only those of ' . sso_providers()->{$key}[0] . ', which you connected in this profile, sent to its own sites and kept until you remove it' : jar_kept() ? 'the site\'s own, kept apart under each site you visit, sealed in this profile until they expire or you clear them' : 'the site\'s own, kept apart under each site you visit, in this window\'s memory until it closes' }), '# Redirects on the way here');
     push @lines, @WAY ? map { ($_ + 1) . '. ' . $plain->($WAY[$_], 600) } 0 .. $#WAY : 'None: the address answered with the page itself.';
     my @chain = grep { /\S/ } split /-----END CERTIFICATE-----/, $certs // '';
     my %named = ('Subject' => 'Subject', 'Issuer' => 'Issuer', 'Start date' => 'Valid from', 'Expire date' => 'Valid until', 'Serial Number' => 'Serial number',
@@ -407,6 +418,8 @@ sub resolved {                            # a Location against the address it ca
 # Only the window can ask for it; its dimensions stay local and are not a site fingerprint.
 sub home_shown {
     my ($wide, $high, $game) = @_;
+    my $fit = $wide > $VIEW_WIDE[1] ? $VIEW_WIDE[1] / $wide : 1;    # a window wider than a page is ever laid: the home is laid at the widest and as much lower, and the window scales it to its room as it does a page (function fit). The application refuses a =view outside the bounds and ends, which left the home black in a window 1611 wide (release 98)
+    ($wide, $high) = map { my ($least, $most) = $_ ? @VIEW_HIGH : @VIEW_WIDE; my $is = int(($_ ? $high : $wide) * $fit + 0.5); $is < $least ? $least : $is > $most ? $most : $is } 0, 1;
     return if $TABS[$TAB]{trmnl};         # [C29] a terminal's tab is no home
     if (length($TABS[$TAB]{url} // '')) {
         return unless $game && @TABS < $TABS_MOST;

@@ -207,16 +207,18 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 
 <!-- sub-map begin -->
 ```
-01-header.pl	1	-	C16 C17 C27 C1 C2 C3 C21 C4 C22 C19 C5 C6 C7 C8 C9 C10 C11 C12 C26 C20 C13 C14 C15 C18 C24 C23 C25 C28 C29
-02-limits-and-state.pl	1	-	C16 C17
-02-limits-and-state.pl	33	kept_in	-
-02-limits-and-state.pl	37	shared	C16 C19 C18 C12 C22 C21 C24 C23 C11 C29 C26
-02-limits-and-state.pl	192	sandbox_says	C26 C27 C4
-02-limits-and-state.pl	240	permit_class	C26
-02-limits-and-state.pl	241	permit_kinds	C26
-02-limits-and-state.pl	269	fresh_tab	C19
-02-limits-and-state.pl	285	now	-
-02-limits-and-state.pl	287	timed	C28
+01-header.pl	1	-	C16 C17 C27 C20 C1 C2 C3 C21 C4 C22 C19 C5 C6 C7 C8 C9 C10 C11 C12 C26 C13 C14 C30 C15 C18 C24 C23 C25 C28 C29 C31
+02-limits-and-state.pl	1	-	-
+02-limits-and-state.pl	18	remove_tree	-
+02-limits-and-state.pl	19	unblocked	C20 C16 C17
+02-limits-and-state.pl	32	kept_in	-
+02-limits-and-state.pl	36	shared	C16 C19 C18 C12 C22 C21 C24 C30 C23 C11 C29 C26
+02-limits-and-state.pl	209	sandbox_says	C26 C27 C4
+02-limits-and-state.pl	260	permit_class	C26
+02-limits-and-state.pl	261	permit_kinds	C26
+02-limits-and-state.pl	289	fresh_tab	C19
+02-limits-and-state.pl	305	now	C19 C6 C8 C14 C30
+02-limits-and-state.pl	324	timed	C28
 03-containers.pl	1	-	C1 C28 C21 C3 C24 C12
 03-containers.pl	185	shell_held	-
 03-containers.pl	190	shell_measured	-
@@ -225,14 +227,19 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 03-containers.pl	353	decoding	C24
 03-containers.pl	365	converting	-
 03-containers.pl	376	seal	-
-03-containers.pl	383	become	-
-03-containers.pl	403	said	-
-03-containers.pl	436	said_all	-
-03-containers.pl	465	ended	C2
-03-containers.pl	512	holds	C21 C3
-03-containers.pl	551	decoder_named	C3
-03-containers.pl	597	witnessed	-
-03-containers.pl	615	inside	-
+03-containers.pl	383	the_program	C1
+03-containers.pl	384	become	-
+03-containers.pl	404	said	-
+03-containers.pl	437	said_all	-
+03-containers.pl	468	said_started	-
+03-containers.pl	477	said_read	-
+03-containers.pl	497	ended	C2
+03-containers.pl	545	holds	C21 C3
+03-containers.pl	588	decoder_named	C3
+03-containers.pl	635	witnessed	-
+03-containers.pl	653	inside	-
+03-containers.pl	675	witness_lost	-
+03-containers.pl	684	named_asked	C21
 04-start.pl	1	-	-
 04-start.pl	4	run	C16 C17 C29
 04-start.pl	43	runs_swept	C16
@@ -283,37 +290,68 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	1	-	-
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
-06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C20 C7 C26 C27 C22 C29 C15
-06-behind.pl	163	paired	-
-06-behind.pl	178	unnamed	-
-06-behind.pl	185	leave	C17 C29 C12 C16
-06-behind.pl	199	closed	-
+06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C15
+06-behind.pl	153	unheard	-
+06-behind.pl	197	paired	-
+06-behind.pl	212	unnamed	-
+06-behind.pl	219	leave	C17 C7 C29 C12 C16
+06-behind.pl	236	closed	-
+07-visit-beside.pl	1	-	C14 C17
+07-visit-beside.pl	23	beside_wanted	-
+07-visit-beside.pl	25	beside_fds	-
+07-visit-beside.pl	29	beside_dropped	-
+07-visit-beside.pl	38	beside_sheets	-
+07-visit-beside.pl	50	beside_taken	-
+07-visit-beside.pl	60	beside_begun	-
+07-visit-beside.pl	75	beside_second	C14 C23 C27 C5 C30 C19
+07-visit-beside.pl	98	run_read	C19 C26 C28
 07-visit.pl	1	-	-
-07-visit.pl	4	visit	C29 C17 C23 C26 C5 C28 C8 C7 C4 C14
-07-visit.pl	182	laid_out	C28 C9
-07-visit.pl	197	outrun	-
-07-visit.pl	212	faces	C13
-07-visit.pl	248	contained	C28 C20 C13 C14 C26 C1 C3 C19
-07-visit.pl	348	run_seal	-
-07-visit.pl	374	keeper	C9
-07-visit.pl	462	unhung	-
-07-visit.pl	470	parted	-
-07-visit.pl	479	checked	C9 C22 C14
-07-visit.pl	576	laid	-
-07-visit.pl	589	laid_run	C4
-07-visit.pl	636	redirect_noted	C4
-07-visit.pl	647	redirect_answered	C4
-07-visit.pl	649	redirects_listed	C4
-07-visit.pl	661	redirects_told	C4 C23
-07-visit.pl	663	redirects_decide	C4
+07-visit.pl	4	visit	C19 C29 C17 C23 C26 C5 C28 C8 C7 C4 C14 C30
+07-visit.pl	235	laid_out	C28 C9
+07-visit.pl	251	outrun	-
+07-visit.pl	266	faces	C13
+07-visit.pl	302	contained	C28 C20 C13 C14 C26 C7 C3
+07-visit.pl	356	page_started	C1 C3
+07-visit.pl	379	spare_for	-
+07-visit.pl	387	spare_taken	-
+07-visit.pl	398	spare_dropped	-
+07-visit.pl	406	spare_work	-
+07-visit.pl	413	idle_taken	C1
+07-visit.pl	425	run_seal	-
+07-visit.pl	451	keeper	C9
+07-visit.pl	539	unhung	-
+07-visit.pl	547	parted	-
+07-visit.pl	556	checked	C30 C9 C22 C14
+07-visit.pl	659	laid	-
+07-visit.pl	672	laid_run	C4
+07-visit.pl	720	redirect_noted	C4
+07-visit.pl	731	redirect_answered	C4
+07-visit.pl	733	redirects_listed	C4
+07-visit.pl	745	redirects_told	C4 C23
+07-visit.pl	747	redirects_decide	C4
 08-pictures.pl	1	-	C7 C5 C17 C8 C22
-08-pictures.pl	46	pictured	C28 C23 C27 C4 C5 C8 C6 C7 C1 C3 C21 C9
-08-pictures.pl	158	system_decoded	C21 C24
-08-pictures.pl	197	plain_read	C24
-08-pictures.pl	217	ts_sounds	C24 C21
-08-pictures.pl	269	system_converted	C21
-08-pictures.pl	295	stated_size	C21
-08-pictures.pl	326	decoders_removed	C24
+08-pictures.pl	46	pictures_state	C28
+08-pictures.pl	57	pictures_begun	C23 C28 C27 C4 C5 C8 C6 C7 C1 C3 C21
+08-pictures.pl	114	pictures_heard	C9
+08-pictures.pl	137	pictures_ended	C21 C17
+08-pictures.pl	152	pictures_judged	-
+08-pictures.pl	160	pictures_ahead	-
+08-pictures.pl	173	pictures_pumped	-
+08-pictures.pl	186	pictures_waited	-
+08-pictures.pl	199	pictures_so_far	-
+08-pictures.pl	206	pictures_before	-
+08-pictures.pl	222	pictures_dropped	-
+08-pictures.pl	229	pictured	C28
+08-pictures.pl	283	picture_named	-
+08-pictures.pl	304	named_owed	-
+08-pictures.pl	317	named_again	-
+08-pictures.pl	331	fit_crop	C21
+08-pictures.pl	368	system_decoded	C21 C24
+08-pictures.pl	407	plain_read	C24
+08-pictures.pl	427	ts_sounds	C24 C21
+08-pictures.pl	479	system_converted	C21
+08-pictures.pl	505	stated_size	C21
+08-pictures.pl	536	decoders_removed	C24
 09-videos.pl	1	-	C22
 09-videos.pl	28	videoed	C23 C27 C5 C4 C28 C8 C6 C7 C22 C24
 09-videos.pl	162	hls_fetched	C5 C6 C7 C22 C23 C28
@@ -331,27 +369,27 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 10-tabs.pl	1	-	-
 10-tabs.pl	11	viewing	C29 C18 C19
 10-tabs.pl	39	relaid	C22
-10-tabs.pl	76	tabbed	C29 C4
-10-tabs.pl	102	closed_kept	-
-10-tabs.pl	113	tab_reopened	C4
-10-tabs.pl	130	lists_bounded	-
-10-tabs.pl	139	tab_moved	-
-10-tabs.pl	155	tab_shown	C29 C18 C12 C7
-10-tabs.pl	189	menu	C16 C4
-10-tabs.pl	240	nav_told	-
-10-tabs.pl	245	navigated	C4
-10-tabs.pl	263	engine_fit	-
-10-tabs.pl	269	engine	-
-10-tabs.pl	279	search_set	C16
-10-tabs.pl	290	typed	C23
-10-tabs.pl	305	secured	-
-10-tabs.pl	327	home	-
-10-tabs.pl	339	go	C7
-10-tabs.pl	364	redirected	-
-10-tabs.pl	372	unfit	-
-10-tabs.pl	383	resolved	-
-10-tabs.pl	408	home_shown	C29
-10-tabs.pl	437	home_arrived	C19
+10-tabs.pl	78	tabbed	C29 C4
+10-tabs.pl	105	closed_kept	-
+10-tabs.pl	116	tab_reopened	C4
+10-tabs.pl	133	lists_bounded	-
+10-tabs.pl	142	tab_moved	-
+10-tabs.pl	158	tab_shown	C29 C18 C12 C7
+10-tabs.pl	192	menu	C7 C16 C4
+10-tabs.pl	251	nav_told	-
+10-tabs.pl	256	navigated	C4
+10-tabs.pl	274	engine_fit	-
+10-tabs.pl	280	engine	-
+10-tabs.pl	290	search_set	C16
+10-tabs.pl	301	typed	C23
+10-tabs.pl	316	secured	-
+10-tabs.pl	338	home	-
+10-tabs.pl	350	go	C7
+10-tabs.pl	375	redirected	-
+10-tabs.pl	383	unfit	-
+10-tabs.pl	394	resolved	-
+10-tabs.pl	419	home_shown	C29
+10-tabs.pl	450	home_arrived	C19
 11-bookmarks.pl	1	-	C4
 11-bookmarks.pl	19	marks_root	C16
 11-bookmarks.pl	28	marks_into_bar	C16
@@ -371,11 +409,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 11-bookmarks.pl	189	marks_bar	-
 11-bookmarks.pl	198	pictures_elsewhere	C16
 11-bookmarks.pl	213	game_helper	-
-11-bookmarks.pl	222	game_helper_set	-
-11-bookmarks.pl	251	order_of	-
-11-bookmarks.pl	261	order_shown	-
-11-bookmarks.pl	268	order_set	-
-11-bookmarks.pl	282	mark_file	-
+11-bookmarks.pl	223	game_helper_set	-
+11-bookmarks.pl	252	order_of	-
+11-bookmarks.pl	262	order_shown	-
+11-bookmarks.pl	269	order_set	-
+11-bookmarks.pl	283	mark_file	-
 12-import.pl	1	-	C15 C4
 12-import.pl	127	import_home	-
 12-import.pl	129	import_base	-
@@ -408,17 +446,21 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 12-import.pl	569	import_plan	-
 12-import.pl	616	import_go	C16
 13-sheets-and-reach.pl	1	-	C14
-13-sheets-and-reach.pl	10	sheeted	C23 C27 C5 C6 C7
-13-sheets-and-reach.pl	30	pixels	-
-13-sheets-and-reach.pl	70	fault	C4
-13-sheets-and-reach.pl	83	fault_said	-
-13-sheets-and-reach.pl	84	asked_words	C19
-13-sheets-and-reach.pl	100	numbered	-
-13-sheets-and-reach.pl	110	find	C23 C17
-13-sheets-and-reach.pl	148	route_asked	-
-13-sheets-and-reach.pl	149	route	-
-13-sheets-and-reach.pl	154	route_of	C6
-13-sheets-and-reach.pl	173	reach	C17 C6
+13-sheets-and-reach.pl	10	sheeted	C23 C27 C5 C6 C7 C30
+13-sheets-and-reach.pl	57	fonted	C23 C27 C5 C6 C7
+13-sheets-and-reach.pl	95	pixels	-
+13-sheets-and-reach.pl	135	fault	C4
+13-sheets-and-reach.pl	148	fault_said	-
+13-sheets-and-reach.pl	149	asked_words	C19
+13-sheets-and-reach.pl	165	numbered	-
+13-sheets-and-reach.pl	174	find_ahead	C23 C17
+13-sheets-and-reach.pl	200	find_numbers	-
+13-sheets-and-reach.pl	212	find_dropped	-
+13-sheets-and-reach.pl	223	find	C23 C17
+13-sheets-and-reach.pl	267	route_asked	-
+13-sheets-and-reach.pl	268	route	-
+13-sheets-and-reach.pl	273	route_of	C6
+13-sheets-and-reach.pl	292	reach	C17 C6
 14-tool.pl	1	-	C20
 14-tool.pl	35	tool_stand	-
 14-tool.pl	36	tool_asked	-
@@ -436,64 +478,201 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 14-tool.pl	236	tool_checked	-
 14-tool.pl	277	tool_none	-
 14-tool.pl	283	tool_shown	C1 C3 C20
-14-tool.pl	303	tool_done	C20
-14-tool.pl	335	tool_procs	-
-14-tool.pl	356	tool_man	C20
-14-tool.pl	380	tool_notes	C20
-14-tool.pl	397	tool_note	-
-14-tool.pl	412	tool_stop	C20
-14-tool.pl	425	tool_off	C20
-14-tool.pl	435	tool_quiet	C20
-14-tool.pl	445	tool_wake	C20
-14-tool.pl	462	tool_due	-
-14-tool.pl	467	tool_watch	-
+14-tool.pl	304	tool_done	C20
+14-tool.pl	336	tool_procs	-
+14-tool.pl	357	tool_man	C20
+14-tool.pl	381	tool_notes	C20
+14-tool.pl	398	tool_note	-
+14-tool.pl	413	tool_stop	C20
+14-tool.pl	426	tool_off	C20
+14-tool.pl	436	tool_quiet	C20
+14-tool.pl	446	tool_wake	C20
+14-tool.pl	465	tool_due	-
+14-tool.pl	471	tool_watch	-
+15-lzr-a-commands.pl	1	-	C20
+15-lzr-a-commands.pl	126	lzr_main	-
+15-lzr-a-commands.pl	148	lzr_parsed	-
+15-lzr-a-commands.pl	178	lzr_named	-
+15-lzr-a-commands.pl	187	lzr_id_like	-
+15-lzr-a-commands.pl	189	lzr_found	-
+15-lzr-a-commands.pl	207	lzr_hint	-
+15-lzr-a-commands.pl	214	lzr_near	-
+15-lzr-a-commands.pl	226	lzr_distance	-
+15-lzr-a-commands.pl	241	lzr_wrong	-
+15-lzr-a-commands.pl	247	lzr_said	-
+15-lzr-a-commands.pl	253	lzr_paint	-
+15-lzr-a-commands.pl	255	lzr_wrapped	-
+15-lzr-a-commands.pl	266	lzr_help	-
+15-lzr-a-commands.pl	286	lzr_version	C20
+15-lzr-a-commands.pl	292	lzr_bin	-
+15-lzr-b-processes.pl	1	-	C20
+15-lzr-b-processes.pl	32	lzr_id	-
+15-lzr-b-processes.pl	39	lzr_look	-
+15-lzr-b-processes.pl	56	lzr_deactivated	C20
+15-lzr-b-processes.pl	62	lzr_keep_deactivated	C20
+15-lzr-b-processes.pl	72	lzr_contained	C20
+15-lzr-b-processes.pl	88	lzr_write_contained	C20
+15-lzr-b-processes.pl	99	lzr_alive	-
+15-lzr-b-processes.pl	105	lzr_named_all	-
+15-lzr-b-processes.pl	114	lzr_which	-
+15-lzr-b-processes.pl	128	lzr_running	-
+15-lzr-b-processes.pl	133	lzr_why_not	C20
+15-lzr-b-processes.pl	144	lzr_program_why_not	C20
+15-lzr-b-processes.pl	153	lzr_jobs_of	C20
+15-lzr-b-processes.pl	177	lzr_asked	-
+15-lzr-b-processes.pl	188	lzr_seen	C20
+15-lzr-b-processes.pl	202	lzr_processes	-
+15-lzr-b-processes.pl	221	lzr_kib	-
+15-lzr-b-processes.pl	222	lzr_json	-
+15-lzr-b-processes.pl	223	lzr_when	-
+15-lzr-b-processes.pl	224	lzr_state_of	-
+15-lzr-b-processes.pl	226	lzr_list	-
+15-lzr-b-processes.pl	246	lzr_all	-
+15-lzr-b-processes.pl	271	lzr_columns	-
+15-lzr-b-processes.pl	273	lzr_pid_of	-
+15-lzr-b-processes.pl	284	lzr_sample	C20
+15-lzr-b-processes.pl	297	lzr_seconds	-
+15-lzr-b-processes.pl	298	lzr_footprint	C20
+15-lzr-b-processes.pl	306	lzr_kill	C20
+15-lzr-b-processes.pl	331	lzr_deactivate	C20
+15-lzr-b-processes.pl	353	lzr_reactivate	C20
+15-lzr-b-processes.pl	375	lzr_due	-
+15-lzr-b-processes.pl	376	lzr_watch	-
+15-lzr-b-processes.pl	385	lzr_argv	C20
+15-lzr-b-processes.pl	398	lzr_contain	C20
+15-lzr-b-processes.pl	432	lzr_keeper	C20
+15-lzr-b-processes.pl	475	lzr_keeper_is	-
+15-lzr-b-processes.pl	477	lzr_release	C20
+15-lzr-c-analyze.pl	1	-	C20
+15-lzr-c-analyze.pl	23	lzr_size	-
+15-lzr-c-analyze.pl	31	lzr_ceiling	-
+15-lzr-c-analyze.pl	33	lzr_about	C20
+15-lzr-c-analyze.pl	55	lzr_analyze	C20
+15-lzr-c-analyze.pl	128	lzr_closing	-
+15-lzr-c-analyze.pl	143	lzr_frame	-
+15-lzr-c-analyze.pl	168	lzr_graph	-
 15-tor.pl	1	-	-
 15-tor.pl	41	tor_client	-
 15-tor.pl	45	tor_where	C23
 15-tor.pl	46	tor_on	C17
-15-tor.pl	108	tor_failed	-
-15-tor.pl	116	tor_off	-
-15-tor.pl	132	tor_reach	C23 C17
-15-tor.pl	175	tor_phase	C17
-15-tor.pl	183	tor_window_opened	C17
-15-tor.pl	190	tor_session_on	C17
-15-tor.pl	204	tor_sealed	C17
-15-tor.pl	212	tor_session_asked	C17
-15-tor.pl	218	tor_session_tables	C17
-15-tor.pl	223	tor_session_files	C17
-15-tor.pl	228	tor_told	C17
-15-tor.pl	230	tor_session_end	C17
+15-tor.pl	112	tor_failed	-
+15-tor.pl	120	tor_off	C17
+15-tor.pl	138	tor_reach	C23 C17
+15-tor.pl	181	tor_phase	C17
+15-tor.pl	189	tor_window_opened	C17
+15-tor.pl	197	tor_session_on	C17
+15-tor.pl	211	tor_sealed	C17
+15-tor.pl	219	tor_session_asked	C17
+15-tor.pl	225	tor_session_tables	C17
+15-tor.pl	230	tor_session_files	C17
+15-tor.pl	235	tor_told	C17
+15-tor.pl	237	tor_session_end	C17
 16-blocklist.pl	1	-	C23
 16-blocklist.pl	25	list_read	C23
 16-blocklist.pl	70	list_has	C23
 16-blocklist.pl	101	url_form	C23
 16-blocklist.pl	145	listed_said	C17
 16-blocklist.pl	146	listed	-
-16-blocklist.pl	154	listed_now	C23
-16-blocklist.pl	181	unlisted	-
-16-blocklist.pl	190	refused	C23
-16-blocklist.pl	196	barred	C23 C28
-16-blocklist.pl	217	flag_of	C28
-16-blocklist.pl	223	flagged_by	C28
-16-blocklist.pl	236	shield_asked	C28
-16-blocklist.pl	256	shield_said	C28
-16-blocklist.pl	266	shield_why	C28
-16-blocklist.pl	271	flag_shown	C28
-16-blocklist.pl	286	flag_door	C28
-16-blocklist.pl	293	flag_report	C28
+16-blocklist.pl	157	listed_now	C23
+16-blocklist.pl	185	unlisted	-
+16-blocklist.pl	194	refused	C23
+16-blocklist.pl	204	barred	C23 C28
+16-blocklist.pl	225	flag_of	C28
+16-blocklist.pl	231	flagged_by	C28
+16-blocklist.pl	244	shield_ahead	C28
+16-blocklist.pl	266	shield_heard	C28
+16-blocklist.pl	287	shield_asked	C28
+16-blocklist.pl	308	shield_said	C28
+16-blocklist.pl	318	shield_why	C28
+16-blocklist.pl	323	flag_shown	C28
+16-blocklist.pl	338	flag_door	C28
+16-blocklist.pl	345	flag_report	C28
+16-tnnl.pl	1	-	-
+16-tnnl.pl	28	tnnl_on	-
+16-tnnl.pl	31	tnnl_read	-
+16-tnnl.pl	53	tnnl_asked	-
+16-tnnl.pl	56	tnnl_file	C5
+16-tnnl.pl	74	tnnl_interface	-
+16-tnnl.pl	91	tnnl_look	C5
+16-tnnl.pl	102	tnnl_forget	-
+16-tnnl.pl	105	tnnl_relay	-
+16-tnnl.pl	126	tnnl_relay_end	-
+16-tnnl.pl	134	tnnl_serve	-
+16-tnnl.pl	158	tnnl_bound	-
+16-tnnl.pl	169	tnnl_carried	-
+16-tnnl.pl	229	tnnl_due	-
+16-tnnl.pl	230	tnnl_watch	-
+16-tnnl.pl	242	tnnl_ready	-
+16-tnnl.pl	252	tnnl_lines	-
+16-tnnl.pl	253	tnnl_container	-
+16-tnnl.pl	259	tnnl_said	-
+16-tnnl.pl	270	tnnl_tried	-
+16-tnnl.pl	313	tnnl_dialed	-
 17-fetch.pl	1	-	C7
 17-fetch.pl	16	request	C7
 17-fetch.pl	46	identity_on	C17
 17-fetch.pl	47	identity_word	-
 17-fetch.pl	48	identity_asked	C1 C3
-17-fetch.pl	58	identity_of_host	-
-17-fetch.pl	64	identity_site	-
-17-fetch.pl	74	identity_headers	C7 C19
-17-fetch.pl	101	fetch	C7 C23 C28 C19 C3
-17-fetch.pl	213	alive	-
-17-fetch.pl	215	public	-
-17-fetch.pl	228	public4	C4
-17-fetch.pl	246	fixed	C23 C5
+17-fetch.pl	59	identity_of_host	-
+17-fetch.pl	65	identity_site	-
+17-fetch.pl	75	identity_headers	C7 C19
+17-fetch.pl	102	fetch	C7 C23 C28 C19 C3
+17-fetch.pl	225	curl_started	C3
+17-fetch.pl	251	curl_for	-
+17-fetch.pl	264	curl_taken	-
+17-fetch.pl	273	curl_ended	-
+17-fetch.pl	281	alive	-
+17-fetch.pl	283	public	-
+17-fetch.pl	296	public4	C4
+17-fetch.pl	314	fixed	C23 C5
+17-jar.pl	1	-	C7 C12 C16 C17 C26
+17-jar.pl	39	jar_kept	C16 C17
+17-jar.pl	40	jar_file	-
+17-jar.pl	41	jar_skips	-
+17-jar.pl	48	jar_encoded	-
+17-jar.pl	50	jar_started	C1 C3
+17-jar.pl	82	jar_locked	-
+17-jar.pl	89	jar_key	-
+17-jar.pl	104	jar_stamp	-
+17-jar.pl	106	jar_merged	-
+17-jar.pl	122	jar_save	-
+17-jar.pl	145	jar_wrote	-
+17-jar.pl	160	jar_line	-
+17-jar.pl	177	jar_said	-
+17-jar.pl	184	jar_lost	-
+17-jar.pl	195	jar_end	-
+17-jar.pl	201	jar_context	-
+17-jar.pl	207	jar_cookie	-
+17-jar.pl	216	jar_heard	-
+17-jar.pl	229	jar_kept_write	C26
+17-jar.pl	239	jar_frame	-
+17-jar.pl	257	jar_clear	-
+17-jar.pl	266	jar_forget	-
+17-prefetch.pl	1	-	C19
+17-prefetch.pl	26	prefetch_end	-
+17-prefetch.pl	41	prefetch_begin	C17 C26 C14 C23
+17-prefetch.pl	86	prefetch_later	C27 C28
+17-prefetch.pl	98	prefetch_go	C26 C7 C28 C27 C8
+17-prefetch.pl	126	prefetch_pump	C5 C7
+17-prefetch.pl	146	prefetch_select	-
+17-prefetch.pl	155	prefetch_heard	-
+17-prefetch.pl	175	prefetch_made	C28 C6 C7
+17-prefetch.pl	219	prefetch_numbers	-
+17-prefetch.pl	235	prefetch_ended	-
+17-prefetch.pl	242	prefetch_asked	C19
+17-prefetch.pl	244	prefetch_keep	C17 C7
+17-prefetch.pl	254	prefetch_take	C7
+17-prefetch.pl	290	together_said	C6 C7
+17-prefetch.pl	298	together_started	-
+17-prefetch.pl	316	together_read	-
+17-prefetch.pl	325	fetched_together	-
+17-prefetch.pl	361	fetchers_for	-
+17-prefetch.pl	393	fetcher_taken	-
+17-prefetch.pl	407	fetchers_dropped	C14 C30 C5
+17-prefetch.pl	422	ahead_key	-
+17-prefetch.pl	424	ahead_begin	C5
+17-prefetch.pl	441	ahead_sheets	C14 C23 C27
+17-prefetch.pl	464	ahead_fonts	C30 C23 C27
 18-licence-and-support.pl	1	-	C16
 18-licence-and-support.pl	19	licence_key	-
 18-licence-and-support.pl	27	licence_read	-
@@ -531,14 +710,14 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 19-updates.pl	185	newer	C16
 19-updates.pl	214	newer_looked	C25
 19-updates.pl	267	welcome	C5 C6 C3
-19-updates.pl	328	installed	C25
-19-updates.pl	355	install_run	C25 C5
-19-updates.pl	455	install_drained	-
-19-updates.pl	488	install_guarded	-
-19-updates.pl	503	restarted	C5
-19-updates.pl	535	install_line	-
-19-updates.pl	553	install_end	-
-19-updates.pl	566	body_of	-
+19-updates.pl	329	installed	C25
+19-updates.pl	356	install_run	C25 C5
+19-updates.pl	457	install_drained	-
+19-updates.pl	490	install_guarded	-
+19-updates.pl	505	restarted	C5
+19-updates.pl	537	install_line	-
+19-updates.pl	555	install_end	-
+19-updates.pl	568	body_of	-
 20-window-side.pl	1	-	C29
 20-window-side.pl	14	window	C12
 20-window-side.pl	23	strip_back	-
@@ -548,7 +727,31 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 20-window-side.pl	43	noted	C23
 20-window-side.pl	44	said_noted	-
 20-window-side.pl	56	stated	-
-20-window-side.pl	64	hear	C12 C29
+20-window-side.pl	64	hear	C12 C29 C19
+21-link.pl	1	-	C31
+21-link.pl	49	link_folder	-
+21-link.pl	50	link_state	C31
+21-link.pl	68	link_on	-
+21-link.pl	69	link_random	-
+21-link.pl	71	link_menu	C31
+21-link.pl	90	link_off	C31
+21-link.pl	102	link_told	C31
+21-link.pl	105	link_url	C31
+21-link.pl	114	link_tokenish	-
+21-link.pl	115	link_words	C31
+21-link.pl	127	link_value	-
+21-link.pl	128	link_stamp	-
+21-link.pl	129	link_line	C31
+21-link.pl	149	link_wrap	-
+21-link.pl	177	link_around	C31
+21-link.pl	197	link_due	-
+21-link.pl	198	link_watch	C31
+21-link.pl	234	link_plain	C31
+21-link.pl	235	link_local	C31
+21-link.pl	248	link_reaped	C31
+21-link.pl	261	link_checked	C31
+21-link.pl	280	link_command	C31
+21-link.pl	334	link_shot	C31
 21-live.pl	1	-	-
 21-live.pl	8	live_of	-
 21-live.pl	10	live_kept	C18
@@ -559,11 +762,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-live.pl	79	live_due	C19
 21-live.pl	91	live_turn	C18 C19 C26 C5 C17 C6 C7
 21-live.pl	147	live_asked	C19 C26
-21-live.pl	163	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	244	live_parts	C19
-21-live.pl	263	unchunked	-
-21-live.pl	278	live_replied	C19
-21-live.pl	283	live_sent	C19
+21-live.pl	179	live_early	C19
+21-live.pl	198	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
+21-live.pl	290	live_parts	C19
+21-live.pl	309	unchunked	-
+21-live.pl	324	live_replied	C19
+21-live.pl	329	live_sent	C19
 22-permits.pl	1	-	C26
 22-permits.pl	42	permit_rules	C26
 22-permits.pl	64	permit_written	C26
@@ -576,33 +780,36 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 22-permits.pl	129	permit_info	C26
 22-permits.pl	138	permit_tracker	C26
 22-permits.pl	146	permit_named	C26
-22-permits.pl	154	permit_part	C26
-22-permits.pl	170	permit_decision	C26
-22-permits.pl	183	sites_told	C26
-22-permits.pl	188	sites_listed	C26
-22-permits.pl	205	sites_decide	C26 C4
-22-permits.pl	239	permit_layers	C26
-22-permits.pl	257	permit_layers_kept	C26
-22-permits.pl	286	curated	C26
-22-permits.pl	317	curated_read	C26
-22-permits.pl	354	curated_rule	C26
-22-permits.pl	391	curated_on	C26
-22-permits.pl	398	permit_curated	C26
-22-permits.pl	409	permit_refused	C26
-22-permits.pl	416	permit_decided	C26
-22-permits.pl	431	permit_queued	C26
-22-permits.pl	448	permit_page	C26
-22-permits.pl	483	permit_stripped	C26
-22-permits.pl	498	permit_body	C26
-22-permits.pl	537	permit_tag	C26
-22-permits.pl	551	permit_scripted	C26
-22-permits.pl	561	live_permitted	C26
-22-permits.pl	577	permit_visited	C26
-22-permits.pl	587	permits_asked	C26
-22-permits.pl	664	permits_later	C26
-22-permits.pl	669	scripts_set	C26 C4
-22-permits.pl	693	scripts_layer	C26 C4
-22-permits.pl	711	scripts_told	C26
+22-permits.pl	155	permit_part	C26
+22-permits.pl	171	permit_decision	C26
+22-permits.pl	184	sites_told	C26
+22-permits.pl	189	sites_listed	C26
+22-permits.pl	206	sites_decide	C26 C4
+22-permits.pl	240	permit_layers	C26
+22-permits.pl	258	permit_layers_kept	C26
+22-permits.pl	287	curated	C26
+22-permits.pl	318	curated_read	C26
+22-permits.pl	355	curated_rule	C26
+22-permits.pl	392	curated_on	C26
+22-permits.pl	399	permit_curated	C26
+22-permits.pl	410	permit_refused	C26
+22-permits.pl	417	permit_decided	C26
+22-permits.pl	433	permit_queued	C26
+22-permits.pl	450	permit_page	C26
+22-permits.pl	488	permit_parts	C26
+22-permits.pl	504	permit_unread	-
+22-permits.pl	512	permit_read	-
+22-permits.pl	521	permit_stripped	C26
+22-permits.pl	536	permit_body	C26
+22-permits.pl	575	permit_tag	C26
+22-permits.pl	589	permit_scripted	C26
+22-permits.pl	599	live_permitted	C26
+22-permits.pl	615	permit_visited	C26
+22-permits.pl	625	permits_asked	C26
+22-permits.pl	703	permits_later	C26
+22-permits.pl	708	scripts_set	C26 C4
+22-permits.pl	732	scripts_layer	C26 C4
+22-permits.pl	750	scripts_told	C26
 23-filters.pl	1	-	C27 C23 C26
 23-filters.pl	34	filters	C27
 23-filters.pl	67	filter_empty	C27
@@ -624,24 +831,32 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 23-filters.pl	313	filters_told	C27
 23-filters.pl	326	filter_skipped	C27
 23-filters.pl	328	filters_dir	C27
-24-live-input.pl	1	-	-
-24-live-input.pl	36	live_input	C18 C29 C12
-24-live-input.pl	66	live_wrote	C18
-24-live-input.pl	78	live_flushed	C18
-24-live-input.pl	86	live_stopped	C18
-24-live-input.pl	98	live_scroll_told	C18
-24-live-input.pl	107	live_scroll_back	C18
-24-live-input.pl	112	live_scroll_left	C18
-24-live-input.pl	164	live_unknown	-
-24-live-input.pl	176	live_answered	C18 C19 C12 C9 C26 C29 C4
-24-live-input.pl	297	live_layer	C18
-24-live-input.pl	334	live_layer_gone	C18
-24-live-input.pl	346	live_layers_paid	C18
-24-live-input.pl	371	live_sound	C12
-24-live-input.pl	419	live_sounded	C12
-24-live-input.pl	434	live_layers_again	C18 C9
-24-live-input.pl	450	live_patched	-
-24-live-input.pl	498	live_window_patch	-
+24-live-input.pl	1	-	C12
+24-live-input.pl	39	live_input	C18 C29 C12
+24-live-input.pl	74	live_wrote	C18
+24-live-input.pl	86	live_flushed	C18
+24-live-input.pl	94	live_stopped	C18
+24-live-input.pl	106	live_scroll_told	C18
+24-live-input.pl	115	live_scroll_back	C18
+24-live-input.pl	120	live_scroll_left	C18
+24-live-input.pl	175	live_unknown	-
+24-live-input.pl	187	live_answered	C18 C19 C12 C7 C9 C26 C29 C4
+24-live-input.pl	312	live_layer	C18
+24-live-input.pl	349	live_layer_gone	C18
+24-live-input.pl	361	live_layers_paid	C18
+24-live-input.pl	386	live_sound	C12
+24-live-input.pl	434	live_sounded	C12
+24-live-input.pl	449	live_layers_again	C18 C9
+24-live-input.pl	465	live_patched	-
+24-live-input.pl	513	live_window_patch	-
+24-parts.pl	1	-	-
+24-parts.pl	24	parts_read	-
+24-parts.pl	35	part_on	-
+24-parts.pl	36	part_left_out	-
+24-parts.pl	41	parts_told	-
+24-parts.pl	42	parts_record	-
+24-parts.pl	47	parts_set	C5
+24-parts.pl	79	parts_fetched	C25
 24-sound.pl	1	-	C12 C3 C22
 24-sound.pl	162	sounding	-
 24-sound.pl	167	sound_told	C12
@@ -652,32 +867,89 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 24-sound.pl	228	video_sound_at	C22
 24-sound.pl	247	sound_hushed	C12
 24-sound.pl	255	sound_ended	C12
+24-trmnl-panes.pl	1	-	C29
+24-trmnl-panes.pl	69	trmnl_leaves	-
+24-trmnl-panes.pl	70	trmnl_panes	-
+24-trmnl-panes.pl	71	trmnl_shown_tab	-
+24-trmnl-panes.pl	73	trmnl_path	-
+24-trmnl-panes.pl	81	trmnl_replaced	-
+24-trmnl-panes.pl	95	trmnl_page	-
+24-trmnl-panes.pl	102	trmnl_least	-
+24-trmnl-panes.pl	110	trmnl_held	-
+24-trmnl-panes.pl	119	trmnl_place	-
+24-trmnl-panes.pl	135	trmnl_layout	-
+24-trmnl-panes.pl	142	trmnl_relaid	-
+24-trmnl-panes.pl	150	trmnl_span	-
+24-trmnl-panes.pl	156	trmnl_label	-
+24-trmnl-panes.pl	161	trmnl_fitted	-
+24-trmnl-panes.pl	171	trmnl_chrome	-
+24-trmnl-panes.pl	190	trmnl_moved	-
+24-trmnl-panes.pl	211	trmnl_composed	-
+24-trmnl-panes.pl	237	trmnl_retitled	-
+24-trmnl-panes.pl	250	trmnl_workspace	-
+24-trmnl-panes.pl	272	trmnl_grown	-
+24-trmnl-panes.pl	284	trmnl_pane_new	C29
+24-trmnl-panes.pl	298	trmnl_pressed	-
+24-trmnl-panes.pl	313	trmnl_pane_at	-
+24-trmnl-panes.pl	315	trmnl_divider_at	-
+24-trmnl-panes.pl	324	trmnl_clicked	-
+24-trmnl-panes.pl	350	trmnl_inside	-
+24-trmnl-panes.pl	352	trmnl_dragged	-
+24-trmnl-panes.pl	363	trmnl_shared	-
+24-trmnl-panes.pl	371	trmnl_focused	-
+24-trmnl-panes.pl	379	trmnl_neighbour	-
+24-trmnl-panes.pl	395	trmnl_divider_for	-
+24-trmnl-panes.pl	403	trmnl_across	-
+24-trmnl-panes.pl	405	trmnl_even	-
+24-trmnl-panes.pl	413	trmnl_splits	-
+24-trmnl-panes.pl	425	trmnl_items	-
+24-trmnl-panes.pl	440	trmnl_menu_offered	-
+24-trmnl-panes.pl	447	trmnl_act	C29
+24-trmnl-panes.pl	477	trmnl_split	C29
+24-trmnl-panes.pl	490	trmnl_pane_closed	C29
+24-trmnl-panes.pl	507	trmnl_tab_added	C29
+24-trmnl-panes.pl	521	trmnl_tab_closed	C29
+24-trmnl-panes.pl	531	trmnl_tab_chosen	-
+24-trmnl-panes.pl	540	trmnl_file	-
+24-trmnl-panes.pl	542	trmnl_cwd	-
+24-trmnl-panes.pl	551	trmnl_tree_lines	-
+24-trmnl-panes.pl	558	trmnl_written	-
+24-trmnl-panes.pl	569	trmnl_saved	C29
+24-trmnl-panes.pl	582	trmnl_kept	-
+24-trmnl-panes.pl	593	trmnl_read_saved	-
+24-trmnl-panes.pl	610	trmnl_tree_read	-
 24-trmnl-window.pl	1	-	C29
-24-trmnl-window.pl	18	window_trmnl_text	C29
+24-trmnl-window.pl	26	window_trmnl_text	C29
 24-trmnl.pl	1	-	C29
-24-trmnl.pl	83	trmnl_opened	-
-24-trmnl.pl	103	trmnl_started	C29 C3
-24-trmnl.pl	126	trmnl_sized	-
-24-trmnl.pl	138	trmnl_shell	C29
-24-trmnl.pl	168	trmnl_send	-
-24-trmnl.pl	174	trmnl_fed	-
-24-trmnl.pl	182	trmnl_keys	-
-24-trmnl.pl	193	trmnl_input	-
-24-trmnl.pl	213	trmnl_viewed	C29
-24-trmnl.pl	224	trmnl_pasted	C29
-24-trmnl.pl	241	trmnl_copied	C29
-24-trmnl.pl	257	trmnl_titled	C29
-24-trmnl.pl	273	trmnl_replied	C29
-24-trmnl.pl	283	trmnl_wrote	-
-24-trmnl.pl	297	trmnl_gone	-
-24-trmnl.pl	310	trmnl_read	-
-24-trmnl.pl	348	trmnl_block	C29 C9
-24-trmnl.pl	370	trmnl_drawn	-
-24-trmnl.pl	385	trmnl_shown	-
-24-trmnl.pl	397	trmnl_end	-
-24-trmnl.pl	412	trmnl_select	-
-24-trmnl.pl	422	trmnl_heard	-
-24-trmnl.pl	435	trmnl_fds	-
+24-trmnl.pl	85	trmnl_opened	-
+24-trmnl.pl	102	trmnl_program	-
+24-trmnl.pl	110	trmnl_started	C29 C3
+24-trmnl.pl	132	trmnl_sized	-
+24-trmnl.pl	144	trmnl_shell	C20 C29
+24-trmnl.pl	175	trmnl_send	-
+24-trmnl.pl	181	trmnl_fed	-
+24-trmnl.pl	189	trmnl_keys	-
+24-trmnl.pl	202	trmnl_input	-
+24-trmnl.pl	224	trmnl_viewed	C29
+24-trmnl.pl	235	trmnl_pasted	C29
+24-trmnl.pl	252	trmnl_copied	C29
+24-trmnl.pl	268	trmnl_titled	C29
+24-trmnl.pl	283	trmnl_replied	C29
+24-trmnl.pl	293	trmnl_reported	C29
+24-trmnl.pl	303	trmnl_moded	-
+24-trmnl.pl	315	trmnl_wrote	-
+24-trmnl.pl	329	trmnl_gone	-
+24-trmnl.pl	343	trmnl_read	-
+24-trmnl.pl	381	trmnl_block	C29 C9
+24-trmnl.pl	404	trmnl_drawn	-
+24-trmnl.pl	417	trmnl_shown	-
+24-trmnl.pl	432	trmnl_pane_end	-
+24-trmnl.pl	442	trmnl_lost	-
+24-trmnl.pl	451	trmnl_end	-
+24-trmnl.pl	463	trmnl_all	-
+24-trmnl.pl	465	trmnl_select	-
+24-trmnl.pl	475	trmnl_heard	-
+24-trmnl.pl	490	trmnl_fds	-
 25-ask-and-address.pl	1	-	-
 25-ask-and-address.pl	10	ask	-
 25-ask-and-address.pl	12	asked	-
@@ -708,17 +980,28 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 27-proof.pl	20	mark	-
 27-proof.pl	27	sum_of	-
 27-proof.pl	41	sum_seen	-
-27-proof.pl	50	file_named	-
-27-proof.pl	51	program_same	-
-27-proof.pl	60	proven	C16
-27-proof.pl	115	testing	-
-27-proof.pl	121	lookup	C23
+27-proof.pl	55	copied	-
+27-proof.pl	68	copy_said	-
+27-proof.pl	76	sum_started	-
+27-proof.pl	77	sum_read	-
+27-proof.pl	85	file_named	-
+27-proof.pl	86	program_same	-
+27-proof.pl	99	mark_started	-
+27-proof.pl	100	mark_read	-
+27-proof.pl	101	proven	C16
+27-proof.pl	156	testing	-
+27-proof.pl	162	lookup	C23
+28-window-link.pl	1	-	C31
+28-window-link.pl	14	window_link_text	-
+28-window-pointer.pl	1	-	-
+28-window-pointer.pl	23	window_pointer_text	C22
 28-window-sound.pl	1	-	C22
 28-window-sound.pl	10	window_sound_text	-
 28-window.pl	1	-	C22
 28-window.pl	18	window_text	C17 C16 C29 C18 C22 C12 C28 C26 C4 C27 C15
+28-window1-tabs.pl	1	-	-
 28-window2.pl	1	-	-
-29-commands.pl	1	-	C17 C16 C18 C23 C27
+29-commands.pl	1	-	C17 C16 C18 C23 C27 C20
 ```
 <!-- sub-map end -->
 
@@ -759,10 +1042,115 @@ What anyone can check without the source:
 - every file in the download has the SHA-256 that `release.txt` names (VERIFY.md, step 7);
 - the program holds no path of the computer it was built on (`strings` shows none under `/Users`).
 
+## Web fonts
+
+Henry's decision of 2026-11-24 (ledger HC-0848) is that a page's `@font-face` fonts may be fetched
+safely. It is built end to end: the application names the fonts, lzrprf fetches them (`fonted`,
+`[C30]`), and the application decodes, checks and draws them. Here is the reasoning a reviewer needs.
+
+- **Which fonts may be fetched.** This is decided in `managed-projects/lzrbrwsr/src/page/pictures.rs`
+  (`wanted_fonts`, `font_entry`), under CSS Fonts 4 §4.3.1. A browser fetches a font file in CORS
+  mode, so a font from another origin can only be used if its server allows it. The application
+  makes no CORS request. It names a font only when the font's `url()`, resolved against the sheet
+  that names it (the page's address for a `<style>` block), is a path on the page's own host by the
+  same rules as a picture's, allowed by the page's font-src, and is not a `.otf` (CFF outlines, which
+  Type does not draw). A font host on a name under the page's host or on another site is not
+  fetched, and the face draws in the application's own local font. A page may fetch at most 8 font
+  files and 8 MB in all, and each file at most 2 MB.
+- **Which run names them.** A run reads the `@font-face` rules of the sheets it was handed and of
+  the `<style>` blocks its policy allows (`src/page/webfonts.rs`, `wanted`, `with_inline`). Of each
+  rule it names the first `src` entry it can use, no path twice and at most 8, with the rule's
+  later paths after it joined by `|`, at most 4 (`Pictures::wanted_font_groups`), on one line
+  `=webfonts /path|/path ...` after the `=sheets` line, and only when it has every sheet it will
+  have and was handed no fonts (`run`). lzrprf checks that line to the same path form as
+  `=sheets`, `{1,8}` fonts of 1 to `$FONT_TRIES` paths (sub `checked`), and tries a font's paths in
+  order until one answers 200, as CSS Fonts 4 §4.3.1 falls through a src entry that fails. Such a run is read as a first run is: with no network and no tiles, as the page
+  is laid out again. A `data:` font carries its file in the sheet: the application decodes it itself
+  (`engine/typeface/data_font.rs`, at most 2 MB once decoded) and nothing is fetched for it.
+- **The fetch.** It is lzrprf's own, `fonted` beside `sheeted`, with no network code in the
+  application:
+  - the page's own host, https only;
+  - `listed()` before a request ([C23]), then `filter_said()` with the type `font` ([C27]);
+  - `record()` before `fetch()` ([C5]), and a second line after it saying whether the font was
+    handed over and why not;
+  - `fetch()` itself holds it to LZRDFNDR's judgement ([C28]) and to the page's own checked
+    addresses, through Tor when Tor is on ([C6] [C7]); the identity headers ask as Safari does,
+    `Sec-Fetch-Dest: font`, `Sec-Fetch-Mode: cors`;
+  - one clock of 10 seconds for starting all of them, each request cut at 2 MiB and 64 KiB
+    (`$FONT_BYTES`), all of them together at most 8 MiB (`$FONTS_TOTAL`).
+
+  A refused, failed, larger, late or not-200 path is not handed over and the font's next path is
+  tried; a font none of whose paths is handed over goes with length 0, as a refused sheet does.
+  Nothing of a font is written to the disk: the answers are held in memory for the page shown
+  (`$SHOWN->{frame}`, so a new width lays it out with them again) in an incognito window as in any.
+- **A page that names no style sheet.** Its own `<style>` blocks, those its policy allows, are
+  read for `@font-face` too. When a first run that names no sheet names fonts from them, lzrprf
+  fetches them with `fonted` exactly as above and hands a second run `=sheets` with no sheet and the
+  `=webfonts` frame (the `elsif` after the sheets branch of `visit`). That first run is read without
+  the network, as one that names sheets is; the second is shown when it is a page that names
+  neither sheets nor fonts again. When it is no page and asked for no address, a third run is handed
+  each font with length 0 and is read with the network, as `[C14]`'s unsheeted run is; it is shown
+  when it is such a page, else the first run is. Still never a fourth run (selftest runs
+  `inlinefonts`, `inlinefontsagain`, `inlinefontsrescue` in `webfonts`).
+- **The third run.** The fonts are handed to a third run in a frame `=webfonts n1 ... nk` after the
+  `=sheets` frame, the answers back to back. It is shown when it is a page that names neither sheets
+  nor fonts again; otherwise the second run is (the first time a page is laid out three times in
+  this way, `[C14]` still holds: never a fourth run). The application reads each answer only as a
+  whole HTTP 200 with no encoding, decodes it (below), and keeps the files that pass for that page
+  alone (`webfonts::files`, then `Pictures::plain_fonts`); a face that does not pass draws in the
+  local font, and the page's statement line says which and why.
+- **The proof.** The studio page `r-webfonts` serves the pinned Liberation Mono 2.1.5 (OFL; the file
+  of `scripts/fetch-test-data.sh`, nothing downloaded) from the page's own host as TrueType, WOFF 1.0
+  and WOFF 2.0, each a family on Arial-fallback text. Our engines and Chrome draw all three in
+  Liberation Mono: every span 259.25 px wide in Chrome and 259.28 to 259.30 px in ours, the font on
+  another host and plain Arial at their Arial widths, 99.84% of pixels the same (`tstr` compare,
+  2026-11-24). The selftest run `webfonts` proves lzrprf's side; `src/page/webfonts_tests.rs` the
+  three runs and every refusal.
+- **Telling the format.** A file's format is read from its first four bytes alone: `wOF2`, `wOFF`,
+  `0x00010000` or `true`. The name and the Content-Type are never used. `OTTO` (CFF outlines) and
+  `ttcf` (collections) are refused, because the application draws neither.
+- **The decoder.** It is in `engine/typeface/woff.rs`, `woff2.rs`, `woff2_glyf.rs` and `brotli.rs`,
+  written for this purpose with no dependency (`woff::to_sfnt`).
+  - Every read is checked against the end of its buffer.
+  - Every loop pays from a fuel counter.
+  - The input is capped at 2 MB (`MOST_FILE`), the unpacked font at 8 MB (`MOST_SFNT`), its tables
+    at 64 and its glyphs at 16384 (`MOST_GLYPHS`, which bounds the glyf rebuild).
+  - A WOFF 1.0 table inflates into a buffer of exactly its declared size. A Brotli meta-block that
+    would pass the cap is refused at its header, before a byte of it is written. WOFF2's Brotli
+    stream is decoded by our own RFC 7932 decoder, and every distance and copy is bounds-checked.
+  - The unpacked font must then read through Type's own readers (`read::read`,
+    `glyf::Glyphs::read`), or the whole file is refused.
+  - Tests cover every cut, every flipped byte and random bytes, headers and directories that claim
+    too much, a zlib bomb, broken glyf and hmtx transforms, and byte-for-byte rebuilds of Source Code
+    Pro from real encoders; none of them panics. They are `engine/typeface/woff_tests.rs`,
+    `woff_hostile_tests.rs`, `woff_real_tests.rs`, `brotli_tests.rs`, `web_tests.rs` and
+    `data_font.rs`.
+- **No font code runs.** A font's `fpgm`, `prep` and glyph bytecode are kept, as WOFF2's rebuild
+  keeps them byte for byte, but no reader in Type has an interpreter, so none of it ever runs.
+- **The one file taken from elsewhere.** Brotli's static dictionary (RFC 7932 Appendix A) is
+  `engine/typeface/brotli_dictionary.bin`.
+  - It was downloaded with Henry's approval from
+    `https://raw.githubusercontent.com/google/brotli/ed738e842d2fbdf2d6459e39267a633c4a9b2f5d/c/common/dictionary.bin`
+    (tag v1.1.0).
+  - It is 122,784 bytes, with SHA-256
+    `20e42eb1b511c21806d4d227d07e5dd06877d8ce7b3a817f378f313653f35c70`.
+  - It is data. It is included with `include_bytes!` and is only ever indexed.
+  - Brotli's MIT notice sits beside it as `BROTLI-LICENSE`, taken from the same commit, with SHA-256
+    `3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94`.
+  - The 121 word transforms and the context tables in `brotli_tables.rs` were read once, by a script,
+    from the libbrotlicommon 1.2.0 already on the build Mac; nothing was downloaded for them. Some
+    entries were checked by hand against the RFC's text, as listed in that file's header.
+
 ## Not built yet
 
 These parts of the audit plan are not built in this release. Each is named so a reader does not assume
 it.
+
+- **Web fonts, what is left.** Fonts are fetched and drawn (see "Web fonts"), but:
+  - only fonts named in fetched sheets are; an `@font-face` in an inline `<style>` alone is not yet;
+  - `data:` font addresses are not decoded yet;
+  - no bold or italic is synthesised for a family that lacks the face;
+  - the `ch` unit is measured in the local font.
 
 - **A `selftest` run of `tools/doc-index --check`.** `selftest` checks the map of subs above and that
   every system program `lzrprf` starts is listed in `capabilities.json` with the sub that starts it,

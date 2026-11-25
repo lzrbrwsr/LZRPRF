@@ -145,6 +145,7 @@ sub permit_tracker {                      # [C26] who runs the scripts of the ho
 
 sub permit_named {                        # [C26] a script by its name (host and path, its query left out, or an inline script of the page by the start of its SHA-256), inline or external, its size in bytes (0 when not seen) and who runs it when known
     my ($site, $kind, $origin, $sha) = @_;
+    permit_read();
     my $info = $PERMIT_INFO{"$site $origin $sha"};
     my ($host) = $site =~ m{\Ahttps://(.*)\z};
     my $name = $info ? $info->{name} : $origin eq 'inline' ? ($kind eq 'handler' ? 'handler ' : 'inline script ') . substr($sha, 0, 12) . " in $host" : $origin =~ m{\Ahttps://(.*)\z} ? "a script from $1, " . substr($sha, 0, 12) : "a $origin script, " . substr($sha, 0, 12);
@@ -381,7 +382,7 @@ sub curated_rule {                        # [C26] E2: one rule's fields checked,
     return 'it names no source inspected' if length $r->{source} < 8;
     return 'it is unreviewed' if $r->{reviewer} =~ /\A\s*(?:unreviewed|-|none)?\s*\z/i;
     my @date = $r->{reviewed} =~ /\A([0-9]{4})-([0-9]{2})-([0-9]{2})\z/ or return 'its review date is not a date';
-    my $when = eval { Time::Local::timegm(0, 0, 0, $date[2], $date[1] - 1, $date[0]) } // return 'its review date is not a date';
+    require Time::Local; my $when = eval { Time::Local::timegm(0, 0, 0, $date[2], $date[1] - 1, $date[0]) } // return 'its review date is not a date';
     return 'its review date is later than today' if $when > $now + 86400;
     my $pattern = $kind eq 'path' ? join('', map { $_ eq '*' ? '[A-Za-z0-9._~-]{1,128}' : quotemeta } split /(\*)/, $id) : undef;
     return { site => $site, origin => $origin, kind => $kind, id => $id, reason => $reason, class => $class, caps => $caps, justification => $r->{justification},
@@ -420,11 +421,12 @@ sub permit_decided {                      # [C26] the policy, in its order, for 
     my $layer = permit_site($site, $rules, $url);
     return $said->('deny', 'none') unless $layer;
     my $class = permit_class($kind);
-    return $said->('once', 'e1') if ($layer eq 'person' || permit_layers()->{e1}) && $kind =~ /\A(?:inline|external|module|handler)\z/ && ($origin eq 'inline' || $origin eq $site) && permit_covers(join(',', keys %PERMIT_E1), $caps);    # E1: never data: or blob:, which are neither
+    return $said->('once', 'e1') if ($layer eq 'person' || permit_layers()->{e1}) && $kind =~ /\A(?:inline|external|module|handler|import)\z/ && ($origin eq 'inline' || $origin eq $site) && permit_covers(join(',', keys %PERMIT_E1), $caps);    # E1: never data: or blob:, which are neither; a module the site imports from itself is its own code too
     return $said->('once', 'e2') if permit_curated($site, $kind, $origin, $sha, $caps, $url);    # E2, a curated rule
     return $said->('always', 'e3') if grep { $_->[0] eq 'always' && $_->[1] eq $site && $_->[2] eq $class && $_->[3] eq $origin && $_->[4] eq $sha && permit_covers($_->[5], $caps) } @$rules;    # E3, your rules, of the class asked
     my $once = $PERMIT_ONCE{$site};
     return $said->('once', 'e3') if $once && grep { my ($k, $o, $s, $c) = split / /; $k eq $kind && $o eq $origin && $s eq $sha && permit_covers($c, $caps) } keys %{ $once->{keys} };    # your Allow Once, of the kind asked
+    return $said->('once', 'e3') if $once && $once->{hosts} && $once->{hosts}{"$class $origin"} && permit_covers(join(',', keys %PERMIT_E1), $caps);    # what the scripts you allowed load from the same hosts on this visit, of the class you allowed there (text made code only where you allowed that): yle.fi asked one level of its loading per reload (2026-11-24)
     return $said->('deny', 'none');
 }
 
@@ -460,10 +462,13 @@ sub permit_page {                         # [C26] the frame for a page run of $u
     $put->('always', @$_{qw(class origin id)}) for $allowed && !permit_signin($url) ? grep { $_->{site} eq $site && $_->{kind} eq 'sha256' } curated_on() : ();    # E2: a curated rule by SHA-256; one by path pattern is answered when the page asks (sub live_permitted)
     $one->('always', join ' ', (split / /)[0 .. 2]) for keys %{ ($PERMIT_ONCE{$site} // {})->{keys} // {} };
     $put->('deny', split / /) for grep { length } keys %{ $PERMIT_DENIED{$site} // {} };
-    my ($stripped, $count, $inline) = permit_stripped($$got);
-    my ($path) = $url =~ m{\Ahttps://[^/?#]+(/[^?#]*)};
-    my @parts = map { permit_part($url, $host . ($path // '/'), @$_) } @$inline;    # [C26] every part taken out by its name: [kind, origin, identity, name, where, text]
-    permit_info($site, @$_[1 .. 5]) for @parts;    # each one's name and source, for the question about it
+    my ($stripped, $count, $inline, @parts);
+    if ($allowed) { permit_unread($url, $site, $$got) }    # nothing is taken out of an allowed page: its parts are read for their names at the next quiet moment (sub permit_read), not before each of its runs (14 ms of each on yle.fi, measured 2026-11-25)
+    else {                                # the page's second run is handed the same answer: taken apart once for the two
+        $PERMIT_STRIPPED = [$$got, permit_stripped($$got)] unless $PERMIT_STRIPPED && $PERMIT_STRIPPED->[0] eq $$got;
+        ($stripped, $count, $inline) = @$PERMIT_STRIPPED[1 .. 3];
+        @parts = permit_parts($url, $site, $inline);
+    }
     if (!$allowed) {
         if ($count) {
             $$got = $stripped;
@@ -478,6 +483,39 @@ sub permit_page {                         # [C26] the frame for a page run of $u
     splice @lines, $PERMITS_MOST - 1 if @lines > $PERMITS_MOST - 1;
     @lines = ('page ' . ($allowed ? 'allow' : 'deny'), map { "$line{$_} $_" } @lines);
     return '=permits ' . @lines . "\n" . join('', map { "$_\n" } @lines);
+}
+
+sub permit_parts {                        # [C26] every part the strip took out of the page at $url, by its name: [kind, origin, identity, name, where, text]; each one's name and source kept, for the question about it (sub permit_info)
+    my ($url, $site, $inline) = @_;
+    my ($host) = $site =~ m{\Ahttps://(.*)\z};
+    my ($path) = $url =~ m{\Ahttps://[^/?#]+(/[^?#]*)};
+    my @parts = map { permit_part($url, $host . ($path // '/'), @$_) } @$inline;
+    permit_info($site, @$_[1 .. 5]) for @parts;
+    return @parts;
+}
+
+# An allowed page loses nothing, so its parts are read only for their names
+# and sources (Script permissions, LZRDFNDR's On Websites). That reading
+# is the whole document once over, and it stood before each run of the page.
+# It is owed instead: done at the next quiet moment (sub idle_taken), or the
+# moment a name is asked for (sub permit_named, sub permits_asked), or before
+# another page is owed. The page's second run owes the same answer and
+# nothing new; an answer once read is not read again for its next run.
+sub permit_unread {
+    my ($url, $site, $got) = @_;
+    return if $PERMIT_UNREAD && $PERMIT_UNREAD->[0] eq $url && $PERMIT_UNREAD->[2] eq $got;
+    permit_read();
+    $PERMIT_UNREAD = [$url, $site, $got, 0];
+    $IDLE_WORK //= \&permit_read;
+}
+
+sub permit_read {
+    my $one = $PERMIT_UNREAD or return;
+    return if $one->[3];
+    $one->[3] = 1;
+    my (undef, undef, $inline) = permit_stripped($one->[2]);
+    permit_parts(@$one[0, 1], $inline);
+    return;
 }
 
 sub permit_stripped {                     # [C26] an answer as curl gave it, with the scripts taken out of its body (sub permit_body) and its length said anew; the same answer when nothing was taken out. Returns it, how many parts were taken out, and [kind, sha256, text] of each inline script and handler
@@ -605,7 +643,7 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
     %PERMIT_WEB = () if keys %PERMIT_WEB > $PERMIT_RULES;
     my $words = "$host has scripts that did not run. " . (@from ? 'Not allowed: ' . join('; ', @from) . '. ' : '') . (@text ? 'Scripts that want to turn text into code (eval): ' . join('; ', @text) . '. ' : '') . ($blocked ? "lzrprf took $blocked script " . ($blocked == 1 ? 'part' : 'parts') . ' out of the page or refused ' . ($blocked == 1 ? 'it' : 'them') . '. ' : '')
         . ($allowed eq 'sandbox' ? (permit_layers()->{e1} ? "Its own scripts ran in lzrprf's sandbox" : "The scripts its curated rules name ran in lzrprf's sandbox") . ($boxed ? ", which refused $boxed " . ($boxed == 1 ? 'request' : 'requests') . ' to send or to fetch from another site' : '') . '. ' : '')
-        . 'Deny Once keeps them from running on this visit; Deny Always keeps a deny rule in LZRDFNDR scripts. Allow Once runs them on this visit' . ($allowed eq 'sandbox' ? ', outside the sandbox' : '') . '; Always Allow keeps a rule in LZRDFNDR scripts' . ($allowed eq 'sandbox' ? ', and the site leaves the sandbox.' : '.');
+        . 'Deny Once keeps them from running on this visit; Deny Always keeps a deny rule in LZRDFNDR scripts. Allow Once runs them on this visit' . ($allowed eq 'sandbox' ? ', outside the sandbox' : '') . ', with what they load from the same hosts; Always Allow keeps a rule in LZRDFNDR scripts' . ($allowed eq 'sandbox' ? ', and the site leaves the sandbox.' : '.');
     my $i = 0;
     window(map { my ($name, $where, $bytes, $who) = permit_named($site, @$_[0 .. 2]); my $info = $PERMIT_INFO{"$site $_->[1] $_->[2]"}; my $source = $info ? $info->{source} : '';
         'permitscript ' . join("\t", $i++, $name, $where, $bytes, $who, length $source, MIME::Base64::encode_base64($source, '')) } @items);    # [C26] each script with its source, shown in the question as text that never runs
@@ -631,7 +669,8 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
         return 0;
     }
     $press -= 1;                          # Allow Once and Always Allow, as they were numbered before Deny Always stood beside Deny
-    $PERMIT_NEXT{$site} = { keys => { %{ ($PERMIT_ONCE{$site} // {})->{keys} // {} }, map { (join(' ', @$_) => 1) } @items } };    # also after Always Allow: what could not be kept still runs on the reload
+    my %hosts = (%{ ($PERMIT_ONCE{$site} // {})->{hosts} // {} }, map { $_->[1] =~ m{\Ahttps://} ? (permit_class($_->[0]) . " $_->[1]" => 1) : () } @items);    # the hosts of what you allowed, by class: what their scripts load from them on the visit runs too (sub permit_decided)
+    $PERMIT_NEXT{$site} = { keys => { %{ ($PERMIT_ONCE{$site} // {})->{keys} // {} }, map { (join(' ', @$_) => 1) } @items }, hosts => \%hosts };    # also after Always Allow: what could not be kept still runs on the reload
     my $kept = '';
     if ($press == 3 && @items) {
         my $date = strftime('%Y-%m-%d', gmtime);
@@ -655,7 +694,7 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
     }
     my $said = $press == 2 ? 'Allowed on this visit.' : !@items ? 'The page named no script to keep a rule for yet, so its scripts run on this visit, and what they ask is put to you again.' : $kept eq 'file' ? 'Kept in LZRDFNDR scripts.' : $kept eq 'memory' ? ($INCOGNITO ? 'Kept in the memory of this incognito window only.' : kept_in() . "/scripts is not a file lzrprf reads, so the rule is kept in this window's memory only.") : 'The rule could not be written, so they run on this visit only.';
     noted("you allowed the scripts of $host " . ($press == 2 ? 'once' : 'always') . ": $said");
-    if ($PERMIT_ROUND >= $PERMIT_ROUNDS) { idle("$said Reload the page to run them."); return 0 }    # your Allow loaded this address again often enough in a row: the next is yours
+    if ($PERMIT_ROUND >= $PERMIT_ROUNDS) { $PERMIT_ONCE{$site} = { keys => { %{ $PERMIT_NEXT{$site}{keys} } }, hosts => { %hosts } }; idle("$said It holds for what the page asks from now on; reload the page to run what it was refused."); return 0 }    # your Allow loaded this address again already: never a second reload, the answer holds for the page as it runs
     $PERMIT_RELOAD = $ask->{url};
     idle("$said lzrprf loads the page again.");
     return 1;

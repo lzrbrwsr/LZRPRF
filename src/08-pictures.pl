@@ -43,102 +43,312 @@
 # window, how many pictures were fetched and how many were asked for, and the
 # pictures decoded, by number, which a new width places again; or nothing
 # when a line of the log could not be written.
+sub pictures_state {                      # what one page's pictures are fetched with: sub pictured's own, or begun ahead of it for an early list (sub pictures_ahead)
+    my ($paths, $wanted, $host, $where, $kept, $page) = @_;
+    open my $request, '>>', "$DIR/busy" or return;
+    flock $request, LOCK_SH or return;    # as in visit: no line of these requests falls into a clearing of the log
+    my %once;
+    my @waiting = grep { $wanted->{$_} && !$once{$_}++ } @$paths;    # in the page's order
+    shield_asked(map { m{^/} ? "https://$host$_" : (address($_))[0] } @waiting);    # [C28] all judged in one run, before any is looked up or fetched
+    return { owner => $$, request => $request, host => $host, where => $where, kept => $kept, answer => $page // '', until => now() + $PICTURE_SECONDS, n => 0, lost => 0, running => {}, sites => {}, found => {}, hosts => [], picture => {}, begun => {%once}, waiting => \@waiting,
+        named => (body_of($page // '') // '') =~ s/&amp;/&/gr };    # running: each picture fetched now, by the number fork gave for it: its entry, its address, what it said so far, its pipe; sites: the other sites asked for this page's pictures so far; found: what each other host was found at, looked up once; named: the page's own text, its body alone and not the site's headers, where an address on another site must stand (sub named_in)
+}
+
+sub pictures_begun {                      # the pictures waiting begun, up to $PICTURES_AT_ONCE side by side: every check and every line of the log of each, then its run
+    my ($P, $few) = @_;                   # $few: at most that many begun in this call (sub pictures_ahead, sub pictures_pumped): beginning eight at once held the page's waiting script requests 31 ms on yle.fi (measured 2026-11-25)
+    my ($host, $where, $kept) = @$P{qw(host where kept)};
+    while (!$P->{lost} && @{ $P->{waiting} } && keys(%{ $P->{running} }) < $PICTURES_AT_ONCE && now() < $P->{until} && (!defined $few || $few-- > 0)) {    # a picture not begun within the clock is not begun
+        my $entry = shift @{ $P->{waiting} };
+        my $n = ++$P->{n};
+        if (listed($entry =~ m{^/} ? "https://$host$entry" : $entry)) { refused("a picture the page $host names", $kept) or $P->{lost} = 1; next }    # [C23] its place stays a grey box, and nothing is looked up or asked
+        my ($url, $there) = $entry =~ m{^/} ? ("https://$host$entry") : address($entry);    # another host: checked as a typed address is
+        next unless defined $url;
+        if (my $filter = filter_said($url, 'image', $host)) { record("$url not fetched: $filter", $kept) or $P->{lost} = 1; next }
+        if ((my $shield = shield_said($url)) ne 'allow') { record("$url not fetched: " . shield_why($shield), $kept) or $P->{lost} = 1; next }    # [C28] its place stays a grey box, and its host is not even looked up    # [C27] after [C23]: its place stays a grey box, and nothing is looked up or asked
+        my $other = defined $there && elsewhere($there, $host);
+        if ($other && !pictures_elsewhere()) { record("$url not fetched: pictures from other sites are blocked (Block pictures from other sites, in the cogwheel's menu)", $kept) or $P->{lost} = 1; next }    # [C4] the setting of the cogwheel's menu (sub pictures_elsewhere): nothing is looked up, nothing is asked
+        if ($other && !named_in($P->{named}, $there, $url)) { record("$url not fetched: the page $host does not name that address in its text", $kept) or $P->{lost} = 1; next }    # [C4] the application named it, and may be hostile: nothing is looked up, nothing is asked
+        if ($other && !$P->{sites}{$there}) {    # another site, not asked yet for this page
+            if (keys(%{ $P->{sites} }) >= $PICTURE_SITES) { record("$url not fetched: the page $host names pictures on more than $PICTURE_SITES other sites, and lzrprf asks at most $PICTURE_SITES of them for one page's pictures", $kept) or $P->{lost} = 1; next }    # [C4] nothing is looked up, nothing is asked
+            $P->{sites}{$there} = 1;
+        }
+        my $to = $where;
+        if (defined $there && $there ne $host) {
+            record("the page $host names a picture on $there: $url", $kept) or ($P->{lost} = 1, last);    # [C5] before the name is even looked up
+            my $why;
+            ($to, $why) = @{ $P->{found}{$there} //= [$TOR_WANTED ? tor_where($there) : find($there)] };    # one lookup for each host of the page's pictures, however many it names there
+            if ($to && grep { $_->{own} } @$to) { ($to, $why) = (undef, "$there leads inside your own network (" . join(', ', map { $_->{text} } @$to) . '), where no picture is fetched') }    # [C8] never for a picture, and nothing is asked
+            if (!$to) { record("$url not fetched: $why", $kept) or $P->{lost} = 1; next }
+            push @{ $P->{hosts} }, $there unless grep { $_ eq $there } @{ $P->{hosts} };
+        }
+        record("$url -> lzrprf connects " . ($TOR_WANTED ? 'through Tor, one circuit for ' . ($there // $host) : 'to the first that answers of: ' . join(', ', map { $_->{text} } @$to)), $kept) or ($P->{lost} = 1, last);    # [C5] written down first, connected second
+        busy("Fetching picture $n of the page: $url");
+        pipe(my $from_run, my $to_lzrprf) or next;
+        my $run = fork // next;
+        if (!$run) {                    # fetched and decoded beside up to seven others; what it says goes to lzrprf alone, which writes the log
+            setpgrp(0, 0);              # a group of its own, named by its number, so what it started (curl, the application, sips) ends with it
+            spare_dropped(); curl_ended($CURL_SPARE); undef $CURL_SPARE;    # its copies of the ends of what lzrprf started before a run: closed here, so they hold nothing open
+            close $from_run;
+            $RUN = getppid();           # it goes on while lzrprf does, and lzrprf ends it when the window is gone
+            $SHIELD_CHILD = 1;          # [C28] it asks the application nothing: what was judged before it, and only that, may be fetched
+            my ($got, $why, $from) = fetch($url, $to, undef, undef, undef, undef, ['image', $host]);    # [C6] [C7]
+            my ($wrote) = $why ? () : contained($url, $got);    # [C1] [C3] no frame of style sheets: a picture run
+            my $system = '';            # what the system's decoder made of it, for the log
+            if (defined $wrote && $wrote =~ /\AS([1-9][0-9]{0,8})\n/ && length($wrote) == length($&) + $1) {    # [C21] a file the application does not decode, handed back whole
+                my $body = body_of($got);    # what sips is given is the site's answer itself, which lzrprf takes from what curl fetched: the application only says that it is for the system, and chooses no byte of it
+                my ($png, $fault) = defined $body && $body eq substr($wrote, length $&) ? system_decoded($body) : (undef, 'the application handed back another file than the site answered');
+                ($wrote) = defined $png ? contained($url, "HTTP/1.1 200 OK\r\nContent-Length: " . length($png) . "\r\n\r\n$png") : ();    # the PNG is decoded by the application as any picture is
+                $system = defined $png ? 'decoded by the operating system (sips) and then by the application' : "the operating system's decoder gave no picture: $fault";
+            }
+            print $to_lzrprf join("\t", defined $wrote ? 1 : 0, length($got // ''), $from // '', $why // '', $system), "\n", $wrote // '';
+            close $to_lzrprf;
+            POSIX::_exit(0);
+        }
+        close $to_lzrprf;
+        setpgrp($run, $run);            # the same from this side, so the group is there whichever of the two runs first
+        $P->{running}{$run} = [$entry, $url, '', $from_run];
+    }
+    return;
+}
+
+sub pictures_heard {                      # ($P, $wait): what the runs wrote within $wait seconds read, and each that ended written to the log and kept
+    my ($P, $wait) = @_;
+    my $kept = $P->{kept};
+    return unless %{ $P->{running} };
+    my $read = '';
+    vec($read, fileno $_->[3], 1) = 1 for values %{ $P->{running} };
+    select($read, undef, undef, $wait) > 0 or return;
+    for my $run (grep { vec($read, fileno $P->{running}{$_}[3], 1) } keys %{ $P->{running} }) {
+        my $one = $P->{running}{$run};
+        my $came = sysread($one->[3], $one->[2], 262144, length $one->[2]);
+        next if defined $came ? $came && length $one->[2] <= $PAGE_BYTES + 1000 : $!{EINTR} || $!{EAGAIN};    # a read a signal broke off is tried again
+        delete $P->{running}{$run};    # it has said all it says
+        close $one->[3];
+        waitpid $run, 0;
+        my ($head, $wrote) = split /\n/, $one->[2], 2;
+        my ($decoded, $length, $from, $why, $system) = split /\t/, $head // '', 5;
+        $why = 'the request could not be made' unless defined $from && ($length // '') =~ /^\d+$/;
+        record("$one->[1] " . (length $why ? "failed: $why" : "answered: $length bytes from $from" . (length($system // '') ? "; $system" : '')), $kept) or ($P->{lost} = 1, last);
+        $P->{picture}{ $one->[0] } = pixels($wrote) if !length $why && $decoded && defined $wrote;    # [C9]
+    }
+    return;
+}
+
+sub pictures_ended {                      # what still runs of a page's pictures ended, each run and every process of its group, sips among them, by the number fork gave
+    my ($P) = @_;
+    kill 'KILL', map { (-$_, $_) } keys %{ $P->{running} };
+    waitpid $_, 0 for keys %{ $P->{running} };
+    decoders_removed(keys %{ $P->{running} });    # [C21] the folder a run ended this way had for the system's decoder, which it could not remove itself
+    close $P->{request};
+    return;
+}
+
+# The pictures an early list places (sub live_early), begun while the page's
+# scripts still run: the same checks, the same lines of the log before each
+# request and the same runs as sub pictured makes, which takes them over when
+# the page's own list is here and begins only what that list places besides.
+# What the page's own list does not place after all was fetched as the early
+# one placed it. Never through Tor, where a request waits for the page [C17].
+sub pictures_judged {                     # ($lines, $paths, $host): the pictures of the page's first list judged beside its second run (sub shield_ahead), so its early list finds their verdicts
+    my ($lines, $paths, $host) = @_;
+    return if $TOR_WANTED;
+    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;
+    shield_ahead(map { m{^/} ? "https://$host$_" : (address($_))[0] } grep { $wanted{$_} } @$paths);
+    return;
+}
+
+sub pictures_ahead {
+    my ($lines, $paths, $host) = @_;
+    my $page = $AHEAD_PAGE or return;
+    return if $PICTURES_AHEAD || $TOR_WANTED || $page->{host} ne $host;
+    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;
+    return unless %wanted;
+    $PICTURES_AHEAD = pictures_state($paths, \%wanted, $host, @$page{qw(where kept answer)}) or return;
+    $PICTURES_AHEAD->{early} = [$lines, $paths, $host];    # the list they are drawn into when they are here (sub pictures_pumped)
+    timed('pictures-ahead ' . scalar @{ $PICTURES_AHEAD->{waiting} }) if $TIMED;
+    pictures_begun($PICTURES_AHEAD, 2);
+    return;
+}
+
+sub pictures_pumped {                     # the pictures begun ahead: what they wrote so far read without waiting, and the next of them begun
+    my $P = $PICTURES_AHEAD or return;
+    return if $P->{owner} != $$;        # a run started since holds a copy of them (a picture's own run reads its decoder as a page is read): only the process that began them hears them or begins more
+    pictures_heard($P, 0);
+    pictures_begun($P, 2);
+    if ($P->{early} && !%{ $P->{running} } && !@{ $P->{waiting} } && !$P->{lost} && !$P->{shown}++ && %{ $P->{picture} }) {    # all of them here before the page's own list: the early list drawn once more, with them in their places
+        my ($shown) = pictured(@{ $P->{early} }, undef, undef, pictures_so_far($P->{host}));
+        window("relaid $TAB", @$shown, '.');
+        timed('pictures-early') if $TIMED;
+    }
+    return;
+}
+
+sub pictures_waited {                     # ($ready, $seconds): select on $ready for reading, changed in place as select changes it; the runs of the pictures begun ahead wake it too and are heard then. Returns how many of the caller's own are ready
+    my $P = $PICTURES_AHEAD;
+    undef $P if $P && $P->{owner} != $$;
+    my @own = grep { vec($_[0], $_, 1) } 0 .. 8 * length($_[0]) - 1;
+    if ($P) { vec($_[0], fileno $_->[3], 1) = 1 for values %{ $P->{running} } }
+    prefetch_select(\$_[0]);              # and the scripts begun ahead (17-prefetch.pl)
+    my $any = select($_[0], undef, undef, $_[1]) > 0;
+    $_[0] = q{} unless $any;
+    pictures_pumped() if $P && $any;
+    prefetch_heard($_[0]) if $any;
+    return scalar grep { vec($_[0], $_, 1) } @own;
+}
+
+sub pictures_so_far {                     # ($host): the pictures a first list may place with nothing fetched: those kept of the page this tab showed before on this host, and over them those begun ahead for this page that are decoded by now
+    my ($host) = @_;
+    my ($P, $B) = ($PICTURES_AHEAD, $PICTURES_BEFORE);
+    if ($B && ($B->{host} ne $host || $B->{tab} != $TABS[$TAB])) { undef $PICTURES_BEFORE; undef $B }    # the tab went to another host, or another tab is read: dropped
+    return { ($B ? %{ $B->{picture} } : ()), ($P && $P->{owner} == $$ && $P->{host} eq $host ? %{ $P->{picture} } : ()) };
+}
+
+sub pictures_before {                     # ($shown, $tab): the decoded pictures of the page shown in this tab kept for the visit that begins, by their entry, up to $PICTURES_BEFORE_BYTES; what was kept before is dropped first
+    my ($shown, $tab) = @_;
+    undef $PICTURES_BEFORE;
+    my $all = $shown && $shown->{pictures} or return;
+    my ($bytes, %kept) = (0);
+    for my $entry (sort keys %$all) {
+        my $size = 0;
+        $size += length for @{ $all->{$entry} }[2 .. $#{ $all->{$entry} }];
+        next if $bytes + $size > $PICTURES_BEFORE_BYTES;
+        $bytes += $size;
+        $kept{$entry} = $all->{$entry};
+    }
+    $PICTURES_BEFORE = { tab => $tab, host => $shown->{host}, picture => \%kept } if %kept;
+    return;
+}
+
+sub pictures_dropped {                    # the pictures begun ahead and never taken over, ended
+    pictures_ended($PICTURES_AHEAD) if $PICTURES_AHEAD && $PICTURES_AHEAD->{owner} == $$;
+    undef $PICTURES_AHEAD;
+    undef $AHEAD_PAGE;
+    return;
+}
+
 sub pictured {
     my ($lines, $paths, $host, $where, $kept, $decoded, $page) = @_;    # $decoded: the pictures of this page decoded before, by their entry in =pictures; given when it is laid out again, and then nothing is fetched (sub relaid); $page: the page's answer as it was fetched, which an address on another site must stand in
     my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;    # by entry: at another width the page may choose other sources, and an entry decoded then is placed again
     @PICTURED = ();
-    return ($lines, 0, 0, {}) unless %wanted;
+    if (!%wanted) { pictures_dropped() unless $decoded; return ($lines, 0, 0, {}) }
     my %picture = $decoded ? %$decoded : ();
     if (!$decoded) {
-        open my $request, '>>', "$DIR/busy" or return;
-        flock $request, LOCK_SH or return;    # as in visit: no line of these requests falls into a clearing of the log
-        my ($until, $n, $lost, %running, %sites, %found) = (now() + $PICTURE_SECONDS, 0, 0);    # %running: each picture fetched now, by the number fork gave for it: its entry, its address, what it said so far, its pipe; %sites: the other sites asked for this page's pictures so far; %found: what each other host was found at, looked up once for the page
-        my $named = (body_of($page // '') // '') =~ s/&amp;/&/gr;    # the page's own text, its body alone and not the site's headers, where an address on another site must stand (sub named_in)
-        my @waiting = grep { $wanted{$_} } do { my %once; grep { !$once{$_}++ } @$paths };    # in the page's order
-        shield_asked(map { m{^/} ? "https://$host$_" : (address($_))[0] } @waiting);    # [C28] all judged in one run, before any is looked up or fetched
-        while (!$lost && alive() && (%running || @waiting && now() < $until)) {
-            while (!$lost && @waiting && keys(%running) < $PICTURES_AT_ONCE && now() < $until) {    # a picture not begun within the clock is not begun
-                my $entry = shift @waiting;
-                $n++;
-                if (listed($entry =~ m{^/} ? "https://$host$entry" : $entry)) { refused("a picture the page $host names", $kept) or $lost = 1; next }    # [C23] its place stays a grey box, and nothing is looked up or asked
-                my ($url, $there) = $entry =~ m{^/} ? ("https://$host$entry") : address($entry);    # another host: checked as a typed address is
-                next unless defined $url;
-                if (my $filter = filter_said($url, 'image', $host)) { record("$url not fetched: $filter", $kept) or $lost = 1; next }
-                if ((my $shield = shield_said($url)) ne 'allow') { record("$url not fetched: " . shield_why($shield), $kept) or $lost = 1; next }    # [C28] its place stays a grey box, and its host is not even looked up    # [C27] after [C23]: its place stays a grey box, and nothing is looked up or asked
-                my $other = defined $there && elsewhere($there, $host);
-                if ($other && !pictures_elsewhere()) { record("$url not fetched: pictures from other sites are blocked (Block pictures from other sites, in the cogwheel's menu)", $kept) or $lost = 1; next }    # [C4] the setting of the cogwheel's menu (sub pictures_elsewhere): nothing is looked up, nothing is asked
-                if ($other && !named_in($named, $there, $url)) { record("$url not fetched: the page $host does not name that address in its text", $kept) or $lost = 1; next }    # [C4] the application named it, and may be hostile: nothing is looked up, nothing is asked
-                if ($other && !$sites{$there}) {    # another site, not asked yet for this page
-                    if (keys(%sites) >= $PICTURE_SITES) { record("$url not fetched: the page $host names pictures on more than $PICTURE_SITES other sites, and lzrprf asks at most $PICTURE_SITES of them for one page's pictures", $kept) or $lost = 1; next }    # [C4] nothing is looked up, nothing is asked
-                    $sites{$there} = 1;
-                }
-                my $to = $where;
-                if (defined $there && $there ne $host) {
-                    record("the page $host names a picture on $there: $url", $kept) or ($lost = 1, last);    # [C5] before the name is even looked up
-                    my $why;
-                    ($to, $why) = @{ $found{$there} //= [$TOR_WANTED ? tor_where($there) : find($there)] };    # one lookup for each host of the page's pictures, however many it names there
-                    if ($to && grep { $_->{own} } @$to) { ($to, $why) = (undef, "$there leads inside your own network (" . join(', ', map { $_->{text} } @$to) . '), where no picture is fetched') }    # [C8] never for a picture, and nothing is asked
-                    if (!$to) { record("$url not fetched: $why", $kept) or $lost = 1; next }
-                    push @PICTURED, $there unless grep { $_ eq $there } @PICTURED;
-                }
-                record("$url -> lzrprf connects " . ($TOR_WANTED ? 'through Tor, one circuit for ' . ($there // $host) : 'to the first that answers of: ' . join(', ', map { $_->{text} } @$to)), $kept) or ($lost = 1, last);    # [C5] written down first, connected second
-                busy("Fetching picture $n of the page: $url");
-                pipe(my $from_run, my $to_lzrprf) or next;
-                my $run = fork // next;
-                if (!$run) {                    # fetched and decoded beside up to three others; what it says goes to lzrprf alone, which writes the log
-                    setpgrp(0, 0);              # a group of its own, named by its number, so what it started (curl, the application, sips) ends with it
-                    close $from_run;
-                    $RUN = getppid();           # it goes on while lzrprf does, and lzrprf ends it when the window is gone
-                    $SHIELD_CHILD = 1;          # [C28] it asks the application nothing: what was judged before it, and only that, may be fetched
-                    my ($got, $why, $from) = fetch($url, $to, undef, undef, undef, undef, ['image', $host]);    # [C6] [C7]
-                    my ($wrote) = $why ? () : contained($url, $got);    # [C1] [C3] no frame of style sheets: a picture run
-                    my $system = '';            # what the system's decoder made of it, for the log
-                    if (defined $wrote && $wrote =~ /\AS([1-9][0-9]{0,8})\n/ && length($wrote) == length($&) + $1) {    # [C21] a file the application does not decode, handed back whole
-                        my $body = body_of($got);    # what sips is given is the site's answer itself, which lzrprf takes from what curl fetched: the application only says that it is for the system, and chooses no byte of it
-                        my ($png, $fault) = defined $body && $body eq substr($wrote, length $&) ? system_decoded($body) : (undef, 'the application handed back another file than the site answered');
-                        ($wrote) = defined $png ? contained($url, "HTTP/1.1 200 OK\r\nContent-Length: " . length($png) . "\r\n\r\n$png") : ();    # the PNG is decoded by the application as any picture is
-                        $system = defined $png ? 'decoded by the operating system (sips) and then by the application' : "the operating system's decoder gave no picture: $fault";
-                    }
-                    print $to_lzrprf join("\t", defined $wrote ? 1 : 0, length($got // ''), $from // '', $why // '', $system), "\n", $wrote // '';
-                    close $to_lzrprf;
-                    POSIX::_exit(0);
-                }
-                close $to_lzrprf;
-                setpgrp($run, $run);            # the same from this side, so the group is there whichever of the two runs first
-                $running{$run} = [$entry, $url, '', $from_run];
-            }
-            last if $lost || !%running;
-            my $read = '';
-            vec($read, fileno $_->[3], 1) = 1 for values %running;
-            select($read, undef, undef, 1) > 0 or next;
-            for my $run (grep { vec($read, fileno $running{$_}[3], 1) } keys %running) {
-                my $one = $running{$run};
-                my $came = sysread($one->[3], $one->[2], 262144, length $one->[2]);
-                next if defined $came ? $came && length $one->[2] <= $PAGE_BYTES + 1000 : $!{EINTR} || $!{EAGAIN};    # a read a signal broke off is tried again
-                delete $running{$run};    # it has said all it says
-                close $one->[3];
-                waitpid $run, 0;
-                my ($head, $wrote) = split /\n/, $one->[2], 2;
-                my ($decoded, $length, $from, $why, $system) = split /\t/, $head // '', 5;
-                $why = 'the request could not be made' unless defined $from && ($length // '') =~ /^\d+$/;
-                record("$one->[1] " . (length $why ? "failed: $why" : "answered: $length bytes from $from" . (length($system // '') ? "; $system" : '')), $kept) or ($lost = 1, last);
-                $picture{ $one->[0] } = pixels($wrote) if !length $why && $decoded && defined $wrote;    # [C9]
-            }
+        my $P = $PICTURES_AHEAD;
+        undef $PICTURES_AHEAD;
+        undef $P if $P && $P->{owner} != $$;
+        if ($P && ($P->{host} ne $host || $P->{answer} ne ($page // ''))) { pictures_ended($P); undef $P }    # begun for another page than this one
+        if ($P) {                           # begun ahead for this very page: what this list places besides waits behind them, in the page's order
+            my @more = grep { $wanted{$_} && !$P->{begun}{$_}++ } @$paths;
+            shield_asked(map { m{^/} ? "https://$host$_" : (address($_))[0] } @more);    # [C28]
+            push @{ $P->{waiting} }, @more;
+            @$P{qw(where kept)} = ($where, $kept);
         }
-        kill 'KILL', map { (-$_, $_) } keys %running;    # the window is gone or a line could not be written: what still runs is ended, each run and every process of its group, sips among them, by the number fork gave
-        waitpid $_, 0 for keys %running;
-        decoders_removed(keys %running);    # [C21] the folder a run ended this way had for the system's decoder, which it could not remove itself
-        close $request;
-        return if $lost;
+        $P //= pictures_state($paths, \%wanted, $host, $where, $kept, $page) or return;
+        while (!$P->{lost} && alive() && (%{ $P->{running} } || @{ $P->{waiting} } && now() < $P->{until})) {
+            pictures_begun($P);
+            last if $P->{lost} || !%{ $P->{running} };
+            pictures_heard($P, 1);
+        }
+        pictures_ended($P);                 # the window is gone or a line could not be written: what still runs is ended
+        return if $P->{lost};
+        %picture = %{ $P->{picture} };
+        @PICTURED = @{ $P->{hosts} };
     }
     my ($drawn, @shown) = (0);
     for (@$lines) {
-        my ($x, $y, $w, $h, $n) = /^I(\d+),(\d+),(\d+),(\d+),(\d+)$/ or (push(@shown, $_), next);
+        my ($x, $y, $w, $h, $n, @fit) = /^I(\d+),(\d+),(\d+),(\d+),(\d+)(?:,([1-4]),(\d+),(\d+),(\d+),(\d+))?$/ or (push(@shown, $_), next);
         my $one = $picture{ $paths->[$n] };
-        if ($one && ($drawn += $one->[0] * $one->[1]) <= $DRAWN_PIXELS) { push @shown, "M$x,$y,$w,$h,$one->[0],$one->[1]", map { "m$_" } @$one[2 .. $#$one] }
+        if ($one && ($drawn += $one->[0] * $one->[1]) <= $DRAWN_PIXELS) {
+            my @crop = defined $fit[0] ? fit_crop($x, $y, $w, $h, $one->[0], $one->[1], @fit) : ($x, $y, $w, $h);
+            next unless @crop;    # the fit leaves nothing of the picture in its box
+            push @shown, 'N' . join(',', picture_named($one), @crop[0 .. 3], $one->[0], $one->[1], @crop[4 .. $#crop]);    # by its name: its rows go to the window once (sub named_owed), however many lists place it
+        }
         else { push @shown, "G$x,$y,$w,$h" }
     }
     return (\@shown, scalar(grep { $picture{$_} } keys %wanted), scalar(keys %wanted), \%picture);
+}
+
+# A decoded picture goes to the window once. A list places it by a name, a line
+# "N<name>,x,y,w,h,<wide>,<high>" with the fit's four numbers after it when it
+# has a fit, and holds none of its rows; before a list is written, the rows of
+# every picture it names that this process has not sent yet are written as
+# "picture <name> <wide> <high>", a line "m<row>" for each row and a line "."
+# (sub named_owed, called by sub window alone). A page's three lists and a
+# page loaded again so carry each picture's rows once: on a front page 22 MB
+# went with every list (measured in the real browser, 2026-11-25). Only sub
+# pictured writes a line N: a list the application makes may not hold one (sub
+# laid_run), so a page cannot place a bitmap of another page. The window keeps
+# a bounded number of bitmaps; one it no longer has is asked for with "page
+# refresh", and then every picture of the list is owed again (sub named_again).
+sub picture_named {                       # ($one): the name of a decoded picture, made the first time it is placed
+    my ($one) = @_;
+    if ($NAMED_OWNER != $$) {             # the first name of this process: a start of its own
+        my $bytes = '';
+        if (open my $random, '<:raw', '/dev/urandom') { read($random, $bytes, 4); close $random }
+        $bytes = pack('N', (time() ^ ($$ << 15)) & 0xffffffff) unless length($bytes) == 4;
+        ($NAMED_RUN, $NAMED_OWNER, $NAMED_COUNT) = (unpack('H*', $bytes), $$, 0);
+        %NAMED = %NAMED_AT = ();
+    }
+    my $known = $NAMED_AT{ 0 + $one };
+    return $known->[0] if $known && defined $known->[1] && $known->[1] == $one;
+    if (!(++$NAMED_COUNT % 64)) {         # the names of pictures no page keeps any more are let go
+        for my $name (grep { !defined $NAMED{$_}[1] } keys %NAMED) { delete $NAMED{$name} }
+        for my $at (grep { !defined $NAMED_AT{$_}[1] } keys %NAMED_AT) { delete $NAMED_AT{$at} }
+    }
+    my $entry = [$NAMED_RUN . sprintf('%x', $NAMED_COUNT), $one, 0];
+    weaken($entry->[1]);
+    $NAMED{ $entry->[0] } = $NAMED_AT{ 0 + $one } = $entry;
+    return $entry->[0];
+}
+
+sub named_owed {                          # (@lines of one list): the rows of each picture it names that the window was not sent yet, as lines to write before it
+    my @owed;
+    for (@_) {
+        next unless /^N([0-9a-f]{9,24}),/;
+        my $entry = $NAMED{$1} or next;
+        next if $entry->[2] || !defined $entry->[1];
+        $entry->[2] = 1;
+        my $one = $entry->[1];
+        push @owed, "picture $entry->[0] $one->[0] $one->[1]", (map { "m$_" } @$one[2 .. $#$one]), '.';
+    }
+    return @owed;
+}
+
+sub named_again { $_->[2] = 0 for values %NAMED; return }    # the window said it lacks a bitmap a list names: every picture is owed again with the list that names it next
+
+# object-fit and object-position (CSS Images 3, sections 5.5 and 5.6): the
+# engine lays the page out before any picture is decoded, so an I line whose
+# img is not fill carries five more numbers: the fit (1 contain, 2 cover, 3
+# none, 4 scale-down), then across and down each a permyriad of the room the
+# box leaves and px, each plus 100000 so no number has a sign. Given the box
+# x, y, w, h and the decoded picture pw by ph, gives the part of the box the
+# picture shows in (rounded to whole px) and the part of the picture drawn
+# there, in hundredths of a picture pixel: left, top, width and height of each.
+# Nothing when none of it shows. The same arithmetic, in the same order, as the
+# engine's layout/object_fit.rs crop, whose tests hold the numbers of this one's
+# selftest. A picture the decoder made smaller has lost its own size: none and
+# scale-down use the smaller one.
+sub fit_crop {
+    my ($x, $y, $bw, $bh, $nw, $nh, $fit, $xp, $xl, $yp, $yl) = @_;
+    return if $nw < 1 || $nh < 1 || $bw <= 0 || $bh <= 0;
+    my $round = sub { $_[0] < 0 ? -int(0.5 - $_[0]) : int($_[0] + 0.5) };
+    my ($across, $down) = ($bw / $nw, $bh / $nh);
+    my $contain = $across < $down ? $across : $down;
+    my $scale = $fit == 1 ? $contain : $fit == 2 ? ($across > $down ? $across : $down) : $fit == 3 || $contain > 1 ? 1 : $contain;
+    my ($w, $h) = ($nw * $scale, $nh * $scale);
+    my $ox = $x + ($xp - 100000) / 10000 * ($bw - $w) + ($xl - 100000);
+    my $oy = $y + ($yp - 100000) / 10000 * ($bh - $h) + ($yl - 100000);
+    my ($l, $t) = ($round->($ox > $x ? $ox : $x), $round->($oy > $y ? $oy : $y));
+    my ($r, $b) = ($round->($ox + $w < $x + $bw ? $ox + $w : $x + $bw), $round->($oy + $h < $y + $bh ? $oy + $h : $y + $bh));
+    return if $r <= $l || $b <= $t || $w <= 0 || $h <= 0;
+    my $along = sub {
+        my ($from, $o, $size, $n) = @_;
+        my ($v, $most) = ($round->(($from - $o) * $n / $size * 100), $round->($n * 100));
+        $v < 0 ? 0 : $v > $most ? $most : $v;
+    };
+    my ($sx, $sy, $sr, $sb) = ($along->($l, $ox, $w, $nw), $along->($t, $oy, $h, $nh), $along->($r, $ox, $w, $nw), $along->($b, $oy, $h, $nh));
+    return if $sr <= $sx || $sb <= $sy;
+    return ($l, $t, $r - $l, $b - $t, $sx, $sy, $sr - $sx, $sb - $sy);
 }
 
 # A picture for the system to decode [C21]: the site's answer itself, which

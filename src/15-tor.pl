@@ -45,7 +45,10 @@ sub tor_client {                        # the client, and whether it is a test's
 sub tor_where { return (undef, $REFUSED_WHY) if listed($_[0]); return (undef, 'this Tor window is not open for browsing, so nothing was fetched: not through Tor, and not directly') if $TOR && $TOR_SESSION && $TOR_SESSION->{phase} ne 'browsing'; return $TOR ? [{ tor => 1, host => $_[0], text => 'Tor' }] : (undef, 'Tor is on and not connected, so nothing was fetched: not through Tor, and not directly') }    # [C23] Tor is not asked for a listed host
 sub tor_on {                              # [C17] started on request only, in its own container, and checked against the release file
     return window('tor on') if $TOR;
+    jar_end();                            # [C17] a new identity, a new jar: none of the window before it goes through Tor
     $TOR_WANTED = 1;
+    return tor_failed('LZRTNNL is not installed: add it in Add or remove LZR modules') unless part_on('lzrtnnl');
+    if (my $why = tnnl_ready()) { return tor_failed($why) }    # with the VPN, Tor starts only while it is there
     my ($bin, $stand_in) = tor_client();
     my ($named) = map { /^file arti ([0-9a-f]{64})$/ ? $1 : () } release_lines();
     return tor_failed("the Tor client is not beside $APP: this release has none") unless -f $bin && ($stand_in || -x _);    # a stand-in is run by perl
@@ -57,21 +60,21 @@ sub tor_on {                              # [C17] started on request only, in it
     open my $cfg, '>', "$data/config.toml" or return tor_failed("lzrprf could not write $data/config.toml");
     print $cfg join("\n", '[proxy]', 'socks_listen = "127.0.0.1:auto"', 'dns_listen = 0', '[logging]', 'console = "info"', '[storage]', qq{cache_dir = "$data/cache"}, qq{state_dir = "$data/state"}, qq{port_info_file = "$data/port"},
         '[address_filter]', 'allow_onion_addrs = true', '[preemptive_circuits]', 'disable_at_threshold = 2', 'initial_predicted_ports = [443]', 'min_exit_circs_for_port = 1', 'prediction_lifetime = "10 minutes"',
-        '[circuit_timing]', 'disused_circuit_timeout = "5 minutes"', '[system]', 'max_files = 1024', 'memory.max = "64 MiB"', 'memory.low_water = "48 MiB"', '');
+        '[circuit_timing]', 'disused_circuit_timeout = "5 minutes"', '[system]', 'max_files = 1024', 'memory.max = "64 MiB"', 'memory.low_water = "48 MiB"', tnnl_lines(), '');    # with the VPN, [channel]: every connection through lzrprf's relay
     close $cfg;
     pipe(my $hold, my $guard) or return tor_failed('lzrprf could not start the Tor client');
     open my $log, '>', "$data/log" or return tor_failed("lzrprf could not write $data/log");
     my $pid = fork // return tor_failed('lzrprf could not start the Tor client');
     if (!$pid) {
         close $guard;
-        my @client = $stand_in ? ('/usr/bin/perl', $bin) : ('/usr/bin/sandbox-exec', '-D', "BIN=$bin", '-D', "DATA=$data", '-p', $TOR_CONTAINER, $bin);    # a test's stand-in is a script, which the container (one named program, nothing it starts) cannot run: the selftest tries the container on its own
+        my @client = $stand_in ? ('/usr/bin/perl', $bin) : ('/usr/bin/sandbox-exec', '-D', "BIN=$bin", '-D', "DATA=$data", '-p', tnnl_container($TOR_CONTAINER), $bin);    # a test's stand-in is a script, which the container (one named program, nothing it starts) cannot run: the selftest tries the container on its own
         become($hold, $log, $log, '/bin/sh', '-c', '"$@" & child=$!; read held; kill $child; wait', 'lzrprf-tor', @client, 'proxy', '-c', "$data/config.toml");
     }
     close $hold;
     close $log;
-    $guard->autoflush(1);
+    select((select($guard), $| = 1)[0]);    # autoflush
     $TOR = { pid => $pid, guard => $guard };
-    record("you turned Tor on: lzrprf starts the Tor client, $bin, in its own container") or return tor_off('the log could not be written');
+    record("you turned Tor on: lzrprf starts the Tor client, $bin, in its own container" . (tnnl_on() ? ", through the VPN on " . tnnl_said() . " alone" : '')) or return tor_off('the log could not be written');
     window('tor step 0 0 Starting the Tor client');
     my ($until, $read, $step) = (now() + $TOR_SECONDS, 0, 0);
     while (now() < $until) {
@@ -85,6 +88,7 @@ sub tor_on {                              # [C17] started on request only, in it
             next;
         }
         push @HELD, $event if length $event;    # the rest is heard once Tor is connected or stopped
+        return if tnnl_watch();           # the VPN dropped while Tor started: stopped, and still wanted
         return tor_failed('the Tor client ended') if waitpid($pid, 1) == $pid;    # 1: WNOHANG
         open my $in, '<', "$data/log" or next;
         seek $in, $read, 0;
@@ -115,6 +119,8 @@ sub tor_failed {
 }
 sub tor_off {
     my ($why) = @_;
+    tnnl_relay_end();                     # LZRTNNL's relay goes with the client: no watch of a VPN outlives the Tor it carried
+    jar_end() if $TOR;                    # [C17] the identity's jar ends with it, written nowhere
     $TOR_WANTED = 0;
     my $was = $TOR or return defined $why ? (window('tor off'), idle('Tor is off.')) : ();
     $TOR = undef;
@@ -155,7 +161,7 @@ sub tor_reach {
     my $kind = ord substr($head, 3, 1);
     my $rest = $kind == 1 ? 6 : $kind == 4 ? 18 : $kind == 3 ? 2 + ord $said->('', 1) : return;
     return unless length $said->('', $rest) == $rest;
-    $tor->blocking(0);
+    unblocked($tor);
     return ($tor, 'Tor');
 }
 
@@ -182,6 +188,7 @@ sub tor_phase {                           # [C17] the next step of the Tor windo
 
 sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window: a Tor window apart from it, and this one as it was
     window('tor off');
+    return idle('LZRTNNL is not installed, so no Tor window opens. Add it in Add or remove LZR modules, in the cogwheel menu.') unless part_on('lzrtnnl');
     return idle('A Tor window was asked for: "lzrprf try" starts none. Tor never carries this window.') if $TRY;
     return idle('No Tor window was started: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'tor', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);
     return idle('A Tor window is opening, apart from this one. It shares nothing with this window, and Tor never carries this one.');
@@ -234,6 +241,7 @@ sub tor_session_end {                     # [C17] the end of a Tor window, step 
     record("the Tor window closes: $why. No new navigation or request is taken");
     my @processes = grep { defined } map { @$_{qw(page keeper)} } @LIVE;
     live_end($_, 'the Tor window closed', 1) for @{ [@LIVE] };
+    jar_end();                            # its cookies with its pages, written nowhere
     kill 'KILL', $witness if $witness;
     my @left = grep { kill 0, $_ } @processes;
     kill 'KILL', @left if @left;
@@ -243,7 +251,7 @@ sub tor_session_end {                     # [C17] the end of a Tor window, step 
     if ($TRY) { print STDERR "test session $_\n" for @SESSION }    # "lzrprf try" only: what the window's log held, for the test to read, written before it is emptied
     remove_tree("$DIR/$_", { safe => 0 }) for tor_session_files();
     @$_ = () for \@LIVE, \@CLOSED, \@SESSION, \@WAY, \@PICTURED, \@PERMIT_SEEN, \@FILTER_SEEN, \@PERMIT_HELD, \@HELD, \@LATER;
-    %$_ = () for \%PERMIT_PASSWORD, \%PERMIT_PATHS, \%PERMIT_DENIED, \%PERMIT_NEXT, \%PERMIT_ONCE, \%PERMIT_INFO, \%PERMIT_WEB;
+    undef $_ for $PERMIT_UNREAD, $PERMIT_STRIPPED; %$_ = () for \%PERMIT_PASSWORD, \%PERMIT_PATHS, \%PERMIT_DENIED, \%PERMIT_NEXT, \%PERMIT_ONCE, \%PERMIT_INFO, \%PERMIT_WEB;
     @MARKS = ();
     listed_said(1);
     ($TAB, $TITLED, @TABS) = (0, '', fresh_tab());

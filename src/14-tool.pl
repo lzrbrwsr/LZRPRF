@@ -283,6 +283,7 @@ sub tool_none { window('tool none'); return idle($_[0]) }
 sub tool_shown {
     my ($how, $said) = @_;
     return tool_none('An incognito window has no tool of the application: it would write what you switch off.') if $INCOGNITO;
+    return tool_none('LZRDFNDR is not installed. Add it in Add or remove LZR modules, in the cogwheel menu.') unless part_on('lzrdfndr');
     $TOOL_ALL = $how eq 'all' if $how ne 'open';
     window('tool busy ' . ($how eq 'all' ? 'Reading every process of this computer' : $how eq 'sense' ? 'Reading the processes and the launchd jobs of this computer' : 'Asking the application'));
     my $look = tool_look($how ne 'open');
@@ -409,14 +410,14 @@ sub tool_note {
     synced(shared()) if $kept;
     return window('tool noted ' . ($kept ? 'kept' : 'failed'));
 }
-sub tool_stop {                           # [C20] a process of yours is asked to end: looked at again first, and ended only when it is still the one that was listed
-    my ($pid) = @_;
+sub tool_stop {                           # [C20] a process of yours is asked to end: looked at again first, and ended only when it is still the one that was listed; the log line says who ended it (lzr says its own command)
+    my ($pid, $who) = @_;
     my $fact = tool_may('stop', $pid) or return (0, "process $pid is not one lzrprf ends");
     my $proc = $TOOL{procs}{$pid};
     my ($now) = tool_asked("proc.$pid", 5, '/bin/ps', '-o', 'uid=,lstart=,comm=', '-p', $pid);
     my ($owner, $began, $path) = $now =~ /^\s*(\d+)\s+(\S+\s+\S+\s+\d+\s+[\d:]+\s+\d+)\s+(.*?)\s*$/ or return (1, "process $pid had ended already");
     return (0, "process $pid is no longer the one that was listed") unless $owner == $proc->{uid} && ($began =~ s/\s+/ /gr) eq $proc->{began} && tool_plain($path, 1000) eq $proc->{path};
-    record("You ended a process from the application's tool: $fact") or return (0, "process $pid: the log could not be written, so it was left running");    # written down first
+    record(($who // "You ended a process from the application's tool") . ": $fact") or return (0, "process $pid: the log could not be written, so it was left running");    # written down first
     return (tool_ran("TERM $pid"), "process $pid was asked to end") if defined tool_stand();
     kill('TERM', $pid) or return (0, "process $pid could not be asked to end");
     for (my $until = now() + 2; now() < $until && kill(0, $pid);) { Time::HiRes::sleep(0.05) }
@@ -458,14 +459,19 @@ sub tool_wake {                           # [C20] a job you switched off here, s
 # no longer switched off, was put back by its app or its installer: it is
 # switched off again, as you chose, written in the log first, and the window
 # lights the tool's icon. Nothing else of the computer is read for this, and
-# with nothing switched off nothing is read at all.                   # [C20]
-sub tool_due {                            # the seconds until the next such look; nothing when there is nothing to look at
-    return if $INCOGNITO || !-s "${\ shared()}/quieted";
-    my $left = ($TOOL_LOOKED // now()) + $TOOL_WATCH - now();
-    return $left > 1 ? $left : 1;
+# with nothing switched off nothing is read at all. The programs you
+# deactivated with lzr are looked for on a cadence of their own (sub
+# lzr_watch), with nothing read while none is deactivated.            # [C20]
+sub tool_due {                            # the seconds until the next such look, or the next look for deactivated programs; nothing when there is nothing to look at
+    return if $INCOGNITO;
+    my @due = sort { $a <=> $b } lzr_due(), -s "${\ shared()}/quieted" && part_on('lzrdfndr') ? ($TOOL_LOOKED // now()) + $TOOL_WATCH - now() : ();
+    return unless @due;
+    return $due[0] > 1 ? $due[0] : 1;
 }
 sub tool_watch {
-    return if $INCOGNITO || defined $TOOL_LOOKED && now() < $TOOL_LOOKED + $TOOL_WATCH;
+    return if $INCOGNITO;
+    lzr_watch();
+    return if !part_on('lzrdfndr') || defined $TOOL_LOOKED && now() < $TOOL_LOOKED + $TOOL_WATCH;    # what LZRDFNDR switched off is looked at only while it is installed; what lzr deactivated, always
     $TOOL_LOOKED = now();
     my $kept = tool_kept();
     return unless @$kept;

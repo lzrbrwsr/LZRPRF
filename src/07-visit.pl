@@ -4,8 +4,10 @@
 sub visit {
     my ($typed, $how, $mark, $auto) = @_;   # whether a redirect to the same site was followed already in this visit; what was typed, how its line in the log begins ("you typed", "you opened your home page", "you opened a bookmark", "you chose to follow a redirect to"), and the bookmark it came from
     $DRAWN = 0;
+    prefetch_end();                       # [C19] nothing fetched ahead or kept for the page before is handed to this one
     trmnl_end($TABS[$TAB], 'an address was opened in its tab') if $TABS[$TAB]{trmnl};    # [C29]
     return idle('This Tor window is closing: nothing more is fetched.') if $TOR_SESSION && $TOR_SESSION->{phase} !~ /^(?:made|connecting|sealed|browsing)$/;    # [C17] from the first step of its end, no new navigation
+    pictures_before($SHOWN, $TABS[$TAB]) unless !$SHOWN && ($how // '') =~ /redirect to$/;    # a redirect followed is the same visit: what was kept for it stays
     undef $SHOWN;                         # a page asked for anew is laid out again only once it is shown
     return barred() if listed($typed);    # [C23] before the address is shown, kept in the tab or written anywhere
     my ($url, $host) = address($typed);
@@ -28,6 +30,8 @@ sub visit {
     window('secure none');
     nav_told();
     return fault('changed') unless program_same();    # before a site is asked: a program that is no longer the file this window began with is given no page, so none is fetched for it
+    curl_for();                           # and curl for its request (sub curl_for)
+    spare_for($url);                      # the process of its first run, started now: it waits in its container, handed nothing, while the address is judged, looked up and fetched
     $UNEXPIRED = !expire_log() if $UNEXPIRED;
     open my $request, '>>', "$DIR/busy" or return idle($UNWRITTEN);
     flock $request, LOCK_SH or return idle($UNWRITTEN);    # from "you typed" until its last line is written, a request keeps the log from being cleared under it
@@ -46,7 +50,7 @@ sub visit {
         record("$url -> lzrprf connects " . ($TOR_WANTED ? "through Tor, one circuit for $host" : 'to the first that answers of: ' . join(', ', map { $_->{text} } @$where)), $kept) or return idle($UNWRITTEN);    # [C5] written down first, connected second
         busy("Fetching $url");
         $tried = 1;
-        identity_asked();                 # [C7] D18: once a window, before its first visit, which hosts the application shows another browser identity
+        identity_asked(); fetchers_for($where, undef, ['style', $host]) unless $TOR_WANTED;    # (17-prefetch.pl) [C7] D18: once a window, before its first visit, which hosts the application shows another browser identity
         ($got, $why, $from, $certs) = fetch($url, $where, undef, 1);    # the request of a page: the one that carries Accept
     }
     timed('fetched');
@@ -86,16 +90,19 @@ sub visit {
         window("page $TAB", '.');
         return idle("Nothing is shown: $url redirects " . (defined $to ? "to $to " : '') . "($status), and lzrprf did not go there." . (length $why ? " $why" : ''));
     }
+    beside_wanted($url, $host, $got, $kept, $where);    # [C19] the scripts the page names, fetched side by side while it is laid out, for when it asks for them: begun the moment its first run is started (sub beside_begun)
     busy("$APP lays the page out, in its container.");
     timed('lay');
     my ($lines, $hosts, $paths, $said, $named, $live, $videos) = laid_out($url, $got, "=sheets\n", 1);    # [C14] a first run is told that no style sheet came with the answer; $live: the run, when the application keeps its page running (sub contained)
-    return flag_shown($url) if !$lines && $hosts eq 'flagged';    # [C28] nothing of the page is drawn: LZRDFNDR's red page instead
+    beside_dropped() unless $lines && @$named; return flag_shown($url) if !$lines && $hosts eq 'flagged';    # [C28] nothing of the page is drawn: LZRDFNDR's red page instead
     return fault($hosts) unless $lines;
-    my $titled_first = $TITLED;             # the first run's title: what the tab says when that run is the one shown after later runs were laid
+    prefetch_later() unless @$named; my $titled_first = $TITLED;             # the first run's title: what the tab says when that run is the one shown after later runs were laid
     my $styled = '';                        # what the bar says of the page's style sheets
     my ($with_sheets, $two) = ("=sheets\n", 0);    # the frame of style sheets the page shown was laid with, and whether that was a second run: what a new width lays it with again
     if (@$named) {                          # [C14] the page names style sheets on its own host: they are fetched, and the page is laid out once more with them
         $live = live_dropped($live);        # the first run is not the one kept running: a page shown as it was laid out first, because its second run is not shown, runs no more
+        curl_for();                         # curl for the first style sheet, and
+        spare_for($url); pictures_judged($lines, $paths, $host);    # the second run's process, started while its style sheets are fetched, and its pictures judged beside it (sub pictures_judged)
         my ($frame, $with) = sheeted($named, $host, $where, $kept) or return idle($UNWRITTEN);
         busy("$APP lays the page out again with its style sheets, in its container.");
         my @again = laid_out($url, $got, $frame, 1);
@@ -107,7 +114,24 @@ sub visit {
             ($with_sheets, $two) = ($frame, 1);
             $live = $again[5];              # the run shown is the one kept running
             $styled = "$APP laid the page out again with $with of the $n " . ($one ? 'style sheet' : 'style sheets') . " it names on $host itself. ";
-        } elsif ($again[0]) {                # a second run that names style sheets again broke the frame it was given: the first run is shown, and nothing starts a third
+            if (@FONTS_NAMED) {             # [C30] that run names web fonts its sheets name on the page's own host: they are fetched, and the page is laid out a third time with its sheets and them, shown when it is a page that names neither again
+                my @fonts = @FONTS_NAMED;
+                $live = live_dropped($live);    # the second run is not the one kept running: shown when the third is not, it runs no more
+                my ($faces, $drawn) = fonted(\@fonts, $host, $where, $kept) or return idle($UNWRITTEN);
+                busy("$APP lays the page out a third time with its style sheets and web fonts, in its container.");
+                my $titled_second = $TITLED;
+                my @third = laid_out($url, $got, $frame . $faces, 1);
+                if ($third[0] && !@{ $third[4] } && !@FONTS_NAMED) {
+                    ($lines, $hosts, $paths, $said, $videos) = (@third[0 .. 3], $third[6]);
+                    ($with_sheets, $live) = ($frame . $faces, $third[5]);    # a new width lays it with both again
+                    $styled .= "It laid it out a third time with $drawn of the " . @fonts . ' web ' . (@fonts == 1 ? 'font' : 'fonts') . ' they name. ';
+                } else {
+                    live_end($third[5], 'it is not shown', 1) if $third[5];
+                    $TITLED = $titled_second;
+                    $styled .= "The run with the web fonts they name is not shown: the page is drawn in $APP" . "'s own faces. ";
+                }
+            }
+        } elsif ($again[0]) {               # a second run that names style sheets again broke the frame it was given: the first run is shown, and nothing starts a third
             live_end($again[5], 'it is not shown', 1) if $again[5];
             $TITLED = $titled_first;
             $styled = "$APP did not use $sheet_words: the page is shown as it was laid out first. ";
@@ -139,16 +163,45 @@ sub visit {
                 }
             }
         }
+    } elsif (@FONTS_NAMED) {                # [C30] the page names no style sheet, but its own <style> names web fonts on its own host: the first run was read without the network; they are fetched, and the page is laid out again with them
+        my @fonts = @FONTS_NAMED;
+        $live = live_dropped($live);        # the first run is not the one kept running
+        my ($faces, $drawn) = fonted(\@fonts, $host, $where, $kept) or return idle($UNWRITTEN);
+        my $font_words = 'the ' . @fonts . ' web ' . (@fonts == 1 ? 'font' : 'fonts') . ' its own style names';
+        busy("$APP lays the page out again with its web fonts, in its container.");
+        my @again = laid_out($url, $got, "=sheets\n" . $faces, 1);
+        my $asked = $READ_ASKED;
+        if ($again[0] && !@{ $again[4] } && !@FONTS_NAMED) {    # a run that names sheets or fonts again is not shown, and nothing starts another
+            ($lines, $hosts, $paths, $said, $videos) = (@again[0 .. 3], $again[6]);
+            ($with_sheets, $two, $live) = ("=sheets\n" . $faces, 1, $again[5]);
+            $styled = "$APP laid the page out again with $drawn of $font_words. ";
+        } elsif (!$again[0] && $again[1] =~ /^(?:changed|unstarted|uncontained)$/) {
+            return fault($again[1]);
+        } else {
+            live_end($again[5], 'it is not shown', 1) if $again[5];
+            my $unfonted = "=sheets\n" . join(' ', '=webfonts', ('0') x @fonts) . "\n";    # each named font with length 0: none to use, and to the application no first run, so it reads the page with the network and names no font again
+            my @third = !$asked && !$again[0] && $again[1] =~ /^(?:unfit|ended|late)$/ ? laid_out($url, $got, $unfonted, 1) : ();    # as for sheets: only when that run asked for no address and was no page
+            if (@third && $third[0] && !@{ $third[4] } && !@FONTS_NAMED) {
+                ($lines, $hosts, $paths, $said, $videos) = (@third[0 .. 3], $third[6]);
+                ($with_sheets, $two, $live) = ($unfonted, 1, $third[5]);
+                $styled = "$APP did not use $font_words: the run with them is not a page, so the page is shown as it was laid out once more without them, with the network for its scripts. ";
+            } else {
+                live_end($third[5], 'it is not shown', 1) if @third && $third[5];
+                $TITLED = $titled_first;
+                $styled = "$APP did not use $font_words: the page is shown as it was laid out first, in $APP" . "'s own faces, and none of its external or module scripts ran in it. ";
+            }
+        }
     }
     timed('laid');
     my $title = $TITLED;                    # the title the run that is shown wrote
     my $first = grep { /^I\d/ } @$lines;    # the page draws pictures: it is shown at once with a grey box in the place of each, and drawn again with them once they came
     if ($first) {
-        window("page $TAB", @{ (pictured($lines, $paths, $host, $where, $kept, {}))[0] }, '.');    # nothing is fetched for this one: no picture is decoded yet
+        window("page $TAB", @{ (pictured($lines, $paths, $host, $where, $kept, pictures_so_far($host)))[0] }, '.');    # nothing is fetched for this one: a picture begun ahead and here, or decoded for the page this tab showed before, stands in its place; every other place is grey
         $DRAWN = 1;
         timed('list');
     }
     my ($shown, $fetched, $wanted, $decoded) = pictured($lines, $paths, $host, $where, $kept, undef, $got);
+    undef $PICTURES_BEFORE;                # the page's own pictures are here: what was kept of the page before is dropped
     window("page $TAB", '.') if !$shown && $first;    # a line of a picture could not be written: the page drawn at once is taken away again, as nothing of this answer would have been shown before
     return live_dropped($live, $UNWRITTEN) unless $shown;
     timed($first ? 'pictured' : 'list');
@@ -183,6 +236,7 @@ sub laid_out {
     my ($url, $got, $sheets, $keep) = @_;
     $LAID_WIDE = $VIEW[0];                # the width contained asks for in its =view frame, and the one width sub laid takes
     my ($wrote, $why, $live) = contained($url, $got, $sheets, $keep);
+    timed('page-read');                   # what the application wrote is all here: the time to "laid" is lzrprf's check of it (sub checked)
     return (undef, $why) unless defined $wrote;
     return (live_dropped($live), flagged_by($wrote)) if substr($wrote, 0, 9) eq '=flagged ';    # [C28] LZRDFNDR blocked the page: its one line, and nothing of the page
     my ($lines, $hosts, $paths, $said, $named, $videos) = checked($wrote) or return (live_dropped($live), 'unfit');    # [C9]
@@ -252,18 +306,14 @@ sub contained {
     $keep = 0 unless defined $sheets;     # a picture run is never kept
     my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
     $frame .= permit_page($url, \$got) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
+    $frame .= jar_frame($url) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
     $frame .= '=live ' . length($got) . "\n" if $keep;
+    if (my $ran = beside_taken($frame . $got, defined $sheets && !$tool, $url, !$local_home && !$soon)) { return run_read($ran, $keep, $sheets, $tool) }    # the very run, started beside the first (sub beside_begun)
     my ($input, $relay);                  # the keeper's end of the relay and lzrprf's, for a page kept running
     if ($keep) { pipe($input, $relay) or return (undef, 'unstarted') }
-    pipe(my $answer_out, my $answer_in) && pipe(my $from_page, my $to_lzrprf) && pipe(my $held, my $hold) or return (undef, 'unstarted');
-    my $seal = run_seal() // return (undef, 'unstarted');    # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
-    my $page = fork // return (undef, 'unstarted');
-    if (!$page) {
-        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'));    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
-        chdir '/';
-        become($answer_out, $to_lzrprf, $TRY ? \*STDERR : undef, $PAGE_LIMITS, contain('', $PROGRAM), @ARGUMENTS);    # [C1]
-    }
-    close $_ for $answer_out, $to_lzrprf;
+    my $run = spare_taken($url, $sheets, $tool, $local_home) // page_started($url, $sheets, $tool, $local_home) // return (undef, 'unstarted');    # its process, started for this one run, here or a moment before (sub spare_for)
+    my ($page, $answer_in, $from_page, $seal) = @$run{qw(page in from seal)};
+    pipe(my $held, my $hold) or do { kill 'KILL', $page; waitpid $page, 0; return (undef, 'unstarted') };
     my $feeder = fork;
     if (!defined $feeder) {               # no second process to be had: the application is running by now, so it is ended here and not left to end by itself
         kill 'KILL', $page;
@@ -271,12 +321,13 @@ sub contained {
         return (undef, 'unstarted');
     }
     if (!$feeder) {                       # the keeper of this page
-        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
+        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
         keeper($held, $answer_in, "=seal $seal\n" . $frame . $got, $page, $input);
         POSIX::_exit(0);                  # the keeper never returns; were it ever to, it ends here and does not go on as a second lzrprf
     }
     close $_ for $answer_in, $held, grep { defined } $input;
     timed('page-forked');
+    timed("run-forked $$") if $TIMED;    # "lzrprf try" with "times": each run of the application by the process that started it, a page's or a picture's (scripts/load-timeline.pl)
     fcntl($relay, POSIX::F_SETFL(), O_NONBLOCK) if $relay;    # lzrprf never waits in a write to a page: a line it cannot write at once ends the page (sub live_input)
     if (!inside($page)) {                 # [C3] the system did not say so: the answer stays here; the application was told the address and nothing else
         kill 'STOP', $page;               # held still before anything else: the keeper's end closes the application's input, and an application the system does not call contained is not to go on at that while it waits to be ended
@@ -293,50 +344,76 @@ sub contained {
         waitpid $_, 0 for $feeder, $page;
         return (undef, 'unstarted');
     }
-    return (undef, undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() }) if $soon && $keep;
-    my ($wrote, $until, $open, $looked, $ready_at, $early, $outrun) = ('', now() + $PAGE_SECONDS, 1, 0, -1);
-    while ($open && now() < $until && length $wrote <= $PAGE_BYTES && alive()) {
-        my $ready = '';
-        vec($ready, fileno $from_page, 1) = 1;
-        vec($ready, fileno $FROM, 1) = 1 if $OUTRUN && $FROM;    # a relayout hears the window while it runs (sub outrun)
-        select($ready, undef, undef, 1) > 0 or next;
-        if ($OUTRUN && $FROM && vec($ready, fileno $FROM, 1)) { last if $outrun = outrun(); next unless vec($ready, fileno $from_page, 1) }
-        $open = sysread($from_page, $wrote, 65536, length $wrote) // $!{EINTR};
-        next unless $keep;
-        while ($wrote =~ /\A=(?:fetch|permit) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
-            $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0 };
-            $early->{held} = $wrote;
-            my $asked = live_asked($early) or last;    # not all there yet
-            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
-            live_fetched($early, $asked);
-            return (undef, 'ended') if $early->{ended};    # a request of no form, or a reply the page did not take: it is ended as a page kept running is (sub live_end)
-            ($wrote, $looked) = ($early->{held}, 0);
-        }
-        $ready_at = index($wrote, "\n=ready\n", $looked > 7 ? $looked - 7 : 0);    # a line no list holds: every line of a list begins with a letter, or is "=page" and the lines of its head
-        $looked = length $wrote;
-        last if $ready_at >= 0;
+    my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
+    if ($soon && $keep) { $started->{fed} = $frame . $got if $soon eq 'beside'; return (undef, undef, $started) }
+    beside_begun($started, $sheets, $keep, $tool);    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
+    return run_read($started, $keep, $sheets, $tool);
+}
+
+# The application's process for one run, started and left waiting on its input for its seal, which
+# its keeper hands over only after the system said it is contained (sub contained). Its variables
+# are those of the run, the address among them: nothing of the answer is in it yet.
+sub page_started {
+    my ($url, $sheets, $tool, $local_home) = @_;
+    pipe(my $answer_out, my $answer_in) && pipe(my $from_page, my $to_lzrprf) or return;
+    my $seal = run_seal() // return;      # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
+    my $page = fork // return;
+    if (!$page) {
+        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
+        chdir '/';
+        the_program($answer_out, $to_lzrprf);    # [C1]
     }
-    if ($outrun) { kill 'KILL', $feeder, $page; waitpid $_, 0 for $feeder, $page; return (undef, 'outrun') }    # a newer width was said: this run is of no use, and the next is not kept waiting behind it
-    if ($ready_at >= 0 && length $wrote <= $PAGE_BYTES) {    # the page is kept running: its first list, and what it wrote after "=ready" is the beginning of its next answer
-        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], until => now() + $LIVE_SECONDS, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
-    }
-    if ($tool && $tool eq 'judge' && !$open && length $wrote <= $PAGE_BYTES) {    # [C28] complete output is not enough: the judge must exit successfully within the same clock
-        my $exit;
-        while (now() < $until && alive()) {
-            my $done = waitpid $page, POSIX::WNOHANG();
-            if ($done == $page) { $exit = $?; last }
-            last if $done == -1;
-            Time::HiRes::sleep(0.001);
-        }
-        kill 'KILL', $feeder; waitpid $feeder, 0;
-        if (!defined $exit) { kill 'KILL', $page; waitpid $page, 0; return (undef, 'late') }
-        return $exit == 0 ? ($wrote) : (undef, 'ended');
-    }
-    kill 'KILL', $feeder, $page;
-    waitpid $_, 0 for $feeder, $page;
-    return (undef, 'late') if $open && length $wrote <= $PAGE_BYTES;
-    return (undef, 'large') if length $wrote > $PAGE_BYTES;
-    return ($wrote);
+    close $_ for $answer_out, $to_lzrprf;
+    return { page => $page, in => $answer_in, from => $from_page, seal => $seal, key => "$url\t" . ($TOR_WANTED ? 1 : 0), of => $$ };
+}
+
+# A page run's process started before its run: the 10 to 25 ms the system takes to put a process in
+# its container (and the program's own start) are then spent while the address is judged and
+# fetched, or while the window is quiet, and not on the way to the drawing (measured 2026-11-24). At
+# most one, for one address, a plain page run's (no picture, tool, verdict or local home); made by
+# this process alone and taken by it alone, so a copy of lzrprf never hands it anything. Each is
+# one run's process as sub contained starts it, with the same variables, limits, container and seal
+# of its own, and it is used once: sub contained hands it its answer as it would a process started
+# there (its keeper, the system asked first, then the seal). One that is not used is ended, never
+# kept for another address; one for an older Tor setting is not taken.
+sub spare_for {
+    my ($url) = @_;
+    return if $SPARE && $SPARE->{of} == $$ && $SPARE->{key} eq "$url\t" . ($TOR_WANTED ? 1 : 0) or $BESIDE && $BESIDE->{run};    # or the run it would be for is started already (07-visit-beside.pl)
+    spare_dropped();
+    return unless $$ == $FRESH && program_same();    # a program changed on the disk is not started, as sub contained starts none
+    $SPARE = page_started($url, "=sheets\n");
+}
+
+sub spare_taken {                         # the process started for this run, when it is the one for its address and is still waiting; else nothing, and one for another run is ended
+    my ($url, $sheets, $tool, $local_home) = @_;
+    return unless $SPARE && defined $sheets && !$tool && !$local_home;
+    my $one = $SPARE;
+    return spare_dropped() if $one->{of} != $$ || $one->{key} ne "$url\t" . ($TOR_WANTED ? 1 : 0);
+    undef $SPARE;
+    return $one if waitpid($one->{page}, POSIX::WNOHANG()) == 0;
+    close $_ for @$one{qw(in from)};      # it ended while it waited, having been handed nothing: a new one is started in its place
+    return;
+}
+
+sub spare_dropped {                       # the process started before its run, ended unused; a copy of lzrprf only forgets it
+    my $one = $SPARE or return;
+    undef $SPARE;
+    if ($one->{of} == $$) { kill 'KILL', $one->{page}; waitpid $one->{page}, 0 }
+    close $_ for @$one{qw(in from)};
+    return;
+}
+
+sub spare_work {                          # what the next quiet moment does (sub hear): the process for the next run of the page shown, for a new width, and curl for the next request
+    my ($url, $curl) = ($SPARE_WANTED, $CURL_WANTED);
+    return unless defined $url || $curl;
+    ($SPARE_WANTED, $CURL_WANTED) = ();
+    return sub { spare_for($url) if defined $url; curl_for() if $curl };
+}
+
+sub idle_taken {                          # the work of a quiet moment, once: sub behind's first ($IDLE_WORK), then a spare's
+    my $work = $IDLE_WORK // return spare_work();
+    undef $IDLE_WORK;
+    return $work;
 }
 
 # The seal of one run of the application [C1]: 16 random bytes as 32 hex digits, named to the
@@ -480,6 +557,7 @@ sub checked {
     my ($wrote) = @_;
     no warnings 'utf8';
     undef $LAID_TALLY;                    # said again by sub laid, for a laid list alone
+    @FONTS_NAMED = ();                    # [C30] said again below, by a run that names web fonts
     return unless utf8::decode($wrote) && $wrote =~ s/\n\z//;
     my ($first, @lines) = split /\n/, $wrote, -1;
     return unless defined $first && $first =~ /^=page((?: $NAME){0,200})$/ && @lines <= $PIECES;
@@ -506,6 +584,11 @@ sub checked {
     if (@lines && $lines[0] =~ /^=sheets/) {    # [C14] the style sheets the page names on its own host, by path alone, as its pictures are
         return unless shift(@lines) =~ m{^=sheets((?: /[A-Za-z0-9._~/%?=&-]{0,511}){1,$SHEETS})$};
         @sheets = split ' ', $1;
+    }
+    if (@lines && $lines[0] =~ /^=webfonts/) {    # [C30] the web font files the page's style names on its own host, by path alone, as its sheets are: a run handed its sheets writes it, or a first run of a page that names no sheet, from its own <style>
+        my $path = qr{/[A-Za-z0-9._~/%?=&-]{0,511}};
+        return unless shift(@lines) =~ m{^=webfonts((?: $path(?:\|$path){0,@{[$FONT_TRIES - 1]}}){1,$FONTS})$};    # each font its paths in order, joined by |
+        @FONTS_NAMED = split ' ', $1;
     }
     my ($said, $boxes, $made, $block, $row, $word, $tail, $before, $begun) = ((stated(\@lines) // return), 0, 0, 0, '', 0, '');    # the words of the one =statement line, '' for none; a malformed one makes the page unfit
     for (@lines) {
@@ -610,9 +693,10 @@ sub laid_run {                            # the lines $first to $last of a laid 
         if ($kind eq 'R') { return unless /^R$N,$N,$N,$N,[0-9a-f]{8}$/ && $inside->($1, $2, $3, $4) }
         elsif ($kind eq 'G') { return unless /^G$N,$N,$N,$N$/ && $inside->($1, $2, $3, $4) }
         elsif ($kind eq 'V') { return unless /^V$N,$N,$N,$N,$N$/ && $inside->($1, $2, $3, $4) && $5 < @$videos }
-        elsif ($kind eq 'I') { return unless /^I$N,$N,$N,$N,$N$/ && $inside->($1, $2, $3, $4) && $5 < @$paths }
+        elsif ($kind eq 'I') { return unless /^I$N,$N,$N,$N,$N(?:,([1-4]),$N,$N,$N,$N)?$/ && $inside->($1, $2, $3, $4) && $5 < @$paths && (!defined $6 || 4 == grep { $_ >= 1 && $_ <= 199999 } $7, $8, $9, $10) }    # a fit and a position (sub fit_crop)
         elsif ($kind eq 'M') {
-            return unless /^M$N,$N,$N,$N,$N,$N$/ && $inside->($1, $2, $3, $4) && $5 >= 1 && $5 <= 1024 && $6 >= 1 && $6 <= 1024 && ($pixels += $5 * $6) <= $PIXELS;
+            return unless /^M$N,$N,$N,$N,$N,$N(?:,$N,$N,$N,$N)?$/ && $inside->($1, $2, $3, $4) && $5 >= 1 && $5 <= 1024 && $6 >= 1 && $6 <= 1024 && ($pixels += $5 * $6) <= $PIXELS;
+            return if defined $7 && ($9 < 1 || $10 < 1 || $7 + $9 > 100 * $5 || $8 + $10 > 100 * $6);    # the part of the picture a fit draws lies in it
             ($rows, $row_bytes, $row_chars) = ($6, $5 * 4, 0);
         } elsif ($kind eq 'K') { return unless /^K$N,$N,$N,$N,$N$/ && $1 < $LAID{K} && !exists $tile{$1} && ($tile{$1} = $cut->($2, $3)) eq "$4,$5"; ($rows, $row_chars, $above) = ($5, 1 + 4 * $4, 0) }    # a tile is not counted in $PIXELS: 32 at most is its bound
         elsif ($kind eq 'J') { return unless /^J$N,$N,$N$/ && defined $tile{$1} && $tile{$1} eq $cut->($2, $3) }

@@ -46,6 +46,7 @@ my $IDENTITY_HOSTS = 64;                  # DECLARED: the most hosts the applica
 sub identity_on { !$TOR_WANTED && !$TOR }    # [C17] never through Tor
 sub identity_word { exists $IDENTITIES{$_[0]} }    # a word lzrprf holds a header set for
 sub identity_asked {                      # once a window, while it is idle or else before its first visit, and never through Tor: a tool run of the application, in the page container, is asked "=identity"; lines of no form are passed over
+    undef $IDLE_WORK if defined $IDLE_WORK && $IDLE_WORK == \&identity_asked;    # asked now, before a first visit: a quiet moment later has the next work to do (sub idle_taken)
     return if !identity_on() || $IDENTITY_ASKED++;
     my ($wrote) = contained('identity', "=identity\n", undef, 0, 1);    # [C1] [C3] as a tool run: no network, no file
     for my $line (split /\n/, $wrote // '') {
@@ -70,7 +71,7 @@ sub identity_site {                       # Sec-Fetch-Site of a request to $to f
     }
     return 'cross-site';    # no last-two-label guess: unrelated co.uk sites are not the same site
 }
-my %IDENTITY_FOR = (document => ['document', 'navigate'], frame => ['iframe', 'navigate'], data => ['empty', 'cors'], script => ['script', 'no-cors'], module => ['script', 'cors'], worker => ['worker', 'same-origin'], style => ['style', 'no-cors'], image => ['image', 'no-cors']);    # what is asked for => Sec-Fetch-Dest and Sec-Fetch-Mode, as Safari sends them
+my %IDENTITY_FOR = (document => ['document', 'navigate'], frame => ['iframe', 'navigate'], data => ['empty', 'cors'], script => ['script', 'no-cors'], module => ['script', 'cors'], worker => ['worker', 'same-origin'], style => ['style', 'no-cors'], font => ['font', 'cors'], image => ['image', 'no-cors']);    # what is asked for => Sec-Fetch-Dest and Sec-Fetch-Mode, as Safari sends them
 sub identity_headers {                    # curl's -H switches for a request sent as identity $word: Safari's headers in Safari's order
     my ($word, $url, $for, $from) = @_;   # $for: a key of %IDENTITY_FOR; $from: the host of the page asking, or nothing for a page you visit
     my ($to) = $url =~ m{^https?://([^/:]+)};
@@ -99,7 +100,7 @@ sub identity_headers {                    # curl's -H switches for a request sen
 # place of GET, or POST with the page's body (handed to curl on its input) and
 # its type of three; and for another host than the page's, the page's Origin.
 sub fetch {
-    my ($url, $where, $ask, $page, $most, $stop, $for, $fixed) = @_;    # $page: the request of a page you visit, which carries the line Accept (sub request); $most: [bytes, seconds] in place of $FETCH_BYTES and $FETCH_SECONDS, and $stop: true when you stopped it, for a video (sub videoed); $for: [style or image, the page's host] for what lzrprf fetches for a page
+    my ($url, $where, $ask, $page, $most, $stop, $for, $fixed) = @_;    # $page: the request of a page you visit, which carries the line Accept (sub request); $most: [bytes, seconds] in place of $FETCH_BYTES and $FETCH_SECONDS, and $stop: true when you stopped it, for a video (sub videoed); $for: [style, font or image, the page's host] for what lzrprf fetches for a page
     my $as = $ask ? (defined $ask->{as} && identity_on() ? $ask->{as} : undef) : identity_of_host($for || $page ? (address($url))[1] : undef);    # [C7] the one exception, D19: a page's request as its =fetch line said; lzrprf's own for a page as the application named the page's host (sub identity_asked); never through Tor
     my @sent = defined $as && exists $IDENTITIES{$as} ? identity_headers($as, $url, $ask ? $ask->{dest} || 'data' : $for ? $for->[0] : 'document', $ask ? $ask->{from} : $for ? $for->[1] : undef)
         : ('-H', "User-Agent: $BROWSER", '-H', $page ? "Accept: $PAGE_ACCEPT" : 'Accept:', '-H', 'Accept-Encoding: identity', '-H', 'Connection: close');
@@ -111,7 +112,10 @@ sub fetch {
     my $none = 'the request could not be made';
     my $up = $ask && $ask->{method} eq 'POST' ? $ask->{body} : $ask && defined $ask->{key} ? "Authorization: Bearer $ask->{key}\n" : undef;    # [C19] the body a page's POST carries, all that is carried besides the request; or the key that reads the answer to a support request, as a line curl adds to its request, so that no list of processes shows it (sub support_read)
     my @asked = !$ask ? () : ($ask->{method} eq 'HEAD' ? ('--head') : (), defined $ask->{key} ? ('-H', '@-') : (), $ask->{method} eq 'POST' ? ('--data-binary', '@-', '-H', 'Content-Type:' . ($ask->{type} eq '-' ? '' : " $ask->{type}"), '-H', 'Expect:') : (), defined $ask->{origin} ? ('-H', "Origin: $ask->{origin}") : ());    # [C19]
-    my $cookie = $page ? sso_cookie($url) : $ask ? $ask->{cookie} : undef;    # [C7] the one exception: the cookies of a provider you connected in this profile, to that provider's own hosts only (sub sso_cookie), carried on curl's input and never on its command line
+    my $cookie = $page ? sso_cookie($url) : $ask ? $ask->{cookie} : undef;    # [C7] the cookies of a provider you connected in this profile, to that provider's own hosts only (sub sso_cookie), carried on curl's input and never on its command line
+    my $jarred = ($page || $ask && defined $ask->{top}) && !defined $cookie && !jar_skips($url);    # [C7] or else the jar's, for a page you visit or a page kept running outside the sandbox (sub jar_cookie)
+    my $ahead = $ask && exists $ask->{jar};    # a request made ahead: the window asked the jar before this run began, and tells it of the answer when the page takes it (sub prefetch_pump)
+    $cookie = $ahead ? (length $ask->{jar} ? $ask->{jar} : undef) : jar_cookie($url, $page, $ask) if $jarred;
     if (defined $cookie && !defined $up) { $up = "$cookie\n"; push @asked, '-H', '@-' }
     elsif (defined $cookie && $ask && $ask->{method} eq 'POST' && $up !~ /\x00/) {    # a POST's body and its cookies, both on curl's input as its settings: a quoted text, with \\ \" \t \n \r \v written as curl reads them
         my $quoted = sub { my ($text) = @_; $text =~ s/([\\"])/\\$1/g; $text =~ s/\t/\\t/g; $text =~ s/\n/\\n/g; $text =~ s/\r/\\r/g; $text =~ s/\x0b/\\v/g; return qq("$text") };
@@ -119,22 +123,25 @@ sub fetch {
         my ($at) = grep { $asked[$_] eq '--data-binary' } 0 .. $#asked;
         @asked[$at, $at + 1] = ('-K', '-');    # in place of --data-binary @-: -K - reads both
     }
+    my $set = !defined $up && !@asked && !grep({ /[\x00-\x1f\x7f]/ } $url, @sent) && !grep({ $sent[$_] ne '-H' } grep { !($_ % 2) } 0 .. $#sent) ? curl_taken() : undef;    # curl started before this request, for one that is the address and its headers alone (sub curl_for)
+    $way = $set->{way} if $set;
     unlink $way;
-    my $listen = IO::Socket::UNIX->new(Local => $way, Listen => 1) or return (undef, $none);
-    pipe(my $from_curl, my $out) or return (undef, $none);
-    my ($body_in, $to_curl);
-    if (defined $up) { pipe($body_in, $to_curl) or return (undef, $none) }
-    my $curl = fork // return (undef, $none);
-    if (!$curl) {
-        %ENV = ();                        # curl takes no setting from the environment
-        my @curl = ($CURL, '-q', '-g', '-s', '-i', '--raw', '--path-as-is', '--proto', '=https', '--tlsv1.2', '--http1.1', '--noproxy', '*', '--no-sessionid', '--ciphers', $TLS_CIPHERS, '--curves', $TLS_CURVES,
-            '--cacert', $roots, '--max-time', $seconds, '--max-filesize', $bytes, '--write-out', "$WROTE%{certs}",
-            @sent, @asked,
-            '--unix-socket', $way, '--', $url);
-        if ($PEER ne '-' && open my $instead, '<', "$ROOT/fetcher") { chomp(@curl = <$instead>) }    # "lzrprf try" only: the test's own program in curl's place, to probe this container too
-        become($body_in, $out, undef, $FETCH_LIMITS, contain($FETCH, shift @curl, '-D', "WAY=$way", '-D', "ROOTS=$roots"), @curl);    # the memory limit first, then the container
+    my $listen; socket($listen, AF_UNIX, SOCK_STREAM, 0) && bind($listen, pack_sockaddr_un($way)) && listen($listen, 1) or do { curl_ended($set); return (undef, $none) };
+    my ($curl, $from_curl, $body_in, $to_curl);
+    timed("fetch-begin $$ $url") if $TIMED;    # "lzrprf try" with "times": each request by the process that makes it, so requests side by side are told apart (scripts/load-timeline.pl)
+    if ($set) {                           # what it would be told on its command line, written as its settings on its input and closed: only then does it go to the socket
+        my $quoted = sub { my ($text) = @_; $text =~ s/([\\"])/\\$1/g; return qq("$text") };    # no character below a space is in either, so these two are all a quoted text holds
+        my $told = "max-time = $seconds\nmax-filesize = $bytes\n" . join('', map { 'header = ' . $quoted->($sent[$_]) . "\n" } grep { $_ % 2 } 0 .. $#sent) . 'url = ' . $quoted->($url) . "\n";
+        ($curl, $from_curl) = @$set{qw(curl from)};
+        my $put = 0;
+        while ($put < length $told) { my $n = syswrite($set->{to}, $told, length($told) - $put, $put) or last; $put += $n }
+        close $set->{to};
+        if ($put < length $told) { curl_ended({ %$set, to => undef }); return (undef, $none) }
     }
-    close $out;
+    else {
+        if (defined $up) { pipe($body_in, $to_curl) or return (undef, $none) }
+        ($curl, $from_curl) = curl_started($body_in, $way, '--max-time', $seconds, '--max-filesize', $bytes, '--write-out', ($TIMED ? $TIMING_OUT : '') . "$WROTE%{certs}", @sent, @asked, '--unix-socket', $way, '--', $url) or return (undef, $none);
+    }
     if (defined $up) {                    # [C19] the body goes to curl as it reads it, never waited for in a write
         close $body_in;
         fcntl($to_curl, POSIX::F_SETFL(), O_NONBLOCK);
@@ -154,14 +161,15 @@ sub fetch {
         }
         select($read, $write, undef, 1) > 0 or next;
         if (!@links && vec($read, fileno $listen, 1)) {
-            my $in = $listen->accept or last;
+            accept(my $in, $listen) or last;
             timed('curl-came');
             if (!inside($curl)) { $loose = 1; last }    # [C3] the system did not say that curl is contained: no connection is made for it
             timed('curl-inside');
             (my $site, $peer) = reach($where, $until);
             if (!$site) { $unreached = 1; last }
             timed('connected');
-            $in->blocking(0);
+            timed("fetch-connected $$ $peer") if $TIMED;
+            unblocked($in);
             @links = ([$in, $site, '', 1, 0, $SENT_BYTES + length($up // '')], [$site, $in, '', 1, 0, $wire]);    # [C19] a page's POST may carry its body more
             next;
         }
@@ -187,7 +195,7 @@ sub fetch {
             substr($up, 0, $sent, '') if $sent;
             if (!length $up || !defined $sent && !$!{EAGAIN}) { close $to_curl; undef $to_curl }
         }
-        if (vec($read, fileno $from_curl, 1)) { sysread($from_curl, $got, 65536, length $got) or ($done = 1, last) }
+        if (vec($read, fileno $from_curl, 1)) { timed("fetch-first-byte $$") if $TIMED && !length $got; sysread($from_curl, $got, 65536, length $got) or ($done = 1, last) }    # "lzrprf try" with "times": curl hands on the answer's head the moment it came
     }
     close $to_curl if $to_curl;
     my $late = now() >= $until;
@@ -195,6 +203,7 @@ sub fetch {
     my $at = rindex $got, $WROTE;            # curl writes the certificates after the whole answer, so the last such line is curl's own, whatever the answer holds
     my $certs = $at >= 0 ? substr($got, $at + length $WROTE) : '';
     substr($got, $at) = '' if $at >= 0;
+    if ($TIMED) { my $clocks = $got =~ s/\n\Q$TIMING_MARK\E ([0-9.]+ [0-9.]+ [0-9.]+ [0-9]+ [0-9]+)\z// ? $1 : '-'; timed("fetch-end $$ " . length($got) . " $clocks") }    # "lzrprf try" with "times": the answer's length, and curl's own clocks (TLS done, first byte, all, status, how many connections it opened), taken off the answer again
     unlink $way;
     my $how = ended($curl, $done ? 2 : 0);    # curl is gone, whatever it was doing, before anything is said about the answer
     my $exit = $how >> 8;
@@ -204,10 +213,69 @@ sub fetch {
     return (undef, $none) if @links && $links[0][4] > $links[0][5];
     return (undef, 'could not connect') if $unreached;
     return (undef, 'the site did not answer in time') if $late || $exit == 28;
+    jar_heard($url, $page, $ask, $got) if $jarred && !$ahead && $done && $how == 0 && length $got && defined $peer;    # [C7] the Set-Cookie lines of an answer that will be taken, to the jar (sub jar_heard)
     return ($got, undef, $peer, $certs) if $done && $how == 0 && length $got && defined $peer;    # an answer is taken only when curl's output was read to its end
     return (undef, 'the certificate does not prove the host') if grep { $exit == $_ } 51, 53, 54, 58, 59, 60, 66, 77, 80, 82, 83, 90, 91;
     return (undef, 'no secure connection could be made') if $exit == 35;
     return (undef, $none);
+}
+
+# curl's process for one request: the fixed switches, then what this request adds. It is started
+# in its container with its limits and no variable, as sub fetch has always started it.
+sub curl_started {
+    my ($in, $way, @told) = @_;
+    my $roots = $PEER ne '-' ? "$ROOT/authority.pem" : $ROOTS;
+    pipe(my $from_curl, my $out) or return;
+    my $curl = fork // return;
+    if (!$curl) {
+        %ENV = ();                        # curl takes no setting from the environment
+        my @curl = ($CURL, '-q', '-g', '-s', '-i', '--raw', '--path-as-is', '--proto', '=https', '--tlsv1.2', '--http1.1', '--noproxy', '*', '--no-sessionid', '--ciphers', $TLS_CIPHERS, '--curves', $TLS_CURVES,
+            '--cacert', $roots, @told);
+        if ($PEER ne '-' && open my $instead, '<', "$ROOT/fetcher") { chomp(@curl = <$instead>) }    # "lzrprf try" only: the test's own program in curl's place, to probe this container too
+        become($in, $out, undef, $FETCH_LIMITS, contain($FETCH, shift @curl, '-D', "WAY=$way", '-D', "ROOTS=$roots"), @curl);    # the memory limit first, then the container
+    }
+    close $out;
+    return ($curl, $from_curl);
+}
+
+# curl started before its request: the 10 to 15 ms it takes to start in its container are spent
+# while the address is judged and looked up, or while the window is quiet, and not on the way to
+# the page (measured 2026-11-24). It is the same curl with the same fixed switches and container,
+# and the address, its headers and the two limits of the request are written as its settings on
+# its input ("-K -") and not on its command line; it reads nothing else, knows no address until
+# then, and goes to its socket file only after its input is closed. Of the requests it takes only
+# one that is the address and its headers alone: one with a body, a key or cookies on curl's
+# input starts its own. At most one waits, made by this process and taken by it alone (a picture's
+# copy of lzrprf closes its ends); its socket file is its own and is removed with it. Whether the
+# system says it is contained is asked when it comes to its socket, as for every curl [C3].
+sub curl_for {                            # one curl started to wait for the next request, unless one waits; ($own): in a copy of lzrprf made to fetch one address (sub fetchers_for)
+    return if $CURL_SPARE && $CURL_SPARE->{of} == $$;
+    curl_ended($CURL_SPARE);
+    undef $CURL_SPARE;
+    return unless ($_[0] || $$ == $FRESH) && !($PEER ne '-' && -e "$ROOT/fetcher");    # the test's own program in curl's place is started as it always was
+    my $way = "$DIR/way.$$";             # the same name as every other request's: a socket name must stay under 104 bytes, and one profile's folder in a deep temporary folder already comes close
+    pipe(my $in, my $to) or return;
+    my ($curl, $from) = curl_started($in, $way, '--write-out', "$WROTE%{certs}", '--unix-socket', $way, '-K', '-') or return;
+    close $in;
+    $CURL_SPARE = { curl => $curl, to => $to, from => $from, way => $way, of => $$ };
+    return;
+}
+
+sub curl_taken {                          # the curl that waits, still waiting; else nothing
+    my $one = $CURL_SPARE // return;
+    undef $CURL_SPARE;
+    return curl_ended($one) if $one->{of} != $$ || -e "$ROOT/fetcher" && $PEER ne '-';
+    return $one if waitpid($one->{curl}, POSIX::WNOHANG()) == 0;
+    close $_ for @$one{qw(to from)};      # it ended while it waited, told nothing: a curl is started for the request as before
+    return;
+}
+
+sub curl_ended {                          # a curl started before its request, ended and its ends closed; a copy of lzrprf only closes its own copies of them
+    my ($one) = @_;
+    $one or return;
+    if ($one->{of} == $$) { kill 'KILL', $one->{curl}; waitpid $one->{curl}, 0; unlink $one->{way} }
+    close $_ for grep { defined } @$one{qw(to from)};
+    return;
 }
 
 sub alive { !$RUN || getppid() == $RUN }  # the window is still there; without it nothing is carried on

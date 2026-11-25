@@ -1,24 +1,23 @@
 use strict;
 use warnings;
 use Cwd 'abs_path';
-use Digest::MD5 ();
 use Digest::SHA;
 use Fcntl qw(:flock O_RDONLY O_RDWR O_WRONLY O_APPEND O_CREAT O_EXCL O_NOFOLLOW O_NONBLOCK);
 use File::Basename qw(basename dirname);
 use File::Glob 'bsd_glob';
-use File::Path 'remove_tree';
-use IO::Handle;
-use IO::Socket::INET;
-use IO::Socket::UNIX;
 use MIME::Base64 qw(decode_base64 encode_base64);
 use POSIX 'strftime';
-use Socket qw(AF_INET AF_INET6 SOCK_STREAM SOL_SOCKET SO_ERROR NI_NUMERICHOST NI_NUMERICSERV AI_NUMERICHOST inet_aton inet_pton pack_sockaddr_in getaddrinfo getnameinfo);
+use Socket qw(AF_INET AF_INET6 AF_UNIX SOCK_STREAM SOL_SOCKET SO_ERROR NI_NUMERICHOST NI_NUMERICSERV AI_NUMERICHOST inet_aton inet_pton pack_sockaddr_in unpack_sockaddr_in pack_sockaddr_un getaddrinfo getnameinfo);
 use Time::HiRes;
-use Time::Local ();
+use Scalar::Util 'weaken';
 
 $^X eq '/usr/bin/perl' or exec '/usr/bin/perl', $0, @ARGV or die "lzrprf: the system's own perl is missing\n";
 umask 0077;                               # what lzrprf writes is readable by you alone
 { my $number; do { $number = POSIX::open('/dev/null', O_RDWR) } while defined $number && $number < 3; POSIX::close($number) if defined $number }    # descriptors 0, 1 and 2 exist from here on
+# Loaded where first needed, not at every start: File::Path (sub remove_tree), Time::Local, Digest::MD5 and IO::Handle (required where called); the two listening sockets are made by socket, bind and listen, the calls IO::Socket made, and a handle is made not to block by fcntl (sub unblocked) and to write at once by $| (11 to 20 ms of the 22 ms of modules, measured 2026-11-24).
+sub remove_tree { require File::Path; return File::Path::remove_tree(@_) }    # File::Path's own, unchanged
+sub unblocked { my $flags = fcntl($_[0], POSIX::F_GETFL(), 0) // return; return fcntl($_[0], POSIX::F_SETFL(), $flags | O_NONBLOCK) }    # what IO::Handle's blocking(0) does: the flags the handle has, and O_NONBLOCK
+my %SHOWN = map { ($ENV{$_} // '') =~ /\A[0-9A-Za-z]{1,8}\z/ ? ($_ => $ENV{$_}) : () } qw(NO_COLOR COLUMNS LINES);    # [C20] how lzr is asked to draw, read before the variables are dropped and told to no program
 %ENV = (PATH => '/usr/bin:/bin:/usr/sbin:/sbin', map { defined $ENV{$_} ? ($_ => $ENV{$_}) : () } qw(LANG TMPDIR __CF_USER_TEXT_ENCODING LZRPRF_SELFTEST_HOME));    # nothing lzrprf starts is found through, or told, a variable of whoever started lzrprf (LZRPRF_SELFTEST_HOME: only a runner slot's home counts, below)
 
 my $SELF = abs_path($0);
@@ -105,7 +104,7 @@ my $ALL_TEXT = 1_000_000;                 # the most characters in all its runs 
 my $PIXELS = 262_144;                     # the most pixels in all its pictures together: one picture of 512 by 512
 my $PICTURES = 24;                        # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURES, the same number): the most pictures one page may name, each fetched by a run of its own
 my $PICTURE_SITES = 8;                    # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURE_SITES, the same number): the most other sites, neither the page's host nor a name under it (sub under), that are asked for one page's pictures; a picture on one more is not fetched, and the log says why
-my $PICTURES_AT_ONCE = 4;                 # DECLARED: the most pictures of one page fetched and decoded side by side, the owner's order of 2026-11-21: 24 one after the other took over 4 seconds
+my $PICTURES_AT_ONCE = 8;                 # DECLARED: the most pictures of one page fetched and decoded side by side, the owner's order of 2026-11-21: 24 one after the other took over 4 seconds; 8 since 2026-11-24, when hs.fi's 24 AVIF pictures took 2.4 s at 4 (scripts/load-timeline.pl)
 my $PICTURE_SECONDS = 20;                 # one clock for all of a page's pictures: a picture not begun by then stays a grey box
 my $PICTURE_PIXELS = 200_000;             # the most pixels in one fetched picture
 my $SIPS = '/usr/bin/sips';               # [C21] the system's own; it decodes for lzrprf what the application cannot (AVIF, HEIC, HEIF), lzrprf holds no code for it
@@ -127,7 +126,20 @@ my $DECODED_BYTES = 16 * 1024 * 1024;     # DECLARED([C21] the most of a PNG the
 my $SHEETS = 8;                           # the most style sheets one page may name on its own host, fetched before it is laid out a second time
 my $SHEET_BYTES = 1024 * 1024;            # the most of one style sheet's answer that is handed over: a larger one goes with length 0
 my $SHEET_SECONDS = 10;                   # one clock for starting all of a page's style sheets: a sheet not begun by then goes with length 0
+my $FONTS = 8;                            # DECLARED([C30] the most web font files one page may name on its own origin: the application names no more, page::MOST_WEB_FONTS)
+my $FONT_TRIES = 4;                       # DECLARED([C30] the most paths of one web font, tried in order until one answers 200, as a src entry that fails falls through to the next: the application names no more, page::MOST_ALTERNATES)
+my $FONT_BYTES = 2 * 1024 * 1024 + 64 * 1024;    # DECLARED([C30] the most of one font's answer: the application's cap of a font file, woff::MOST_FILE, and room for its headers; a larger one goes with length 0)
+my $FONTS_TOTAL = 8 * 1024 * 1024;        # DECLARED([C30] the most of all of a page's font answers together: a font that would pass it goes with length 0; Liberation's four faces are 1.6 MB as TrueType)
+my $FONT_SECONDS = 10;                    # DECLARED([C30] one clock for starting all of a page's fonts, and the most one font's request may take)
+my @FONTS_NAMED;                          # [C30] the web font files the run read last named on its =webfonts line, by path on the page's own host: sub checked sets it for every run
 my @PICTURED;                             # the other hosts the pictures of the page last laid out were asked of, in its order: what the bar says
+my $PICTURES_AHEAD;                       # the pictures of the page being read begun ahead of its own list (sub pictures_ahead), until sub pictured takes them over
+my $PICTURES_BEFORE;                      # the pictures decoded for the page this tab showed, kept while the same site is asked again in it and placed in the first list where grey boxes stood (sub pictures_before, sub pictures_so_far); dropped once the visit's own pictures are here, when the tab goes to another host and when it is closed
+my $PICTURES_BEFORE_BYTES = 64 * 1024 * 1024;    # the most bytes of decoded rows kept so: a picture beyond them is a grey box until it is fetched again
+my %NAMED;                                # the decoded pictures this lzrprf named in a list, by name: [name, the picture (held weakly: a picture no page keeps is gone here too), whether its rows were sent to the window]. A list places a picture by its name (a line N), and its rows go to the window once (sub picture_named, sub named_owed)
+my %NAMED_AT;                             # the same, by where the picture stands in memory
+my ($NAMED_RUN, $NAMED_OWNER, $NAMED_COUNT) = ('', 0, 0);    # the eight random characters every name of this process begins with, the process they were made in, and how many it named: a copy made by fork, or lzrprf started again behind a window that lives on, never names a bitmap another one sent
+my $AHEAD_PAGE;                           # the answer being read now, with its host, its addresses and how its lines are kept: what a picture begun ahead is checked against (sub prefetch_begin)
 my $DRAWN_PIXELS = 8 * $PICTURE_PIXELS;   # the most pixels the window is given for fetched pictures on one page, however often one is placed: a place beyond that stays a grey box
 my @FACES = map { "/System/Library/Fonts/Supplemental/$_.ttf" } 'Arial', 'Arial Bold', 'Arial Italic', 'Arial Bold Italic', 'Courier New', 'Courier New Bold', 'Courier New Italic', 'Courier New Bold Italic';    # the fonts a page is drawn with, in the application's order: plain, bold, italic, both, then the same in fixed width
 my $FACE_BYTES = 2 * 1024 * 1024;         # the most of one font that is handed over: the largest of the eight is 773,236 bytes on this macOS
@@ -143,6 +155,8 @@ my %LISTED;                               # [C23] the list as lzrprf holds it, o
 my ($LIST_HELD, $LIST_WHY, $LIST_COUNT) = (0, undef, 0);    # [C23] whether the list is held; why it is not, once reading it failed; how many digests it holds
 my $REFUSED = 'This address is on a list of child sexual abuse material or other illegal content, so LZRBRWSR does not open it.';    # [C23] the one sentence of a refusal, the same in the window and in the log
 my $REFUSED_HELP = 'If you are worried about your own thoughts or someone else\'s, Stop It Now helps in confidence: https://www.stopitnow.org.uk. To report child sexual abuse material you came across: https://report.iwf.org.uk';    # [C23] said in the window after it, never written in the log
+my $REFUSED_AHMIA = 'This onion address is on Ahmia\'s list of child sexual abuse material sites (https://ahmia.fi/blacklist/). That list can contain mistakes: a site that only names such terms without sharing the material, such as some Tor hidden wikis, can be on it. If you believe this address is listed by mistake, report it to Ahmia (https://ahmia.fi/about/)';    # [C23] said in the window after $REFUSED when the onion part refused it (Ahmia's list), never written in the log; sub refused adds the release file's report address
+my $LIST_HIT;                            # [C23] the part of the list (onion, host, url, query, or whole for an address too long to be read) that refused the address sub listed matched last, for the words of sub refused; emptied there
 my $REFUSED_WHY = 'that address is on a list of child sexual abuse material or other illegal content';    # [C23] why, where a lower check refuses: it names no address
 my $KEPT_DAYS = 30;                       # how long a kept log keeps a line, when you chose a kept log and no number of days
 my $KEPT_MOST = 3650;                     # a setting of more days than this is no setting: nothing is kept
@@ -164,6 +178,8 @@ my $PROGRAM_SEEN;                         # the file the program was when its SH
 my ($FROM, @EVENTS);                      # what the window says; or, without a window, what a test has typed
 my $FROM_HELD = '';                       # what the window said that is not a whole line yet (sub hear)
 my $IDLE_WORK;                            # a sub run once, the first moment the window and every page are quiet (sub hear), set by sub behind: the identity question, asked before the first address is typed
+my ($SPARE, $SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)
+my ($CURL_SPARE, $CURL_WANTED) = (undef, 1);    # curl started before its request (sub curl_for); whether the next quiet moment starts one
 my @LIVE;                                 # the pages kept running with their tabs, the oldest first (sub live_kept)
 my $LAID_TALLY;                           # what the last laid list checked holds: its counts, text, pixels and tiles (sub laid), kept by a page kept running for a splice of it (sub live_patched)
 my $TRMNL_OPEN = 0;                       # [C29] the local home's terminal icon was pressed: a terminal is opened once the answer that said so is taken (sub trmnl_opened)
@@ -172,7 +188,8 @@ my @LIVE_TOLD = ('off', 0);               # what the window was last told of the
 my $LIVE_STOP_SECONDS = 0.25;             # DECLARED(a quarter of a second, many frames of the screen: the window says where it stopped on the frame after it read lzrprf's scroll): how long after the window said a page's own scroll back its next place may say where its view stopped short of it (sub live_input)
 my $LIVE_FRAME_SECONDS = 1 / 60;          # DECLARED(one frame of a screen that draws 60 times a second; the window shows no more places than that): the least time between two places of a page's own scroll that lzrprf tells the window; one sooner waits, and only the newest (sub live_scroll_told)
 my $LIVE_UNKNOWN_NAMES = 16;              # DECLARED(far more than one later application adds at once): the most names of answer lines it does not know that lzrprf writes in the log for one page kept running (sub live_unknown)
-my %LIVE_KNOWN = map { $_ => 1 } qw(focus go statement scroll layers sound samples play hush again patch ready fetch fetched end page live permit permitted permits);    # the names of the lines of an answer and of the frame around it: one of these out of its form or its place ends the page
+my %LIVE_KNOWN = map { $_ => 1 } qw(focus go statement scroll layers sound samples play hush again patch ready fetch fetched end page live permit permitted permits keep jar);    # the names of the lines of an answer and of the frame around it: one of these out of its form or its place ends the page
+my %CURSORS = map { $_ => 1 } qw(default pointer text vertical-text crosshair move grab grabbing not-allowed no-drop copy alias context-menu col-resize row-resize ew-resize ns-resize e-resize w-resize n-resize s-resize);    # the pointer's shapes a page kept running may ask for ("=cursor"), those the window has a cursor for: the application's own list of them
 my %PERMIT_CAPS = (                       # [C26] the capabilities a script may ask, by name, and who may grant each: "low", the sandbox (E1), a curated rule (E2) or you (E3); "person", only you, by your own rule; "c5", nobody by any script permission: it has its own question each time (C5). A name not here is granted by your rule alone
     dom => 'low', layout => 'low', timers => 'low', 'storage-own' => 'low', 'fetch-same' => 'low',
     clipboard => 'person', camera => 'person', microphone => 'person', location => 'person', files => 'person',
@@ -205,7 +222,7 @@ my $FILTER_SEEN_MOST = 48;                # DECLARED(the filter design of 2026-1
 my @FILTER_SEEN;                          # [C27] the requests the filter lists blocked in this window, newest first: [page host, address, type, rule, list], in memory only and never written
 my $FILTER_ALLOWS = 400;                  # DECLARED(the filter design of 2026-11-22: the most hosts you may let through on sites; a file of more is not read)
 my $HELD_FILTER_LAYERS;                   # [C27] in an incognito window, and for "lzrprf filters": the filter switches, in memory only
-my %FILTER_DEST = (data => 'xmlhttprequest', script => 'script', module => 'script', worker => 'script', frame => 'subdocument');    # [C27] the type a filter rule names for each destination of a page's request (sub live_fetched)
+my %FILTER_DEST = (data => 'xmlhttprequest', script => 'script', module => 'script', worker => 'script', frame => 'subdocument', image => 'image');    # [C27] the type a filter rule names for each destination of a page's request (sub live_fetched)
 my %PERMIT_PATHS;                         # [C26] the path each script came from, by "SITE ORIGIN SHA256", as lzrprf fetched it for the page: what a curated rule by path pattern is matched against
 my ($HELD_LAYERS);                        # [C26] in an incognito window, the sandbox switch and the curated rules switched off, as chosen in it: in its memory only
 my $PERMIT_KIND = qr/inline|external|module|handler|eval|function|timer|worker|import|frame/;    # [C26] what a page's engine asks to run
@@ -214,10 +231,13 @@ my $PERMIT_CAPS = qr/-|[a-z][a-z0-9-]{0,31}(?:,[a-z][a-z0-9-]{0,31}){0,31}/;    
 my $PERMIT_FILE_BYTES = 256 * 1024;       # DECLARED(script-permissions contract 2026-11-22: the largest scripts file read, room for well over a thousand rules)
 my $PERMIT_RULES = 1000;                  # DECLARED(script-permissions contract 2026-11-22: a file of more rules is not read, and none is written)
 my $PERMIT_QUEUE = 32;                    # DECLARED(script-permissions contract 2026-11-22: the most scripts of one visit put to you in one question)
-my $PERMIT_ROUNDS = 3;                    # DECLARED(script-permissions contract 2026-11-22: the most reloads in a row that your Allow starts for one address; after that you reload)
+my $PERMIT_ROUNDS = 1;                    # DECLARED(Henry 2026-11-24, yle.fi: one reload after your answers, never one per question; a later Allow holds for the page as it runs): the most reloads in a row that your Allow starts for one address
 my $LIVE_PERMIT_MOST = 2000;              # DECLARED(script-permissions contract 2026-11-22: the most =permit questions one page asks in its life; a page that asks more is ended)
+my $BEHIND_FAULTS = 100;                 # DECLARED(Henry 2026-11-24: a page must never take the browser down; past this many errors of its own in one window, lzrprf behind it ends after all, as one that comes back at every line would never let the window go on)
 my @PERMIT_HELD;                          # [C26] rules in this window's memory only: every rule of an incognito window, and a rule lzrprf could not write because the file is not read
 my %PERMIT_DENIED;                        # [C26] what you denied with Deny Once, by site: "CLASS ORIGIN SHA256" of a script, and '' for the site's scripts as a whole; for the visit shown only (sub permit_visited lets it go) and never written
+my $PERMIT_STRIPPED;                     # [C26] the last answer whose scripts were taken out, and what that gave: [answer, without them, how many parts, the parts] (sub permit_page)
+my $PERMIT_UNREAD;                       # [C26] the allowed page whose parts are not read for their names yet: [address, site, answer, read] (sub permit_unread)
 my %PERMIT_INFO;                          # [C26] what lzrprf saw of each script it fetched or found in a page, by "SITE ORIGIN SHA256": {name => host and path (or "inline script ... in" the page), where => inline or external, bytes, source => its first $PERMIT_SOURCE_MOST bytes}; in memory only, at most $PERMIT_RULES
 my $PERMIT_SOURCE_MOST = 8192;            # DECLARED(enough to read what a script does at its start; a large bundle is cut and said so): the most bytes of one script's source shown when you are asked about it
 my %PERMIT_WEB;                           # [C26] the scripts put to you, by "SITE<tab>CLASS<tab>ORIGIN<tab>SHA256": [site, kind, origin, sha256, caps], for LZRDFNDR's On Websites; in memory only, at most $PERMIT_RULES
@@ -284,9 +304,30 @@ my (@SESSION, $UNMARKED, $MARKED, $UNEXPIRED);    # this window's lines, in the 
 
 sub now { Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) }    # a clock nobody can set: seconds since the computer started
 my $TIMED = 0;                            # "lzrprf try" only, with a file "times" in the test's folder: each step of a start and a visit is said with the time it was reached, for the audit (scripts/audit.mjs) to show where the time goes
+my $PREFETCH_AT_ONCE = 24;                # DECLARED([C19] the most requests of one page fetched ahead side by side: yle.fi names 13 scripts and a sheet on its own host, and with twelve the last waited until the page asked (2026-11-25); each curl waits on its site, not on a processor)
+my $PREFETCH_HELD_BYTES = 32 * 1024 * 1024;    # DECLARED([C19] the most bytes of answers fetched ahead that lzrprf reads before the page asks for them (sub prefetch_select): hs.fi's 45 scripts are 9 MiB; past it an answer waits in its pipe as every one did before, so at most this and one read more of each running request, 24 x 256 KiB, is held)
+my $PREFETCH_MOST = 64;                   # DECLARED([C19] the most scripts of one page fetched ahead; the rest are fetched when the page asks, as before)
+my %FOUND;                                # [C6] each name looked up in this window: when, and the addresses with their ways (sub find), in memory only
+my $FOUND_SECONDS = 30;                   # DECLARED([C6] [C8] how long a lookup stands: a page asks a host for dozens of requests in its first seconds, and a network changed under it is looked at again within half a minute)
+my %FINDING;                             # [C6] the lookups begun ahead of their request and not read yet, by name (sub find_ahead)
+my $FINDING_MOST = 4;                     # DECLARED([C6] the most names looked up ahead at a time: a page names a font host and a picture host, seldom more that it asks at once)
+my $VISIT_KEPT_BYTES = 48 * 1024 * 1024;  # DECLARED([C19] the most bytes of answers one visit keeps for its page's later reads of the same request: yle.fi's scripts are 3 MB)
+my %PREFETCH;                             # [C19] the scripts of the page being read fetched ahead, by address (sub prefetch_begin), and the answers this visit already handed its page (sub prefetch_keep)
+my $PREFETCH_LATER;                      # [C19] the page whose named scripts are judged and begun once its first run is started: its address, where it came from, its host (sub prefetch_later)
+my %AHEAD;                                # [C14] [C30] the style sheets and web fonts begun ahead of the run that names them, by address (sub ahead_begin)
+my @FETCHERS;                             # copies of lzrprf that wait with their curl for a style sheet's address (sub fetchers_for)
+my @PREFETCH_MADE;                        # [C19] the makers of those begun (sub prefetch_made), until each is reaped
+my @PREFETCH_WAITING;                     # [C19] those not begun yet, in the page's order
+my $PREFETCH_NAMED;                       # [C19] the scripts the page being read names, fetched once it asks for its first (sub prefetch_go)
+my $TIMING_MARK = 'lzrprf-clocks';        # with $TIMED alone: the line curl writes after an answer with its own clocks of it (sub fetch), read by scripts/load-timeline.pl
+my $TIMING_OUT = "\n$TIMING_MARK %{time_appconnect} %{time_starttransfer} %{time_total} %{http_code} %{num_connects}";
 sub timed { printf STDERR "test time %s %.1f\n", $_[0], Time::HiRes::time() * 1000 if $TIMED; return }    # the step and the time of day in milliseconds, on the clock the audit reads too
 my $SHIELD_CACHE = 2048;                   # DECLARED([C28] at most this many address verdicts are cached; at the bound the next batch is judged afresh)
 my $SHIELD_DAY = int(time / 86400);        # the UTC day of cached verdicts; list expiry is checked again when it changes
 my %SHIELD_SAID;                          # [C28] LZRDFNDR's verdict on each address this window asked about before fetching it, in memory only: its line, "=allow" or a checked "=flagged" (sub shield_asked)
+my $BESIDE_SECONDS = 0.25;                # DECLARED(the style sheets begun ahead are waited for this long before a page's first run is read; yle.fi's is here within 0.06 s, and a first run that names other sheets, or none, is read this much later at most)
+my %BESIDE_LOGGED;                        # the sheets whose two lines of the log were written when they were taken beside a first run (sub beside_sheets)
+my ($BESIDE, $BESIDE_WANTED, $BESIDE_FIRST, $BESIDE_FONTS, @AHEAD_SHEETS);    # a page's second run started beside its first (07-visit-beside.pl): the run with what it was handed; what its first run begins when it is started; the first run's pipes meanwhile; the addresses of the style sheets the answer names, in its order (sub ahead_sheets)
+my $SHIELD_AHEAD;                         # a judging run begun beside the page's second run (sub shield_ahead), until its verdicts are taken (sub shield_heard)
 my $SHIELD_CHILD = 0;                     # a copy of lzrprf made to fetch one picture: it asks the application nothing, and what the window did not judge before it is not fetched
 my $FLAGGED;                              # [C28] what LZRDFNDR said of the page it blocked last, checked (sub flagged_by): {category, list, confidence, context}, in memory only

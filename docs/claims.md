@@ -31,6 +31,7 @@ the reader to check against the code. Regenerate with `perl tools/doc-index --wr
 | - sub pictured, called from sub visit after ... | `pictured`, `visit`, `relaid`, `under`, `address` | C8 C17 C7 | - |
 | After the lines =pictures and =sheets, or where ... | `stated` | - | - |
 | - sub sheeted, called from sub visit alone, ... | `sheeted`, `visit` | C13 C14 C19 | - |
+| - sub fonted, called from sub visit alone, ... | `fonted`, `visit`, `sheeted`, `checked`, `listed` | C30 | - |
 | - sub fixed, which runs for three fixed ... | `fixed`, `newer`, `fault`, `installed`, `release_signed`, `support_sent`, `support_read` | C25 | - |
 | - sub live_fetched, from release 54 on, for ... | `live_fetched` | C19 | - |
 | Before any of them, the line is in ... | `redirected`, `pictured`, `checked` | C5 C6 C19 | - |
@@ -154,7 +155,7 @@ called from five places, and `selftest` reads `lzrprf` and counts them:
   picture's address, which names the page's picture and so tells it which page you read, and
   when; it is sent no cookie (lzrprf keeps none), no `Referer`, no `Origin`, nothing but the
   fixed request of that address. Each
-  picture placed is fetched once, in the page's order, at most four side by side
+  picture placed is fetched once, in the page's order, at most eight side by side
   (`$PICTURES_AT_ONCE`: twenty-four one after the other took over four seconds). A path goes the way the page went: its
   line `<address> -> lzrprf connects to ...` is in the log first, then `fetch` connects to the
   same addresses the page came from. An address on any other host is checked exactly as a typed
@@ -213,6 +214,31 @@ called from five places, and `selftest` reads `lzrprf` and counts them:
   when a late second run that asked for nothing gets a third. There is never a
   fourth run, and a picture run is given neither frame. The pictures are fetched after the page
   that is shown was chosen.
+- `sub fonted`, called from `sub visit` alone, from release 84 on, after `sub sheeted`. A run
+  handed style sheets may name up to 8 web fonts the sheets' `@font-face` rules name on the
+  page's own host, each by up to 4 paths joined by `|`, in a line `=webfonts /path|/path /path ...`
+  right after the line `=sheets` (or where it would stand), each path in the same grammar and with
+  the same checks as the paths of sheets; `sub checked` reads it. When the second run is shown and
+  names fonts, each font's paths are tried in order until one answers 200, as a src entry that
+  fails to load falls through to the next, and each path is fetched the way a
+  sheet is, after `sub listed` and the filter lists as a font, its line in the log first, from
+  `https://` the page's own host and that path; one clock of 10 seconds for starting them, each
+  cut at 2 MiB and 64 KiB, all at most 8 MiB, and a font not begun in time, refused, failed or
+  over either cap, or not answered 200, is not handed over, its second line in the log saying why,
+  and a font none of whose paths is goes with length 0 `[C30]`. The page is
+  then run a third time with the same `=sheets` frame and, after it, `=webfonts` and the length of
+  each on one line, and the answers as the site sent them. The third run's page is shown when it
+  is a page and names neither sheets nor fonts; otherwise the second run's is, and the line under
+  the bar says that the run with the web fonts is not shown. Nothing of a font is written to the
+  disk: the frame is kept in memory with the page shown, and a new width lays the page out with
+  it again. This third run and the third run of `sub sheeted` never both happen, as one follows a
+  second run that is shown and the other one that is not: there is never a fourth run. A first run
+  of a page that names no sheet may name fonts its own `<style>` names: that
+  run is read without the network, as one that names sheets is, the fonts are fetched the same
+  way, and a second run is handed `=sheets` with no sheet and the fonts; it is shown when it is a
+  page that names neither again. When it is no page and asked for no address, a third run is
+  handed each font with length 0 and read with the network, shown when it is such a page; else the
+  first run's page is shown, and the bar says none of its external or module scripts ran.
 - `sub fixed`, which runs for three fixed addresses of the release file, each only after your
   yes in the window: the newest release number (`sub newer`), a report you chose to send
   (`sub fault`), and the installer after "Install it" (`sub installed`); and, from release 76 on,

@@ -75,7 +75,7 @@ sub list_has {                            # [C23] whether one digest is in one p
     while ($low < $high) {
         my $mid = ($low + $high) >> 1;
         my $order = substr($all, $mid * $wide, $wide) cmp $digest;
-        return 1 unless $order;
+        ($LIST_HIT = $kind), return 1 unless $order;    # which part held it: sub refused words an onion refused by Ahmia's list on its own
         if ($order < 0) { $low = $mid + 1 } else { $high = $mid }
     }
     return 0;
@@ -148,14 +148,18 @@ sub listed {
     return 1 unless list_read();
     return 0 unless $LIST_COUNT && defined $text;
     %LISTED_SAID = () if keys %LISTED_SAID >= 4096;    # held small: a page of many addresses starts the memory afresh
-    return listed_now($text) if length $text > 2100;    # a text longer than any address lzrprf fetches is matched each time and not kept: the memory holds at most 4096 texts of 2100 bytes
-    return $LISTED_SAID{$text} //= listed_now($text);
+    my $was = $LIST_HIT;                  # the part that refused the last listed text: a text not listed leaves it as it was
+    $LIST_HIT = undef;
+    my $said = length $text > 2100 ? listed_now($text) && ($LIST_HIT // 'whole') : ($LISTED_SAID{$text} //= listed_now($text) && ($LIST_HIT // 'whole'));    # a text longer than any address lzrprf fetches is matched each time and not kept: the memory holds at most 4096 texts of 2100 bytes; each holds the part that refused it (onion, host, url, query, or whole for one too long to be read), so a match from the memory words its refusal as the first did
+    $LIST_HIT = $said || $was;
+    return $said ? 1 : 0;
 }
 sub listed_now {                          # [C23] the match itself, for sub listed
     my ($text) = @_;
     my ($host, $path, $query) = url_form($text) or return 0;
     return 1 unless defined $host;        # too long to be read in the form of the list: refused rather than let past
     my @labels = split /\./, $host;
+    require Digest::MD5 if @labels >= 2 && $labels[-1] eq 'onion';    # loaded for the first onion address, not at every start
     return 1 if @labels >= 2 && $labels[-1] eq 'onion' && list_has(onion => Digest::MD5::md5("$labels[-2].onion"));    # an onion address and every name under it
     for my $at (0 .. ($#labels > 1 ? $#labels - 1 : 0)) { return 1 if list_has(host => Digest::SHA::sha256(join '.', @labels[$at .. $#labels])) }    # the host, and every name it stands under but the last label alone
     if (length $query) {
@@ -189,8 +193,12 @@ sub unlisted {
 
 sub refused {                             # [C23] a listed address refused: the sentence, in the log with no address, and the words for the window after it; $what says what it was, in words that name no address
     my ($what, $kept) = @_;
+    my $ahmia = ($LIST_HIT // '') eq 'onion';    # refused by the onion part, Ahmia's list: the window says whose list it is, that it can be wrong and where to report a wrong entry
+    $LIST_HIT = undef;
     record((defined $what ? "$what: " : '') . $REFUSED, $kept) or return;
-    return "$REFUSED $REFUSED_HELP";
+    return "$REFUSED $REFUSED_HELP" unless $ahmia;
+    my $report = (beside())[2];           # the release file's report address, when it names one
+    return "$REFUSED $REFUSED_AHMIA" . (defined $report ? " and to LZRBRWSR ($report)" : '') . ". $REFUSED_HELP";
 }
 
 sub barred {                              # [C23] a visit to a listed address: the tab is left showing no address and no page, nothing of it is kept in the tab or its history, and the window says why
@@ -233,11 +241,55 @@ sub flagged_by {                          # [C28] the run's =flagged line checke
 # "=unfit". A block sends nothing to that site; neither does an answer in no form, a run that did
 # not end well, or an address not judged. The application's lists stay its own: what lzrprf learns
 # is the verdict alone. The fixed addresses of the release file are the maker's and are not asked.
+sub shield_ahead {                        # [C28] the same question, asked beside what lzrprf does next: one run of at most 64 addresses in a copy of lzrprf, its verdicts taken by sub shield_heard before any of them is read. Judging yle.fi's 17 pictures held its waiting script requests 25 ms (measured 2026-11-25)
+    return if $SHIELD_CHILD || $SHIELD_AHEAD;
+    my %once;
+    my @new = grep { defined && !exists $SHIELD_SAID{$_} && !$once{$_}++ } @_;
+    splice @new, 64 if @new > 64;
+    return unless @new;
+    pipe(my $from, my $to) or return;
+    my $pid = fork // return;
+    if (!$pid) {
+        spare_dropped(); curl_ended($CURL_SPARE); undef $CURL_SPARE;
+        close $from;
+        $RUN = getppid();
+        ($PREFETCH_LATER, $PREFETCH_NAMED, @PREFETCH_WAITING) = ();    # a copy begins nothing of the page's: its run started the page's scripts a second time (17 requests more on yle.fi, measured 2026-11-25)
+        my ($wrote) = contained($new[0], join('', map { "$_\n" } @new), undef, 0, 'judge');
+        syswrite $to, $wrote // '';
+        POSIX::_exit(0);
+    }
+    close $to;
+    $SHIELD_AHEAD = { owner => $$, pid => $pid, from => $from, these => \@new, until => now() + $FETCH_SECONDS };    # owner: a later copy of lzrprf neither reads its pipe nor ends it
+    return;
+}
+
+sub shield_heard {                        # [C28] the verdicts of the run begun beside, waited for and taken as sub shield_asked takes its own: all in their form, or none
+    my $ahead = $SHIELD_AHEAD or return;
+    undef $SHIELD_AHEAD;
+    return if $ahead->{owner} != $$;
+    my ($wrote, $these) = ('', $ahead->{these});
+    while (now() < $ahead->{until} && length $wrote <= 4096 * @$these) {
+        my $ready = '';
+        vec($ready, fileno $ahead->{from}, 1) = 1;
+        next unless select($ready, undef, undef, 1) > 0;
+        sysread($ahead->{from}, $wrote, 65536, length $wrote) or last;
+    }
+    close $ahead->{from};
+    kill 'KILL', $ahead->{pid} if now() >= $ahead->{until};
+    waitpid $ahead->{pid}, 0;
+    my @said = split /(?<=\n)/, $wrote;
+    return unless @said == @$these && !grep { $_ ne "=allow\n" && $_ ne "=unfit\n" && !flag_of($_) } @said;
+    return if keys(%SHIELD_SAID) + @$these > $SHIELD_CACHE;    # the bound of the window's verdicts holds here too: they are asked again
+    $SHIELD_SAID{ $these->[$_] } //= $said[$_] for 0 .. $#$these;
+    return;
+}
+
 sub shield_asked {                        # [C28] each address not judged yet in this window, asked of the application in runs of at most 64
     return if $SHIELD_CHILD;              # a picture child keeps exactly the verdicts inherited from its parent
     my $today = int(time / 86400);
     %SHIELD_SAID = () if $today != $SHIELD_DAY || keys(%SHIELD_SAID) + @_ > $SHIELD_CACHE;
     $SHIELD_DAY = $today;
+    shield_heard();
     my %once;
     my @new = grep { defined && !exists $SHIELD_SAID{$_} && !$once{$_}++ } @_;
     splice @new, $SHIELD_CACHE if @new > $SHIELD_CACHE;    # a later fetch asks again for an uncached address

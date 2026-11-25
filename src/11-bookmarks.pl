@@ -211,6 +211,7 @@ sub pictures_elsewhere {                  # 1 when pictures from other sites are
 # page is started with it (sub contained, LZRPRF_HOME "home satellite"), so a page kept running with the
 # other choice is ended and the home shown again: off is off from that moment.
 sub game_helper {                         # 1 while LZRDFNDR's satellite plays in the minigame
+    return 0 unless part_on('lzrdfndr') && part_on('lzrgm');    # neither plays without both parts
     return $HELD_HELPER if $INCOGNITO && defined $HELD_HELPER;
     sysopen(my $in, kept_in() . '/gamehelper', O_RDONLY | O_NOFOLLOW | O_NONBLOCK) or return 0;
     my @is = stat $in;

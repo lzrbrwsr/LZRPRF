@@ -47,6 +47,41 @@ sub sum_seen {                            # (the SHA-256 of a file, the file it 
     my $after = file_named($in);
     return ($sum, defined $before && defined $after && $before eq $after ? $after : undef);
 }
+# At the start the sum is read by a copy of this process (fork, no other program) while the tries of
+# sub holds run, and handed back on a pipe: the same sub, the same file, the same answer, but its 30 ms
+# no longer stand on the way to the first page (measured 2026-11-24). The copy runs nothing else and
+# ends at once; an answer that is not one sum of 64 hex digits and one name of a file is no answer, and
+# then the sum is read here, as before.
+sub copied {                              # a copy of this process (fork, no other program) that works out one answer beside this one, and the pipe it answers on; or nothing
+    my ($work) = @_;
+    pipe(my $from, my $to) or return;
+    my $copy = fork // return;
+    if (!$copy) {
+        close $from;
+        $SIG{$_} = 'DEFAULT' for qw(INT TERM HUP QUIT);
+        syswrite $to, $work->();
+        POSIX::_exit(0);
+    }
+    close $to;
+    return [$from, $copy];
+}
+sub copy_said {                           # what the copy answered, at most 400 bytes, once it ended
+    my ($from, $copy) = @{ $_[0] };
+    my $said = '';
+    1 while length $said < 400 && sysread($from, $said, 400, length $said);
+    close $from;
+    waitpid $copy, 0;
+    return $said;
+}
+sub sum_started { my ($file) = @_; my $run = copied(sub { my ($sum, $seen) = sum_seen($file); ($sum // '') . "\n" . ($seen // '') . "\n" }) or return; return [@$run, $file] }    # the pipe the copy answers on, or nothing
+sub sum_read {                            # (the SHA-256, the file it was) as sub sum_seen gives them, from the copy or else read here
+    my ($run) = @_;
+    return unless $run;
+    my $file = $run->[2];
+    my $said = copy_said($run);
+    my ($sum, $seen) = $said =~ /\A([0-9a-f]{64})\n((?:[0-9]+(?:\.[0-9]+)? ){5}[0-9]+(?:\.[0-9]+)?)?\n\z/ or return sum_seen($file);
+    return ($sum, $seen);
+}
 sub file_named { my @is = Time::HiRes::stat($_[0]); return @is ? join(' ', @is[0, 1, 2, 7, 9, 10]) : undef }    # device, number, mode, size, written, changed
 sub program_same {                        # true when the program on the disk is the file this window began with
     return 0 unless defined $BEGAN;
@@ -57,8 +92,14 @@ sub program_same {                        # true when the program on the disk is
     return $same ? 1 : 0;
 }
 
-sub proven {
-    my $mark = mark();
+# The mark of now is worked out the same way, by sub mark in a copy beside the tries (10 ms off the way
+# to the first page, measured 2026-11-24): the same build asked of sysctl, the same two files read whole,
+# the sums taken while the window is being made rather than a moment after it said it was ready. Only a
+# whole mark is taken from the copy; no answer, or an empty one, and the mark is worked out here, after.
+sub mark_started { return copied(sub { mark() . "\n" }) }
+sub mark_read { my $said = $_[0] ? copy_said($_[0]) : ''; return $said =~ /\A(macOS build \w+, lzrprf [0-9a-f]{64}, selftest [0-9a-f]{64})\n\z/ ? $1 : mark() }
+sub proven {                              # given the copy of sub mark_started, or nothing
+    my $mark = mark_read($_[0]);
     my $is = sub {                        # 'plain' for the mark of now; the line, for the mark of now with the checks that could not be tried; '' for neither
         sysopen my $in, "$ROOT/proven", O_RDONLY | O_NONBLOCK or return '';    # a pipe put in its place is not waited for
         return '' unless length $mark && -f $in;

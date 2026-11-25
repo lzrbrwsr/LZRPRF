@@ -13,6 +13,13 @@
 // kept by lzrprf for every process of that program). The panel widens to PROCS_WIDE while they show.
 // Nothing here changes a process: ending one stays a ticked row of the list above, confirmed.
 // SYNC: 14-tool.pl (sub tool_procs, sub tool_note), ../lzrbrwsr/architecture/lzrdfndr.md §11, docs/window.md
+// Clear Cookies of This Site, in the Go menu (J2, ../lzrbrwsr/architecture/cookie-jar.md): asked once, then
+// "menu forget-cookies", and lzrprf clears the cookies of the shown tab's site from the jar (sub jar_forget).
+function cookieSite() {
+    if (!takes()) return;
+    modal('Clear cookies of this site?', 'The cookies of the site in this tab are cleared, under every site you visited it from, and its pages see you as new: you may need to sign in to it again. Other sites keep theirs.',
+        [['Cancel', closeModal], ['Clear cookies', function () { closeModal(); sent('menu forget-cookies'); }]], 'small');
+}
 var toolAll = false, toolAllButton = null, procNoteField = null, procEditing = null, PROCS_WIDE = 1120, PROCS_ROW = 40;    // DECLARED(wide enough for seven columns with a description of two lines; a row as tall as two lines of 11 points)
 var PROC_GROUPS = [['core', 'Core processes'], ['lzrbrwsr', 'LZRBRWSR and lzrprf'], ['yours', 'Your apps and programs'], ['macos', 'macOS'], ['others', 'Other users']];
 var PROC_FIELDS = ['pid', 'cpu', 'mem', 'group', 'title', 'about', 'source', 'note', 'ppid', 'user', 'began', 'path', 'args', 'signed', 'job'];
@@ -45,6 +52,7 @@ function procsEnabled() {    // the button, on On Your Computer only, not on the
     if (toolAllButton.hidden) procNoteHidden();
 }
 function procsPlaced(M, w) {    // bottom left, left of the panel's own buttons; on the row above, right of the copy button, when they leave no room
+    partsPlaced(M, w);    // and the boxes of the modules modal and of LZRTNNL (below)
     if (!toolAllButton) return;
     var left = panelButtons.length ? panelButtons[0].frame.origin.x : M + w - 26, wide = 180;
     toolAllButton.frame = left - 10 - (M + 26) >= wide ? $.NSMakeRect(M + 26, M + 18, wide, 32) : $.NSMakeRect(M + 26 + Math.min(w - 52, 380) + 10, M + 62, wide, 32);
@@ -151,6 +159,100 @@ function procsMade() {    // the button and the field, made once with the panel
     toolView.addSubview(procNoteField);
 }
 
+// THE LZR MODULES (Henry, 2026-11-24, HC-0858). lzrprf says which parts are installed ("parts on NAME ...", from the
+// record the installer and this modal share, sub parts_told); until it says, every part counts as installed. A part
+// that is not installed is shown nowhere: LZRDFNDR's icon, Tor's icon, and on the home page LZRTRMNL and LZRGM (lzrprf
+// tells the page, sub contained). "Add or remove LZR modules..." in the cogwheel's menu opens a modal with a box to tick
+// for each part. LZRBRWSR stays ticked and cannot be unticked: this window, and the settings where the others are
+// switched, are its own. Once a box differs from what is installed, "Restart with these modules" sends "parts set
+// NAME ..."; lzrprf writes the record, takes away the program of a part left out, or fetches an added one through its
+// signed road of an update (the installer's modal then shows), says "parts applied", and this window answers
+// "restart": LZRBRWSR starts again with the new set. "parts refused WHY" stands in the modal, and nothing changed.
+// SYNC: 24-parts.pl, ../lzrbrwsr/packaging/parts.sh.in, docs/window.md
+var PARTS = [['lzrbrwsr', 'LZRBRWSR: the browser, its profiles and settings (always installed)'], ['lzrdfndr', 'LZRDFNDR: the tool that shows and stops what runs on this Mac'], ['lzrtrmnl', 'LZRTRMNL: the terminal tab'], ['lzrtnnl', 'LZRTNNL: Tor, with an optional VPN of your own'], ['lzrgm', 'LZRGM: the minigame of the home page']];
+var MODULES_ABOUT = 'Tick the modules LZRBRWSR has. LZRBRWSR itself cannot be unticked: this window, and these settings, are its own. A module added is fetched through the signed road of an update; one removed takes its program and its menu items with it.';
+var partsOn = null, partsWanted = null, partTicks = [], partsHand = null, partsSaid = '';
+function partOn(name) { return !partsOn || partsOn.indexOf(name) >= 0; }
+function partsTold(rest) {
+    var parts = rest.split(' '), word = parts[0];
+    if (word == 'on') { partsOn = parts.slice(1); if (root) place(); if (cogBox) cogBox.needsDisplay = true; return; }
+    if (word == 'applied') { partsSaid = 'The modules are set. LZRBRWSR starts again with them.'; say('restart'); }
+    else if (word == 'refused') partsSaid = parts.slice(1).join(' ');
+    else if (word == 'install') partsSaid = 'Fetching the release through the signed road of an update.';
+    if (modalOpen && modalKind == 'modules') modulesShown();
+}
+function modulesOpened() { if (!takes()) return; partsWanted = PARTS.map(function (one) { return partOn(one[0]); }); partsSaid = ''; modulesShown(); }
+function modulesShown() { modal('Add or remove LZR modules', MODULES_ABOUT + (partsSaid ? '\n' + partsSaid : ''), modulesChoices(), 'modules'); }
+function modulesChanged() { return !!partsWanted && PARTS.some(function (one, k) { return partsWanted[k] != partOn(one[0]); }); }
+function modulesChoices() { return partsSaid && partsSaid.indexOf('The modules are set') == 0 ? [] : modulesChanged() ? [['Cancel', closeModal], ['Restart with these modules', modulesApplied]] : [['Close', closeModal]]; }
+function modulesApplied() { partsSaid = 'Setting the modules.'; say('parts set ' + PARTS.filter(function (one, k) { return partsWanted[k]; }).map(function (one) { return one[0]; }).join(' ')); modulesShown(); }
+function partTicked(sender) { var k = +sender.tag; if (k <= 0 || !partsWanted) { sender.state = 1; return; } partsWanted[k] = sender.state == 1; partsSaid = ''; panelSub.stringValue = $(MODULES_ABOUT); buttons(modulesChoices()); }
+function partsShown(kind) {    // from modal(): the boxes of the modules modal and the box of LZRTNNL, each in its own kind alone
+    partTicks.forEach(function (one, k) { one.hidden = kind != 'modules'; if (kind == 'modules' && partsWanted) { one.state = partsWanted[k] ? 1 : 0; one.enabled = k > 0; } });
+    if (tnnlTick) { tnnlTick.hidden = kind != 'tnnl'; tnnlTick.state = tnnlVpn ? 1 : 0; tnnlTick.enabled = tnnlStep != 'busy'; }
+}
+function partsPlaced(M, w) {    // from placeModal, through procsPlaced: the words at the top, the boxes under them
+    var h = panel.frame.size.height - 2 * M;
+    if (modalKind == 'modules') { panelSub.frame = $.NSMakeRect(M + 26, M + h - 128, w - 52, 72); partTicks.forEach(function (one, k) { one.frame = $.NSMakeRect(M + 26, M + h - 170 - k * 40, w - 52, 26); }); }
+    if (modalKind == 'tnnl') { panelSub.frame = $.NSMakeRect(M + 26, M + 98, w - 52, h - 156); tnnlTick.frame = $.NSMakeRect(M + 26, M + 64, w - 52, 26); }
+}
+
+// LZRTNNL IN A TOR WINDOW (Henry, 2026-11-24). A Tor window connects nothing by itself: once it is on the screen lzrprf
+// says "torsession made" and its LZRTNNL modal flies out of the onion, with Connect to Tor and a box, Use also VPN.
+// Ticked, the modal walks you through your own provider: the WireGuard app, its configuration file imported and
+// activated there, and the same file chosen here (an Open panel; "tnnl vpn file PATH"). lzrprf reads it ("tnnl vpn read
+// ADDRESS SERVER [v6]" or "tnnl refused WHY"). Connect to Tor then asks whether the VPN is active ("tnnl vpn look":
+// "tnnl vpn found UTUN INDEX" or "tnnl vpn missing WHY") and only once it is says "tor on": the Tor modal and its beam
+// as before. "tnnl vpn dropped" comes when the VPN went away under Tor: Tor stopped, and Try again looks for it first.
+// SYNC: 16-tnnl.pl, 15-tor.pl, ../lzrbrwsr/architecture/lzrtnnl.md
+var TNNL_ABOUT = 'This Tor window has not connected, and nothing is fetched until Tor is connected and the window reaches nothing past it. Connect to Tor when you are ready.';
+var TNNL_VPN_ABOUT = 'Your own VPN under Tor: you, then the VPN, then Tor. Your provider sees that you use Tor and never where you go; Tor never sees your address. If the VPN drops, Tor stops and nothing goes out without it.\n1. Install the WireGuard app (App Store, by WireGuard Development Team).\n2. Import the .conf file your provider gives you (Mullvad, IVPN, Proton VPN, AirVPN and others do; its AllowedIPs must be 0.0.0.0/0), and activate it there.\n3. Choose the same file here: lzrprf keeps its address and server, never its private key.';
+var tnnlTick = null, tnnlVpn = false, tnnlStep = '', tnnlSaid = '', tnnlFile = '';
+function tnnlShown() {
+    if (!TORWINDOW) return;
+    if (!win.visible || modalOpen && modalKind != 'tor' && modalKind != 'tnnl') { partsHand.performSelectorWithObjectAfterDelay('tnnlShown:', $(), 0.1); return; }    // looked at again a moment later, as the Tor modal is
+    techHidden(); secureHidden(); suggestHidden();
+    flyNext = modalOpen ? null : { icon: torIcon, at: Date.now() };
+    modal('LZRTNNL', tnnlAbout(), tnnlChoices(), 'tnnl');
+}
+function tnnlAbout() { return (tnnlVpn ? TNNL_VPN_ABOUT : TNNL_ABOUT) + (tnnlSaid ? '\n' + tnnlSaid : ''); }
+function tnnlChoices() { return tnnlStep == 'busy' ? [] : tnnlVpn && !tnnlFile ? [['Hide', closeModal], ['Choose WireGuard file...', tnnlChoose]] : [['Hide', closeModal], ['Connect to Tor', tnnlConnect]]; }
+function tnnlRefresh() { if (modalOpen && modalKind == 'tnnl') { panelSub.stringValue = $(tnnlAbout()); partsShown('tnnl'); buttons(tnnlChoices()); } }
+function tnnlTicked(sender) { tnnlVpn = sender.state == 1; tnnlSaid = ''; if (!tnnlVpn && tnnlFile) { tnnlFile = ''; say('tnnl vpn off'); } placeModal(); tnnlRefresh(); }
+function tnnlChoose() {    // the system's Open panel: one file, a WireGuard configuration
+    try {
+        var one = $.NSOpenPanel.openPanel;
+        one.canChooseDirectories = false; one.canChooseFiles = true; one.allowsMultipleSelection = false; one.resolvesAliases = false;
+        one.allowedFileTypes = $(['conf']); one.prompt = $('Choose'); one.message = $('The WireGuard file of your provider, the one you activated in the WireGuard app');
+        one.beginSheetModalForWindowCompletionHandler(win, function (answer) { if (answer != 1 || one.URL.isNil()) return; tnnlStep = 'busy'; tnnlSaid = 'Reading the file.'; tnnlRefresh(); say('tnnl vpn file ' + one.URL.path.js.replace(/[^\x20-\x7e]/g, '\x7f').slice(0, 1000)); });
+    } catch (e) { tnnlSaid = 'The Open panel could not be shown.'; tnnlRefresh(); }
+}
+function tnnlConnect() { if (!tnnlVpn) return tnnlGo(); tnnlStep = 'busy'; tnnlSaid = 'Looking for the VPN.'; tnnlRefresh(); say('tnnl vpn look'); }
+function tnnlGo() { tnnlStep = ''; closeModal(); torStarted(); torShown(); }    // Tor, through the VPN when one was found: the Tor modal and its beam
+function tnnlAgain() { if (!tnnlFile) return torStarted(); tnnlSaid = ''; tnnlShown(); tnnlConnect(); }    // Try again of the Tor modal: with the VPN, it is looked for first
+function tnnlTold(rest) {
+    var parts = rest.split(' ');
+    tnnlStep = '';
+    if (parts[0] == 'refused') tnnlSaid = parts.slice(1).join(' ');
+    else if (parts[1] == 'read') { tnnlFile = parts[2]; tnnlSaid = 'The file names the VPN address ' + parts[2] + ' and the server ' + parts[3] + '. With it active in the WireGuard app, press Connect to Tor.'; }
+    else if (parts[1] == 'missing') tnnlSaid = 'The VPN is not active: ' + parts.slice(2).join(' ') + '. Activate it in the WireGuard app, then press Connect to Tor again.';
+    else if (parts[1] == 'found') return tnnlGo();
+    else if (parts[1] == 'none') tnnlFile = '';
+    else if (parts[1] == 'dropped') { if (words) words.stringValue = $('The VPN dropped: Tor stopped, and nothing goes out without it.'); return; }
+    tnnlRefresh();
+}
+function partsMade() {    // the boxes of the two modals, made once with the panel, and the object their presses reach
+    ObjC.registerSubclass({ name: 'LzrprfParts', superclass: 'NSObject', methods: {
+        'ticked:': { types: ['void', ['id']], implementation: function (sender) { partTicked(sender); } },
+        'vpn:': { types: ['void', ['id']], implementation: function (sender) { tnnlTicked(sender); } },
+        'tnnlShown:': { types: ['void', ['id']], implementation: function () { tnnlShown(); } }
+    } });
+    partsHand = $.LzrprfParts.alloc.init;
+    var tick = function (words, k, action) { var one = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 520, 26)); one.setButtonType(3); one.title = $(words); one.font = sans(13); one.tag = k; one.target = partsHand; one.action = action; one.hidden = true; panel.addSubview(one); return one; };
+    partTicks = PARTS.map(function (one, k) { return tick(one[1], k, 'ticked:'); });
+    tnnlTick = tick('Use also VPN: your own WireGuard VPN under Tor', 0, 'vpn:');
+}
+
 function run(argv) {
     NAME = argv[0] || NAME;
     TORWINDOW = argv[1] == 'tor';
@@ -162,7 +264,7 @@ function run(argv) {
     app.applicationIconImage = icon(256);
     hand = $.LzrprfHand.alloc.init;
     app.delegate = hand;
-    canvas = $.LzrprfLaid.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640));
+    canvas = $.LzrprfLaid.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640)); tracked(canvas);    // its moves and its exit, for a page kept running (28-window-pointer.pl)
     win = $.NSWindow.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(0, 0, 1000, 760), 15 | 32768, 2, false);    // titled, closable, minimisable, resizable, its content under the title bar
     win.title = $(INCOGNITO ? NAME + ' Incognito' : NAME);
     if (INCOGNITO) win.restorable = false;
@@ -172,6 +274,7 @@ function run(argv) {
     win.opaque = false;
     win.hasShadow = true;    // the system's own shadow, drawn outside the window and taking no press: the frame's glow falls inward now
     win.releasedWhenClosed = false;
+    win.allowsToolTipsWhenApplicationIsInactive = true;    // a tooltip shows while another application is in front (clickThrough, 28-window1-tabs.pl)
     win.minSize = $.NSMakeSize(560, 360);
     opened(argv[2] || 'none');
     win.delegate = hand;
@@ -186,7 +289,7 @@ function run(argv) {
     root.addSubview(tabsView);
     belt = $.LzrprfBelt.alloc.initWithFrame($.NSMakeRect(0, 0, 960, BAR_ROW));    // under the bar and the cogwheel: what they do not take, it takes
     root.addSubview(belt);
-    bar = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 24));
+    bar = $.LzrprfField.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 24));
     bar.placeholderAttributedString = styled('Search or enter a website', inked(sans(14), GREY));
     bar.font = sans(14);
     bar.textColor = WHITE;
@@ -251,7 +354,7 @@ function run(argv) {
     $.NSNotificationCenter.defaultCenter.addObserverSelectorNameObject(hand, 'pageScrolled:', $.NSViewBoundsDidChangeNotification, scroll.contentView);
     findBox = $.LzrprfFind.alloc.initWithFrame($.NSMakeRect(0, 0, FIND_WIDE, FIND_HIGH));    // Find's bar, over the page's top right corner
     findBox.hidden = true;
-    findField = $.NSTextField.alloc.initWithFrame($.NSMakeRect(14, 8, 160, 20));
+    findField = $.LzrprfField.alloc.initWithFrame($.NSMakeRect(14, 8, 160, 20));
     findField.placeholderAttributedString = styled('Find in page', inked(sans(13), GREY));
     findField.font = sans(13);
     findField.textColor = WHITE;
@@ -314,11 +417,6 @@ function run(argv) {
     secureTech = button('What this page is made of', 'techs:');    // the lock's panel's last row
     secureTech.autoresizingMask = 0;
     secureBox.addSubview(secureTech);
-    noteView = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 100, 10));    // the note under the bar (function noteShown)
-    noteView.editable = false; noteView.selectable = false; noteView.bordered = false; noteView.drawsBackground = false;
-    noteView.font = sans(9); noteView.textColor = GREY; noteView.alignment = 1; noteView.hidden = true;
-    noteView.cell.lineBreakMode = 4;    // one line, cut in its middle if it is long
-    root.addSubview(noteView);
     root.addSubview(secureBox);
     suggestBox = $.LzrprfSuggest.alloc.initWithFrame($.NSMakeRect(0, 0, 600, 200));
     suggestBox.hidden = true;
@@ -432,6 +530,7 @@ function run(argv) {
     toolCopy.hidden = true;
     panel.addSubview(toolCopy);
     procsMade();    // Show all processes and its Notes field (HC-0843), once toolView is made
+    partsMade();    // the boxes of Add or remove LZR modules and of LZRTNNL
     toolTabs = ['On Your Computer', 'On Websites', 'Redirects', 'Other'].map(function (words, k) {    // the panel's three tabs, under its title
         var one = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 170, 28));
         one.title = $(words); one.bezelStyle = 1; one.font = sans(13, true); one.tag = k; one.target = hand; one.action = 'toolTab:'; one.hidden = true;

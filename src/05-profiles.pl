@@ -362,7 +362,7 @@ sub sso_date {                            # the time an Expires names (RFC 6265 
     my ($d, $m, $y, $hh, $mm, $ss) = $text =~ /([0-9]{1,2})[ -]([A-Za-z]{3})[a-z]*[ -]([0-9]{2,4}) ([0-9]{1,2}):([0-9]{2}):([0-9]{2})/ or return;
     $m = $month{ lc $m } // return;
     $y += $y < 70 ? 2000 : 1900 if $y < 100;
-    return eval { Time::Local::timegm($ss, $mm, $hh, $d, $m, $y) };
+    require Time::Local; return eval { Time::Local::timegm($ss, $mm, $hh, $d, $m, $y) };
 }
 sub sso_written {                         # a provider's cookies into its one file, through to the disk, under a lock against another window of the profile
     my ($key, $cookies) = @_;

@@ -9,25 +9,90 @@
 # log could not be written.                                              # [C14]
 sub sheeted {
     my ($named, $host, $where, $kept) = @_;
+    %BESIDE_LOGGED = (); if (my @had = beside_sheets($named)) { return @had }    # taken beside the first run, which named exactly these (07-visit-beside.pl)
+    timed('sheets-begin ' . scalar @$named) if $TIMED;
     open my $request, '>>', "$DIR/busy" or return;
     flock $request, LOCK_SH or return;    # as in visit: no line of these requests falls into a clearing of the log
-    my ($until, @got) = (now() + $SHEET_SECONDS);
+    my (@got, @jobs);
     for my $n (0 .. $#$named) {
-        if (now() >= $until || !alive()) { push @got, ''; next }    # not begun in time: nothing is fetched for it
         my $url = "https://$host$named->[$n]";
         if (listed($url)) { refused("a style sheet the page $host names", $kept) or return; push @got, ''; next }    # [C23] handed over with length 0
         if (my $filter = filter_said($url, 'stylesheet', $host)) { record("$url not fetched: $filter", $kept) or return; push @got, ''; next }    # [C27] after [C23]: handed over with length 0
-        record("$url -> lzrprf connects to the first that answers of: " . join(', ', map { $_->{text} } @$where), $kept) or return;    # [C5] written down first, connected second
-        busy('Fetching style sheet ' . ($n + 1) . " of the page: $url");
-        my ($got, $why, $from) = fetch($url, $where, undef, undef, undef, undef, ['style', $host]);    # [C6] [C7]
-        record("$url " . ($why ? "failed: $why" : 'answered: ' . length($got) . " bytes from $from"), $kept) or return;
-        push @got, !$why && length $got <= $SHEET_BYTES ? $got : '';
+        $BESIDE_LOGGED{$url} or $AHEAD{$url} && $AHEAD{$url}{logged} && $AHEAD{$url}{key} eq ahead_key([$url, $where, undef, ['style', $host]]) or record("$url -> lzrprf connects to the first that answers of: " . join(', ', map { $_->{text} } @$where), $kept) or return;    # [C5] written down first, connected second; a sheet taken beside a first run that then named other sheets has its two lines already, and its one fetch is not written down twice; one begun ahead for this very request (the key sub fetched_together takes it by) has this line already, any other is fetched afresh and written down here
+        push @got, undef;
+        push @jobs, [$n, $url];
     }
+    busy('Fetching the ' . @jobs . (@jobs == 1 ? ' style sheet' : ' style sheets') . " of the page $host") if @jobs;
+    my @answers = fetched_together(map { [$_->[1], $where, undef, ['style', $host]] } @jobs);    # [C6] [C7] side by side, each the request it always was
+    for my $i (0 .. $#jobs) {
+        my ($n, $url) = @{ $jobs[$i] };
+        my ($got, $why, $from) = @{ $answers[$i] };
+        delete $BESIDE_LOGGED{$url} or record("$url " . ($why ? "failed: $why" : 'answered: ' . length($got) . " bytes from $from"), $kept) or return;
+        $got[$n] = !$why && length $got <= $SHEET_BYTES ? $got : '';
+    }
+    %BESIDE_LOGGED = ();
     close $request;
+    ($BESIDE_FIRST ? sub { $BESIDE_FONTS = [@_] } : \&ahead_fonts)->($host, $where, $kept, map { ["https://$host$named->[$_]", $got[$_]] } grep { length $got[$_] } 0 .. $#got);    # [C30] the fonts these sheets name, begun now: here when the next run names them
     return (join(' ', '=sheets', map { length } @got) . "\n" . join('', @got), scalar grep { length } @got);
 }
 
-sub pixels {                              # what a picture run wrote: [wide, high, each row in base64], or nothing when it is not exactly a picture
+# The web fonts a page's sheets name. A run handed sheets may write a line
+# "=webfonts /path|/path ..." of up to $FONTS fonts on the page's own host,
+# which the application chose from the sheets' @font-face rules (https on
+# the page's origin alone, of a format it draws), each up to $FONT_TRIES
+# paths tried in order until one answers 200, as a src entry that fails
+# falls through to the next. Each path is fetched as a sheet is:
+# held to the illegal-content list, then the filter lists as a font, its line
+# in the log first, then "fetch" to the same checked addresses the page came
+# from, which holds it to LZRDFNDR's judgement and to Tor when Tor is on.
+# One clock of $FONT_SECONDS is for starting them all, and each is cut at
+# $FONT_BYTES; a font not begun in time, refused, failed, larger, or past
+# $FONTS_TOTAL of all of them is not handed over; a font none of whose paths
+# is goes with length 0, and the application draws
+# that face's text in its own. Nothing of a font is written to the disk: the
+# answers are held in memory for the page shown alone, in an incognito window
+# as in any. Returns the frame for the next run, "=webfonts", the length of
+# each, a line end, then the answers as the site sent them, and how many had
+# bytes; or nothing when a line of the log could not be written.        # [C30]
+sub fonted {
+    my ($named, $host, $where, $kept) = @_;
+    timed('fonts-begin ' . scalar @$named) if $TIMED;
+    open my $request, '>>', "$DIR/busy" or return;
+    flock $request, LOCK_SH or return;    # as in visit: no line of these requests falls into a clearing of the log
+    my ($until, $total) = (now() + $FONT_SECONDS, 0);
+    my @paths = map { [split /\|/, $_] } @$named;    # each font its paths in order, until one answers 200
+    my @got = ('') x @$named;
+    while (grep { scalar @$_ } @paths) {      # a round: the next path of every font that has none yet, side by side
+        last if now() >= $until || !alive();  # not begun in time: nothing more is fetched
+        my @jobs;
+        for my $n (0 .. $#paths) {
+            while (@{ $paths[$n] }) {
+                my $url = "https://$host" . shift @{ $paths[$n] };
+                if (listed($url)) { refused("a web font the page $host names", $kept) or return; next }    # [C23] not handed over
+                if (my $filter = filter_said($url, 'font', $host)) { record("$url not fetched: $filter", $kept) or return; next }    # [C27] after [C23]: not handed over
+                record("$url -> lzrprf connects to the first that answers of: " . join(', ', map { $_->{text} } @$where), $kept) or return;    # [C5] written down first, connected second
+                push @jobs, [$n, $url];
+                last;
+            }
+        }
+        last unless @jobs;
+        busy('Fetching the ' . @jobs . (@jobs == 1 ? ' web font' : ' web fonts') . " of the page $host");
+        my @answers = fetched_together(map { [$_->[1], $where, [$FONT_BYTES, $FONT_SECONDS], ['font', $host]] } @jobs);    # [C6] [C7] side by side, each the request it always was
+        for my $i (0 .. $#jobs) {
+            my ($n, $url) = @{ $jobs[$i] };
+            my ($got, $why, $from) = @{ $answers[$i] };
+            $why ||= length($got) > $FONT_BYTES ? "it is larger than $FONT_BYTES bytes" : $total + length($got) > $FONTS_TOTAL ? "the page's fonts would be more than $FONTS_TOTAL bytes" : $got !~ m{\AHTTP/[0-9.]+ 200[ \r]} ? 'its answer is not 200' : undef;
+            record("$url " . ($why ? "not handed over: $why" : 'answered: ' . length($got) . " bytes from $from, handed to $APP for a web font"), $kept) or return;
+            next if $why;
+            ($got[$n], $total) = ($got, $total + length $got);
+            @{ $paths[$n] } = ();         # this font is here: its other paths are not tried
+        }
+    }
+    close $request;
+    return (join(' ', '=webfonts', map { length } @got) . "\n" . join('', @got), scalar grep { length } @got);
+}
+
+sub pixels {                            # what a picture run wrote: [wide, high, each row in base64], or nothing when it is not exactly a picture
     my ($wrote) = @_;
     return unless $wrote =~ s/\n\z//;
     my ($head, @rows) = split /\n/, $wrote, -1;
@@ -102,6 +167,54 @@ sub numbered {
     return $failed || !$one ? undef : $one;
 }
 
+# The lookup of a name begun and not waited for: sub find reads what it says
+# when the name is asked for. The same program, the same name and the same
+# checks before it as sub find makes; a name that is never asked for after
+# all was looked up and nothing more. At most $FINDING_MOST wait at a time.
+sub find_ahead {
+    my ($host) = @_;
+    return if listed($host) || $TOR_SESSION || $TOR_WANTED || $PEER ne '-' || $FINDING{$host} || keys %FINDING >= $FINDING_MOST;    # [C23] [C17] as sub find: never a listed name, never past Tor
+    my $cached = $FOUND{$host};
+    return if $cached && now() - $cached->[0] < $FOUND_SECONDS;
+    timed("find-ahead $$ $host") if $TIMED;
+    pipe(my $from, my $to) or return;
+    my $pid = fork // return;
+    if (!$pid) {                          # a copy that waits for the lookup, in a fresh perl as ever, then asks the system the ways to what it gave, all at once, and writes both: asked by sub find itself after the lookup, the ways took 13 ms in which a page's waiting requests stood still (yle.fi, measured 2026-11-25)
+        close $from;
+        setpgrp(0, 0);                    # a group of its own, so the lookup it waits for ends with it (sub find_dropped)
+        spare_dropped(); curl_ended($CURL_SPARE); undef $CURL_SPARE;
+        $RUN = getppid();
+        my ($found) = said($FIND_SECONDS, '/usr/bin/perl', '-e', $LOOKUP, $host);
+        syswrite $to, $found // '';        # the lookup's answer at once: were the ways never told, sub find has it and asks them itself
+        my ($numbers, $families, $told) = find_numbers($found // '');
+        my @says = said_all(5, (map { route_asked($_->{family}, $_->{text}) } @$numbers), map { route_asked($_, 'default') } @$families);
+        print $to "=ways\n", map { "=way $told->[$_]\n" . ($says[$_] // '') . "\n" } 0 .. $#$told;
+        close $to;
+        POSIX::_exit(0);
+    }
+    close $to;
+    $FINDING{$host} = [$from, $pid];
+    return;
+}
+
+sub find_numbers {                        # ($found): of what a lookup printed, the first $LOOKED addresses that are numbers, their families, and the name each way is told under (an address, default4, default6)
+    my ($found) = @_;
+    my (@numbers, %had, $looked);
+    for my $text (grep { /^[0-9A-Fa-f:.]+(?:%[A-Za-z0-9]+)?$/ && !$had{$_}++ } split /\n/, $found) {
+        last if ++$looked > $LOOKED;
+        my $one = numbered($text) or next;
+        push @numbers, { %$one, text => $text };
+    }
+    my @families = do { my %once; grep { !$once{$_}++ } map { $_->{family} } @numbers };
+    return (\@numbers, \@families, [(map { $_->{text} } @numbers), map { $_ == AF_INET6 ? 'default6' : 'default4' } @families], scalar keys %had);
+}
+
+sub find_dropped {                        # the lookups begun and never asked for, ended
+    for my $one (values %FINDING) { close $one->[0]; kill 'KILL', -$one->[1]; kill 'KILL', $one->[1]; waitpid $one->[1], 0 }    # the copy and, by its group, the lookup it waits for
+    %FINDING = ();
+    return;
+}
+
 # Returns the addresses the name leads to, each with whether it is "own":
 # not on the public internet, or reached by a route of its own. At most eight
 # are returned: the first eight this computer has a way to. An address it has
@@ -118,16 +231,19 @@ sub find {
         $public = grep { chomp; $_ eq $host } <$names> if open $names, '<', "$ROOT/public";    # the names the test's file "public" lists are taken for hosts on the public internet, to try what is fetched there
         return [{ family => AF_INET, addr => pack_sockaddr_in($port, inet_aton($to)), text => $to, own => !$public && !public($to) }];
     }
-    my ($found) = said($FIND_SECONDS, '/usr/bin/perl', '-e', $LOOKUP, $host);
+    my $cached = $FOUND{$host};
+    return [map { {%$_} } @{ $cached->[1] }] if $cached && now() - $cached->[0] < $FOUND_SECONDS;    # looked up a moment ago in this window: the same addresses, and the same ways to them, without the five processes a lookup starts
+    timed("find-begin $$ $host") if $TIMED;    # "lzrprf try" with "times": each name looked up, and when its addresses and their ways were known (scripts/load-timeline.pl)
+    my $begun = delete $FINDING{$host};    # the same lookup, begun while the page's answer was read (sub find_ahead): only what is left of it is waited for
+    my ($found) = $begun ? @{ (said_read($FIND_SECONDS, $begun))[0] } : said($FIND_SECONDS, '/usr/bin/perl', '-e', $LOOKUP, $host);
     timed('looked-up');
-    my (@where, %had, @numbers, $looked);
-    for my $text (grep { /^[0-9A-Fa-f:.]+(?:%[A-Za-z0-9]+)?$/ && !$had{$_}++ } split /\n/, $found) {
-        last if ++$looked > $LOOKED;
-        my $one = numbered($text) or next;
-        push @numbers, { %$one, text => $text };
-    }
-    my @families = do { my %once; grep { !$once{$_}++ } map { $_->{family} } @numbers };
-    my @says = said_all(5, (map { route_asked($_->{family}, $_->{text}) } @numbers), map { route_asked($_, 'default') } @families);    # the way to each address and the default way, asked of the system all at once
+    timed("find-looked $$ $host") if $TIMED;
+    my %way;                              # what a lookup begun ahead was told of the ways (sub find_ahead)
+    if ($begun && defined $found && $found =~ s/^=ways\n(.*)\z//ms) { my @told = split /^=way (\S{1,64})\n/m, $1; shift @told; %way = @told if @told % 2 == 0 }
+    my @where;
+    my ($numbers, $families, $told, $had) = find_numbers($found // '');
+    my @numbers = @$numbers; my @families = @$families;
+    my @says = %way && !(grep { !defined $way{$_} } @$told) ? @way{@$told} : said_all(5, (map { route_asked($_->{family}, $_->{text}) } @numbers), map { route_asked($_, 'default') } @families);    # the way to each address and the default way: told by the lookup begun ahead, or asked of the system all at once
     my %usual = map { $families[$_] => $says[@numbers + $_] } 0 .. $#families;
     for my $at (0 .. $#numbers) {
         last if @where >= $FOUND;
@@ -135,7 +251,10 @@ sub find {
         my $route = route_of($one->{family}, $one->{text}, $says[$at], $usual{ $one->{family} }) or next;    # this computer has no way there at all
         push @where, { %$one, text => $one->{text}, own => $route eq 'own' || !public($one->{text}) };
     }
-    return (undef, %had ? 'this computer has no way to that host' : 'no such host') unless @where;
+    timed("find-end $$ $host " . scalar @where) if $TIMED;
+    return (undef, $had ? 'this computer has no way to that host' : 'no such host') unless @where;
+    %FOUND = () if keys %FOUND >= 256;
+    $FOUND{$host} = [now(), [map { {%$_} } @where]];    # only an answer with addresses is kept: a failure is looked up again
     return \@where;
 }
 
@@ -178,7 +297,7 @@ sub reach {
         my $left = $until - now();
         last if $left <= 0;
         socket(my $site, $one->{family}, SOCK_STREAM, 0) or next;
-        $site->blocking(0);
+        unblocked($site);
         connect($site, $one->{addr});     # [C6]
         my $ready = '';
         vec($ready, fileno $site, 1) = 1;

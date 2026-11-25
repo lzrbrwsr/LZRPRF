@@ -9,7 +9,7 @@ over every one of them:
 
 1. **E1, the sandbox.** A site with no rule of yours runs its own scripts inside lzrprf's sandbox.
 2. **E2, the curated rules.** Reviewed rules for known scripts of a few sites, shipped signed with the release.
-3. **E3, your rules.** Always Allow and Deny, kept in the file scripts, and Allow Once for one visit.
+3. **E3, your rules.** Always Allow and Deny, kept in the file scripts, and Allow Once for one visit, with what the scripts you allowed load from the same hosts on that visit.
 4. **Ask.** Deny, Allow Once, Always Allow; Deny is the answer when nobody answers.
 
 A page with a password field, or at an address of signing in, has no sandbox and no curated rule: every
@@ -25,7 +25,7 @@ capabilities. The table is @PERMIT_SANDBOX in lzrprf, by name; Script permission
 
 | name | verdict | what it means |
 |---|---|---|
-| own-scripts | runs | the page's own scripts, inline and external from its own origin, asking only capabilities of low risk |
+| own-scripts | runs | the page's own scripts, inline and external from its own origin, and the modules they import from it, asking only capabilities of low risk |
 | other-scripts | asks | a script or module from another origin: fetched, hashed and asked about, unless a curated rule names it |
 | strings | asks | eval, Function, a timer given a string |
 | fetch-own | runs | a GET or HEAD of the page to its own origin |
