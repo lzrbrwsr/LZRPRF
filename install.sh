@@ -163,12 +163,12 @@ umask 022
 BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="ad2e11ddeae287f3b1e04d5dd9546892fcfb8b1fb3e70993c044a8b3d72a3053"
-RELEASE="113"
-LZRPRF_COMMIT="15943d6ecab7d26e277fc8a991acb9450624f1b4"
+SHA256="15bb9411a0eee05231038020537dc063d322f6ceb67e0a0762e5aed6112f1bb5"
+RELEASE="125"
+LZRPRF_COMMIT="d76fd960fc058d1513537169445172f24b2db667"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="475320ed7d29abf4e0eb5901b247c32478c538e84bee68bd3052be7c0b46c2f5"
-SELFTEST_SHA256="d7c7023f6354413e505adee2913fa682d2e9cf6bb4f13c5226c7022d152b5b8a"
+LZRPRF_SHA256="4b92374093f19762837398af8f4bc50700931a0ab3a01ee52d5670ef66c4084a"
+SELFTEST_SHA256="4a0fa5e224990d2f1d76a0a5d09a87f1b957d5316b2a83077b984e6cca8a770d"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
 BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
 # RELEASE_KEY: the public half of the release key; a release is installed only when its manifest is signed with it
@@ -784,23 +784,18 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 113
+release 125
 home local
-new Pages load much faster: a page is drawn before its scripts run, and its style sheets, fonts, scripts and pictures are fetched ahead and side by side the moment the site answers.
-new Pictures are sent to the window once and appear with the first drawing; a page you load again shows them at once instead of grey boxes, and stays where you were reading it.
-new The installer asks for each LZR module one by one (LZRDFNDR, LZRTRMNL, LZRTNNL and LZRGM); Add or remove LZR modules in the cogwheel menu changes them later.
-new LZRTNNL: Tor connects only when you press Connect to Tor, with an optional WireGuard VPN under it that stops all traffic if the VPN drops.
-new Onion addresses on Ahmia's list of banned onion services are never opened; the page that refuses one names the list and says where to report a mistake.
-new Fixes: the home page is no longer black in a wide window or after a resize, and shows on every start; with LZRTRMNL, new terminals have lzr on their PATH.
+new The address bar selects the whole address on the first click, ready to copy, and blocking a script keeps the page showing instead of turning it white.
 newest https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/latest
 installer https://raw.githubusercontent.com/lzrbrwsr/lzrprf/main/install.sh
 same https://lzrbrwsr.com/install.sh
 report https://origin.lzrbrwsr.com/report
 file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-file lzrbrwsr-bin 7fa8028d469b8926768ec361ea967dc78248c1802b1b785b864a45a21a7e76e4
+file lzrbrwsr-bin 456018f598ad8ff537c75e3b1ca59ff996e71ef1ec8497c9be5c406f36b9348e
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-lzrprf 475320ed7d29abf4e0eb5901b247c32478c538e84bee68bd3052be7c0b46c2f5
+lzrprf 4b92374093f19762837398af8f4bc50700931a0ab3a01ee52d5670ef66c4084a
 blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."
