@@ -166,8 +166,8 @@ BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 # that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="62c7787a0b6a556281fc250d88f71215a4f1421f134d51b19e56d234be98cd66"
-RELEASE="151"
+SHA256="a241c23c9755f411f661fd3f9ba358321a4ca5ee047762dfb38b73329c8e7d22"
+RELEASE="152"
 LZRPRF_COMMIT="feaf1edfbaaae5f5d0a291b0335cf9d8a1f5dc79"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
 LZRPRF_SHA256="bde7b91c64110b03538f9d48eb912f0fceb925c7e299971c891407f59c7aeead"
@@ -787,8 +787,9 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 151
+release 152
 home local
+new yle.fi login (Kirjaudu) runs: String substr now takes a length as browsers do, so sites whose scripts read names with it work.
 new A login or other window a site opens in a frame after a click draws again (yle.fi Kirjaudu).
 new yle.fi articles and its electricity price graph show again (dates written as +0200, and en-CA dates).
 new A click on a link opens it even when the site's own scripts fail under the click (yle.fi).
@@ -798,7 +799,7 @@ installer https://lzrbrwsr.com/install.sh
 same https://lzrbrwsr.vercel.app/install.sh
 report https://origin.lzrbrwsr.com/report
 file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-file lzrbrwsr-bin 073385d837608a2989f682288f038efc3ec23d69c49f99e001acc676a8546b8b
+file lzrbrwsr-bin 21ce58f25af09e0fa8daa4b1ad0f6f8a8e02b56ab3c7d3f8157f0fce159f5b7c
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
 lzrprf bde7b91c64110b03538f9d48eb912f0fceb925c7e299971c891407f59c7aeead
