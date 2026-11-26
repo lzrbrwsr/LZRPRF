@@ -253,6 +253,7 @@ my ($TRY, $PEER, $TYPED, $ANSWER, $RUN, $APP, $PROGRAM, @ARGUMENTS) = (0, '-', '
 my $BEGAN;                                # the SHA-256 of the program when this window began: see "sub laid_out"
 my $PROGRAM_SEEN;                         # the file the program was when its SHA-256 was last found to be $BEGAN: see "sub program_same"
 my ($FROM, @EVENTS);                      # what the window says; or, without a window, what a test has typed
+my $WELCOMING;                            # the release whose welcome card is shown, until its Got it (sub welcome, sub welcomed)
 my $FROM_HELD = '';                       # what the window said that is not a whole line yet (sub hear)
 my $IDLE_WORK;                            # a sub run once, the first moment the window and every page are quiet (sub hear), set by sub behind: the identity question, asked before the first address is typed
 my ($SPARE, $SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)
@@ -1853,6 +1854,7 @@ sub behind {
         elsif ($event =~ /^tool (open|sense|all)$/) { tool_shown($1) }    # [C20] the application's tool, from its icon in the bottom bar: a look, which changes nothing; "all" from its Show all processes, with every process
         elsif ($event =~ /^tool note ([^\x00-\x1f\x7f]{1,1000})\t([^\x00-\x1f\x7f]{0,2000})\z/) { tool_note($1, $2) }    # [C20] a note you wrote to the processes of a program in Show all processes
         elsif ($event =~ /^tool (act|undo) ((?:0|[1-9][0-9]{0,2})(?:,(?:0|[1-9][0-9]{0,2})){0,199})$/) { tool_done($1, $2) }    # [C20] the rows you ticked, and for a switching off confirmed
+        elsif ($event eq 'welcomed') { welcomed() }    # Got it on the welcome card: the release is marked welcomed, and nothing ever waited for it
         elsif ($event eq '') { tool_watch(); tnnl_watch(); link_watch() }    # [C20] nothing was said for a while: the jobs you switched off are looked at again, and the VPN under Tor
         elsif ($event =~ /^parts set((?: (?:lzrbrwsr|lzrdfndr|lzrtrmnl|lzrtnnl|lzrgm)){0,5})$/) { parts_set(split ' ', $1) }    # Add or remove LZR modules: the set ticked, after Restart with these modules
         elsif ($event eq 'parts list') { parts_told() }
@@ -9731,17 +9733,18 @@ sub welcome {
     window(@new ? ("welcome line n What is new in release $release", map { "welcome line b $_" } @new) : ());
     window("welcome line g What $APP keeps you from", (map { "welcome line b $_" } @PROTECTS), "welcome line y What $APP cannot keep you from: yours to watch", map { "welcome line b " . s/\$APP/$APP/gr } @CANNOT);
     window('welcome end');
-    my @held;
-    while (defined(my $line = hear(scalar link_due(undef)))) {    # [C31] with the live debug link on, its commands are still looked at while the welcome waits: a staging browser left on it took none for hours (2026-11-26)
-        if ($line eq '') { eval { link_watch() }; next }
-        if ($line ne 'welcomed') { push @held, $line; next }
-        unlink "${\ shared()}/welcomed";
-        my $out;
-        sysopen($out, "${\ shared()}/welcomed", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600) && print({$out} $release) && close($out);
-        unshift @HELD, @held;
-        return;
-    }
-    leave();                              # the window is gone
+    $WELCOMING = $release;                # nothing waits for "Got it": behind's own loop takes it (sub welcomed). A wait here held every
+    return;                               # other line, the page's answers among them, so a welcome card another modal replaced left the page grey and deaf (2026-11-26)
+}
+
+sub welcomed {                            # "Got it" on the welcome card, taken in behind's own loop: the release is marked welcomed once
+    my $release = $WELCOMING // return;
+    undef $WELCOMING;
+    unlink "${\ shared()}/welcomed";
+    my $out;
+    sysopen($out, "${\ shared()}/welcomed", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600) && print({$out} $release) && close($out);
+    window("welcome kept $release");    # said back once the release is marked, so the window (and its self-test) knows Got it was taken
+    return;
 }
 
 # What "Install it" does, with no key to press after it: the press is the yes.

@@ -213,12 +213,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 02-limits-and-state.pl	19	unblocked	C20 C16 C17
 02-limits-and-state.pl	32	kept_in	-
 02-limits-and-state.pl	36	shared	C16 C19 C18 C12 C22 C21 C24 C30 C23 C11 C29 C26
-02-limits-and-state.pl	210	sandbox_says	C26 C27 C4
-02-limits-and-state.pl	261	permit_class	C26
-02-limits-and-state.pl	262	permit_kinds	C26
-02-limits-and-state.pl	292	fresh_tab	C19
-02-limits-and-state.pl	308	now	C19 C6 C8 C14 C30
-02-limits-and-state.pl	327	timed	C28
+02-limits-and-state.pl	211	sandbox_says	C26 C27 C4
+02-limits-and-state.pl	262	permit_class	C26
+02-limits-and-state.pl	263	permit_kinds	C26
+02-limits-and-state.pl	293	fresh_tab	C19
+02-limits-and-state.pl	309	now	C19 C6 C8 C14 C30
+02-limits-and-state.pl	328	timed	C28
 03-containers.pl	1	-	C1 C28 C21 C3 C24 C12
 03-containers.pl	185	shell_held	-
 03-containers.pl	190	shell_measured	-
@@ -293,11 +293,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
 06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C18 C15
-06-behind.pl	172	unheard	-
-06-behind.pl	216	paired	-
-06-behind.pl	231	unnamed	-
-06-behind.pl	238	leave	C17 C7 C29 C12 C16
-06-behind.pl	255	closed	-
+06-behind.pl	173	unheard	-
+06-behind.pl	217	paired	-
+06-behind.pl	232	unnamed	-
+06-behind.pl	239	leave	C17 C7 C29 C12 C16
+06-behind.pl	256	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-
@@ -715,15 +715,16 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 19-updates.pl	155	release_signed	C25
 19-updates.pl	185	newer	C16
 19-updates.pl	214	newer_looked	C25
-19-updates.pl	267	welcome	C31 C5 C6 C3
-19-updates.pl	330	installed	C25
-19-updates.pl	357	install_run	C25 C5
-19-updates.pl	458	install_drained	-
-19-updates.pl	491	install_guarded	-
-19-updates.pl	506	restarted	C5
-19-updates.pl	538	install_line	-
-19-updates.pl	556	install_end	-
-19-updates.pl	569	body_of	-
+19-updates.pl	267	welcome	-
+19-updates.pl	284	welcomed	C5 C6 C3
+19-updates.pl	331	installed	C25
+19-updates.pl	358	install_run	C25 C5
+19-updates.pl	459	install_drained	-
+19-updates.pl	492	install_guarded	-
+19-updates.pl	507	restarted	C5
+19-updates.pl	539	install_line	-
+19-updates.pl	557	install_end	-
+19-updates.pl	570	body_of	-
 20-window-side.pl	1	-	C29
 20-window-side.pl	14	window	C12
 20-window-side.pl	24	strip_back	-
