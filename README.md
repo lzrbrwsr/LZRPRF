@@ -266,7 +266,7 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 143
+    release 144
     home local
     new A tab pulled out into its own window shows no second app icon in the Dock or menu bar.
     newest https://lzrbrwsr.com/latest
