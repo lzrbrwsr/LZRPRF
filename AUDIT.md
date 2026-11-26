@@ -878,14 +878,14 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 24-live-input.pl	121	live_scroll_left	C18
 24-live-input.pl	176	live_unknown	-
 24-live-input.pl	188	live_answered	C18 C19 C12 C7 C9 C26 C29 C4
-24-live-input.pl	314	live_layer	C18
-24-live-input.pl	351	live_layer_gone	C18
-24-live-input.pl	363	live_layers_paid	C18
-24-live-input.pl	388	live_sound	C12
-24-live-input.pl	436	live_sounded	C12
-24-live-input.pl	451	live_layers_again	C18 C9
-24-live-input.pl	467	live_patched	-
-24-live-input.pl	515	live_window_patch	-
+24-live-input.pl	316	live_layer	C18
+24-live-input.pl	353	live_layer_gone	C18
+24-live-input.pl	365	live_layers_paid	C18
+24-live-input.pl	390	live_sound	C12
+24-live-input.pl	438	live_sounded	C12
+24-live-input.pl	453	live_layers_again	C18 C9
+24-live-input.pl	469	live_patched	-
+24-live-input.pl	517	live_window_patch	-
 24-parts.pl	1	-	-
 24-parts.pl	24	parts_read	-
 24-parts.pl	35	part_on	-

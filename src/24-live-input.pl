@@ -221,6 +221,7 @@ sub live_answered {                       # [C18]
                 my $wrong = live_sound($live, $line, \@sounds);
                 return live_end($live, "it wrote a sound lzrprf does not take: $wrong") if $wrong;
             }
+            elsif ($line =~ /^=pressed (a|a-nohref|button|input|none) (click|noclick) (acts|canceled|-)$/) { link_line('INFO', 'pressed', "the page met the press: $1, $2, $3", met => $1, click => $2, outcome => $3) }    # [1238] what a released press met, for the live debug link's log alone, before =again in any place
             elsif ($line =~ /^=inspect ([1-9][0-9]{0,8}) (-|(?:[0-9a-f]{2}){1,1000}) (-|(?:[0-9a-f]{2}){1,2400})$/) { inspect_answer($live, $1, $2, $3) }    # [C18] bounded, numbered reply to the current native pane
             elsif ($line =~ /^=cursor ([a-z-]{1,16})$/ && $CURSORS{$1}) { $cursor = $1 }    # the cursor over the page, before =again, in any place among the lines above
             elsif ($line =~ /^=keep ([^\x00-\x20\x7f]{1,16000})$/) { jar_kept_write($live, $1) }    # [C7] a cookie the page's script set, before =again in any place: judged by the jar against the page's own address (sub jar_kept_write)
@@ -287,6 +288,7 @@ sub live_answered {                       # [C18]
             if ($go =~ m{^https://lzrbrwsr\.invalid/_home/(search|marks|tabs|new|trmnl)$} && now() - ($live->{pressed} // 0) <= 1) { $1 eq 'trmnl' ? ($TRMNL_OPEN = 1) : window("homeaction $1") }    # [C29] the terminal icon: lzrprf opens it itself, within a second of your press
             undef $go;    # a local home never follows an address, even if its program asks
         }
+        link_line('INFO', 'go', 'the page asked to go to another address', home => ($live->{home} ? 1 : 0)) if defined $go;    # [1238] the address itself is not logged
         return go($go, 'you followed the page to') if defined $go;    # [C4] a visit like a typed address; it ends this page first (sub visit)
     }
     live_scroll_told($live) if !$live->{ended} && $DRAWN && $live->{tab} == $TABS[$TAB];    # of the answers of this turn with no drawing, the newest scroll only, and only onto a drawing the window shows
