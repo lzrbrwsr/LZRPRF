@@ -2101,12 +2101,12 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
         if ($OUTRUN && $FROM && vec($ready, fileno $FROM, 1)) { last if $outrun = outrun(); next unless vec($ready, fileno $from_page, 1) }
         $open = sysread($from_page, $wrote, 65536, length $wrote) // $!{EINTR};
         next unless $keep;
-        while ($wrote =~ /\A=(?:fetch|permit|early|soon|wsopen|wssend|wsclose) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
+        while ($wrote =~ /\A=(?:fetch|permit|early|soon|wsopen|wssend|wsclose|store) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
             $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0 };
-            $early->{kept_app} = $app if $app;
+            @$early{qw(kept_app storage_epoch)} = ($app, $run->{storage_epoch}) if $app;
             $early->{held} = $wrote;
             my $asked = live_asked($early) or last;    # not all there yet
-            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ' || $asked->[0] eq '=early' || substr($asked->[0], 0, 6) eq '=soon ' || substr($asked->[0], 0, 3) eq '=ws';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
+            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ' || $asked->[0] eq '=early' || substr($asked->[0], 0, 6) eq '=soon ' || substr($asked->[0], 0, 3) eq '=ws' || substr($asked->[0], 0, 7) eq '=store ';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
             live_fetched($early, $asked);
             return (undef, 'ended') if $early->{ended};    # a request of no form, or a reply the page did not take: it is ended as a page kept running is (sub live_end)
             ($wrote, $looked) = ($early->{held}, 0);
@@ -2118,7 +2118,7 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
     timed("run-read $$ " . length $wrote) if $TIMED;
     if ($outrun) { kill 'KILL', $feeder, $page; waitpid $_, 0 for $feeder, $page; return (undef, 'outrun') }    # a newer width was said: this run is of no use, and the next is not kept waiting behind it
     if ($ready_at >= 0 && length $wrote <= $PAGE_BYTES) {    # the page is kept running: its first list, and what it wrote after "=ready" is the beginning of its next answer
-        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => $app ? $app->{until} : now() + $LIVE_SECONDS, kept_app => $app, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
+        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => $app ? $app->{until} : now() + $LIVE_SECONDS, kept_app => $app, storage_epoch => $run->{storage_epoch}, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
     }
     if ($tool && $tool eq 'judge' && !$open && length $wrote <= $PAGE_BYTES) {    # [C28] complete output is not enough: the judge must exit successfully within the same clock
         my $exit;
@@ -2458,6 +2458,8 @@ sub contained {
     my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]" . ($VIEW_SCALE == 2 ? " 2" : "") . "\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
     $frame .= permit_page($url, \$got, $app) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
     $frame .= ($app ? kept_app_jar($app, sub { jar_frame($url) }) : jar_frame($url)) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
+    my ($stored, $epoch) = $app ? kept_storage_frame($app, $url) : ('', undef);
+    $frame .= $stored;
     $frame .= '=live ' . length($got) . "\n" if $keep;
     if (!$app && (my $ran = beside_taken($frame . $got, defined $sheets && !$tool, $url, !$local_home && !$soon))) { return run_read($ran, $keep, $sheets, $tool) }    # the very run, started beside the first (sub beside_begun)
     my ($input, $relay);                  # the keeper's end of the relay and lzrprf's, for a page kept running
@@ -2496,7 +2498,7 @@ sub contained {
         return (undef, 'unstarted');
     }
     my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
-    $started->{kept_app} = $app if $app;
+    @$started{qw(kept_app storage_epoch)} = ($app, $epoch) if $app;
     if ($soon && $keep) { $started->{fed} = $frame . $got if $soon eq 'beside'; return (undef, undef, $started) }
     beside_begun($started, $sheets, $keep, $tool) unless $app;    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
     return run_read($started, $keep, $sheets, $tool);
@@ -4129,7 +4131,11 @@ sub menu {
     if ($what eq 'forget-cookies') {      # [C7] the cookies of the shown tab's site, under every site they were set under
         my ($url, $host) = address($TABS[$TAB]{url} // '');
         return idle('No cookie was cleared: this tab shows no site.') unless $url && length $TABS[$TAB]{url};
-        my $gone = jar_forget($url);
+        my $app = $TABS[$TAB]{kept_app};
+        my $gone = $app ? kept_app_jar($app, sub { jar_clear() }) : jar_forget($url);
+        my $stored = kept_storage_forget_site($url);
+        return idle('The cookies were cleared, but Discord storage could not be cleared.') unless defined $stored;
+        return idle('Discord storage and site cookies were cleared. Reload Discord to sign in again.') if $stored && $app;
         noted("you cleared the cookies of $host: $gone");
         return idle("The cookies of $host were cleared: $gone. Reload the page to see it without them.");
     }
@@ -10320,6 +10326,9 @@ sub kept_app_response {
     return (undef, 0) if $why || !defined $got || !kept_app_budget($app, 0, length($got));
     my $parts = live_parts($got, $method);
     return (undef, 0) unless $parts && record("$host answered the kept app with $parts->[0]: " . length($got) . ' bytes');
+    if ($method eq 'POST' && $url =~ m{\Ahttps://discord\.com/api/(?:v[0-9]+/)?auth/logout(?:\?[^#]*)?\z} && $parts->[0] >= 200 && $parts->[0] < 300) {
+        record('Discord signed out but its stored session could not be cleared') unless kept_storage_forget_app($app);
+    }
     return ($got, $parts->[0], $peer, $certs, $parts);
 }
 
@@ -10722,6 +10731,7 @@ sub link_command {                        # [C31] one command: checked, written 
         my ($url, $host) = address($arg);
         return link_line('WARN', 'command', 'the address is not one lzrprf fetches', verb => $verb, nonce => $nonce) unless $url;
         my $gone = jar_forget($url);
+        kept_storage_forget_site($url);
         noted("the live debug link cleared the cookies of $host: $gone");
         return link_line('INFO', 'forget', "the cookies of $host were cleared: $gone", nonce => $nonce, cleared => $gone);
     }
@@ -10923,6 +10933,7 @@ sub live_turn {
 # "=fetched 0 0 0". A request line of no form ends the page.
 sub live_asked {                          # [C19] the request at the front of what the page wrote: nothing when there is none, 0 while it is not all there, else [its line, its body, the bytes it takes], or [its line] when it is of no form
     my ($live) = @_;
+    return kept_storage_asked($live->{held}) if substr($live->{held}, 0, 7) eq '=store ';
     return ws_asked($live->{held}) if $live->{held} =~ /\A=ws(?:open|send|close) /;
     my $permit = substr($live->{held}, 0, 8) eq '=permit ';    # [C26] a question whether a script may run: one line, no body
     if (substr($live->{held}, 0, 7) eq '=early ') {    # the page as it is before its scripts run: one line "=early BYTES", then that many bytes of a list, answered with nothing (sub live_early)
@@ -10983,6 +10994,7 @@ sub live_fetched {                        # [C19]
     return live_end($live, 'it wrote a line of no form') unless defined $took;
     substr($live->{held}, 0, $took, '');
     $live->{looked} = 0;
+    return kept_storage_change($live, $body) if substr($line, 0, 7) eq '=store ';
     return ws_request($live, $line, $body) if $line =~ /\A=ws/;
     return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';
@@ -11136,6 +11148,147 @@ sub live_sent {                           # [C19] a reply written to a page kept
     return;
 }
 
+# Kept Discord localStorage. The renderer is handed only its own origin's
+# snapshot and tells lzrprf bounded mutations. Nothing here is sent to the log.
+# SYNC: managed-projects/lzrbrwsr/src/page/web_storage.rs
+my $STORAGE_BYTES = 2 * 1024 * 1024;       # DECLARED(matches the renderer's kept-app snapshot bound)
+my $STORAGE_ITEMS = 100_000;             # DECLARED(matches engine storage::MAX_ITEMS)
+
+sub kept_storage_file {
+    my ($app, $url) = @_;
+    return unless kept_app_valid($app, $url);
+    my ($host) = $url =~ m{\Ahttps://(discord\.com|discord\.gg)(?:[/?]|\z)} or return;
+    return "$app->{folder}/$host.storage";
+}
+
+sub kept_storage_locked {
+    my ($file, $step) = @_;
+    sysopen(my $lock, "$file.lock", O_WRONLY | O_CREAT | O_NOFOLLOW | O_NONBLOCK, 0600) or return;
+    my @info = stat $lock;
+    return unless @info && -f _ && $info[4] == $< && !($info[2] & 077);
+    return unless flock($lock, LOCK_EX);
+    return $step->();
+}
+
+sub kept_storage_read {
+    my ($file) = @_;
+    sysopen(my $in, $file, O_RDONLY | O_NOFOLLOW | O_NONBLOCK) or return $!{ENOENT} ? '' : undef;
+    my @info = stat $in;
+    return unless @info && -f _ && $info[3] == 1 && $info[4] == $< && !($info[2] & 077) && $info[7] <= $STORAGE_BYTES + 32;
+    binmode $in;
+    local $/;
+    my $raw = <$in>;
+    return unless defined $raw && length($raw) == $info[7] && $raw =~ /\A[0-9a-f]{32}/;
+    return $raw;
+}
+
+sub kept_storage_replace {
+    my ($file, $raw) = @_;
+    my $next = "$file.new.$$";
+    unlink $next;
+    sysopen(my $out, $next, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600) or return;
+    binmode $out;
+    my $fit = print {$out} $raw;
+    $fit = close($out) && $fit;
+    return 1 if $fit && rename($next, $file);
+    unlink $next;
+    return;
+}
+
+sub kept_storage_items {
+    my ($snapshot) = @_;
+    my (%entries, $at);
+    $at = 0;
+    while ($at < length $snapshot) {
+        return if length($snapshot) - $at < 8 || keys(%entries) >= $STORAGE_ITEMS;
+        my ($k, $v) = unpack 'NN', substr($snapshot, $at, 8);
+        $at += 8;
+        return if ($k | $v) & 1 || $k + $v > length($snapshot) - $at;
+        my $key = substr($snapshot, $at, $k);
+        return if exists $entries{$key};
+        $entries{$key} = substr($snapshot, $at + $k, $v);
+        $at += $k + $v;
+    }
+    return \%entries;
+}
+
+sub kept_storage_frame {
+    my ($app, $url) = @_;
+    my $file = kept_storage_file($app, $url) or return ('', undef);
+    my $epoch;
+    my $snapshot = kept_storage_locked($file, sub {
+        my $raw = kept_storage_read($file) // return;
+        if (!length $raw) {
+            $raw = link_random(16) // return;
+            return unless kept_storage_replace($file, $raw);
+        }
+        my $snapshot = substr($raw, 32);
+        return unless kept_storage_items($snapshot);
+        $epoch = substr($raw, 0, 32);
+        return $snapshot;
+    });
+    return defined $snapshot ? ('=webstore ' . length($snapshot) . "\n$snapshot", $epoch) : ('', undef);
+}
+
+sub kept_storage_asked {
+    my ($held) = @_;
+    my $end = index $held, "\n";
+    return length($held) <= 24 ? 0 : [''] if $end < 0;
+    my $line = substr($held, 0, $end);
+    my ($size) = $line =~ /\A=store ([1-9][0-9]{0,6})\z/ or return [''];
+    return [''] if $size < 9 || $size > $STORAGE_BYTES;
+    return 0 if length($held) < $end + 1 + $size;
+    return [$line, substr($held, $end + 1, $size), $end + 1 + $size];
+}
+
+sub kept_storage_change {
+    my ($live, $body) = @_;
+    my $app = $live->{kept_app} or return;
+    my $file = kept_storage_file($app, $live->{url}) or return;
+    my $epoch = $live->{storage_epoch} or return;
+    my ($op, $k, $v) = unpack 'CNN', $body;
+    return unless ($op == 2 || $op == 1 && !$v || !$op && !$k && !$v)
+        && !(($k | $v) & 1) && $k + $v + 9 == length($body);
+    my $key = substr($body, 9, $k);
+    return kept_storage_locked($file, sub {
+        my $raw = kept_storage_read($file) // return;
+        return unless substr($raw, 0, 32) eq $epoch;
+        my $entries = $op ? kept_storage_items(substr($raw, 32)) : {};
+        return unless $entries;
+        if ($op == 2) { $entries->{$key} = substr($body, 9 + $k, $v) }
+        elsif ($op == 1) { delete $entries->{$key} }
+        return if keys(%$entries) > $STORAGE_ITEMS;
+        my $snapshot = join '', map { pack('NN', length($_), length($entries->{$_})) . $_ . $entries->{$_} } sort keys %$entries;
+        return if length($snapshot) > $STORAGE_BYTES;
+        return kept_storage_replace($file, $epoch . $snapshot);
+    });
+}
+
+# Rotate the on-disk generation while clearing. A renderer loaded before the
+# clear cannot later write its old snapshot or credentials back.
+sub kept_storage_forget {
+    my ($app, $url) = @_;
+    my $file = kept_storage_file($app, $url) or return;
+    my $epoch = link_random(16) // return;
+    return kept_storage_locked($file, sub { kept_storage_replace($file, $epoch) });
+}
+
+sub kept_storage_forget_app {
+    my ($app) = @_;
+    my $first = kept_storage_forget($app, 'https://discord.com/');
+    my $second = kept_storage_forget($app, 'https://discord.gg/');
+    return $first && $second;
+}
+
+sub kept_storage_forget_site {
+    my ($url) = @_;
+    return 0 unless $url =~ m{\Ahttps://(?:discord\.com|discord\.gg)(?:[/?]|\z)} &&
+        -d "$ROOT/cht/web/discord";
+    my $app = kept_app_discord() or return;
+    return unless kept_storage_forget_app($app);
+    for my $live (grep { $_->{kept_app} } @LIVE) { live_end($live, 'its Discord storage was cleared', 1) }
+    return 1;
+}
 # The renderer's bounded WebSocket protocol. Permission to open a transport requires
 # trusted kept-app provenance. Ordinary pages receive a failed socket rather than losing the page.
 # SYNC: managed-projects/lzrbrwsr/architecture/lzrcht-discord-web.md

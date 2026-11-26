@@ -314,24 +314,24 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 07-visit.pl	261	outrun	-
 07-visit.pl	276	faces	C13
 07-visit.pl	312	contained	C28 C20 C13 C14 C26 C7 C3
-07-visit.pl	368	page_started	C1 C3
-07-visit.pl	391	spare_for	-
-07-visit.pl	399	spare_taken	-
-07-visit.pl	410	spare_dropped	-
-07-visit.pl	418	spare_work	-
-07-visit.pl	425	idle_taken	C1
-07-visit.pl	437	run_seal	-
-07-visit.pl	463	keeper	C9
-07-visit.pl	551	unhung	-
-07-visit.pl	559	parted	-
-07-visit.pl	568	checked	C30 C9 C22 C14
-07-visit.pl	671	laid	-
-07-visit.pl	684	laid_run	C4
-07-visit.pl	734	redirect_noted	C4
-07-visit.pl	746	redirect_answered	-
-07-visit.pl	753	redirects_listed	C4
-07-visit.pl	766	redirects_told	C4 C23
-07-visit.pl	768	redirects_decide	C4
+07-visit.pl	370	page_started	C1 C3
+07-visit.pl	393	spare_for	-
+07-visit.pl	401	spare_taken	-
+07-visit.pl	412	spare_dropped	-
+07-visit.pl	420	spare_work	-
+07-visit.pl	427	idle_taken	C1
+07-visit.pl	439	run_seal	-
+07-visit.pl	465	keeper	C9
+07-visit.pl	553	unhung	-
+07-visit.pl	561	parted	-
+07-visit.pl	570	checked	C30 C9 C22 C14
+07-visit.pl	673	laid	-
+07-visit.pl	686	laid_run	C4
+07-visit.pl	736	redirect_noted	C4
+07-visit.pl	748	redirect_answered	-
+07-visit.pl	755	redirects_listed	C4
+07-visit.pl	768	redirects_told	C4 C23
+07-visit.pl	770	redirects_decide	C4
 08-pictures.pl	1	-	C7 C5 C17 C8 C22
 08-pictures.pl	46	pictures_state	C28
 08-pictures.pl	57	pictures_begun	C23 C28 C27 C4 C5 C8 C6 C7 C1 C3 C21
@@ -382,20 +382,20 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 10-tabs.pl	144	tab_moved	-
 10-tabs.pl	160	tab_shown	C29 C32 C18 C12 C7
 10-tabs.pl	195	menu	C7 C16 C4
-10-tabs.pl	254	nav_told	-
-10-tabs.pl	259	navigated	C4
-10-tabs.pl	277	engine_fit	-
-10-tabs.pl	283	engine	-
-10-tabs.pl	293	search_set	C16
-10-tabs.pl	304	typed	C23
-10-tabs.pl	319	secured	-
-10-tabs.pl	341	home	-
-10-tabs.pl	353	go	C7
-10-tabs.pl	378	redirected	-
-10-tabs.pl	386	unfit	-
-10-tabs.pl	397	resolved	-
-10-tabs.pl	422	home_shown	C29 C32
-10-tabs.pl	453	home_arrived	C19
+10-tabs.pl	258	nav_told	-
+10-tabs.pl	263	navigated	C4
+10-tabs.pl	281	engine_fit	-
+10-tabs.pl	287	engine	-
+10-tabs.pl	297	search_set	C16
+10-tabs.pl	308	typed	C23
+10-tabs.pl	323	secured	-
+10-tabs.pl	345	home	-
+10-tabs.pl	357	go	C7
+10-tabs.pl	382	redirected	-
+10-tabs.pl	390	unfit	-
+10-tabs.pl	401	resolved	-
+10-tabs.pl	426	home_shown	C29 C32
+10-tabs.pl	457	home_arrived	C19
 11-bookmarks.pl	1	-	C4
 11-bookmarks.pl	19	marks_root	C16
 11-bookmarks.pl	28	marks_into_bar	C16
@@ -746,8 +746,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-kept-app.pl	55	kept_app_jar	-
 21-kept-app.pl	66	kept_app_fetched	-
 21-kept-app.pl	77	kept_app_response	-
-21-kept-app.pl	100	kept_app_open_tab	-
-21-kept-app.pl	120	kept_app_visit	-
+21-kept-app.pl	103	kept_app_open_tab	-
+21-kept-app.pl	123	kept_app_visit	-
 21-link.pl	1	-	C31
 21-link.pl	49	link_folder	-
 21-link.pl	50	link_state	C31
@@ -771,8 +771,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-link.pl	248	link_reaped	C31
 21-link.pl	261	link_checked	C31
 21-link.pl	280	link_command	C31
-21-link.pl	363	link_drew	C31
-21-link.pl	369	link_shot	C31
+21-link.pl	364	link_drew	C31
+21-link.pl	370	link_shot	C31
 21-live.pl	1	-	-
 21-live.pl	8	live_of	-
 21-live.pl	10	live_kept	C18
@@ -783,12 +783,24 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-live.pl	80	live_due	C19
 21-live.pl	92	live_turn	C18 C19 C26 C5 C17 C6 C7
 21-live.pl	150	live_asked	C19 C26
-21-live.pl	184	live_early	C19
-21-live.pl	204	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	309	live_parts	C19
-21-live.pl	328	unchunked	-
-21-live.pl	343	live_replied	C19
-21-live.pl	348	live_sent	C19
+21-live.pl	185	live_early	C19
+21-live.pl	205	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
+21-live.pl	311	live_parts	C19
+21-live.pl	330	unchunked	-
+21-live.pl	345	live_replied	C19
+21-live.pl	350	live_sent	C19
+21-web-storage.pl	1	-	-
+21-web-storage.pl	7	kept_storage_file	-
+21-web-storage.pl	14	kept_storage_locked	-
+21-web-storage.pl	23	kept_storage_read	-
+21-web-storage.pl	35	kept_storage_replace	-
+21-web-storage.pl	48	kept_storage_items	-
+21-web-storage.pl	65	kept_storage_frame	-
+21-web-storage.pl	83	kept_storage_asked	-
+21-web-storage.pl	94	kept_storage_change	-
+21-web-storage.pl	119	kept_storage_forget	-
+21-web-storage.pl	126	kept_storage_forget_app	-
+21-web-storage.pl	133	kept_storage_forget_site	-
 21-websocket.pl	1	-	-
 21-websocket.pl	4	ws_asked	-
 21-websocket.pl	26	ws_request	-

@@ -94,6 +94,9 @@ sub kept_app_response {
     return (undef, 0) if $why || !defined $got || !kept_app_budget($app, 0, length($got));
     my $parts = live_parts($got, $method);
     return (undef, 0) unless $parts && record("$host answered the kept app with $parts->[0]: " . length($got) . ' bytes');
+    if ($method eq 'POST' && $url =~ m{\Ahttps://discord\.com/api/(?:v[0-9]+/)?auth/logout(?:\?[^#]*)?\z} && $parts->[0] >= 200 && $parts->[0] < 300) {
+        record('Discord signed out but its stored session could not be cleared') unless kept_storage_forget_app($app);
+    }
     return ($got, $parts->[0], $peer, $certs, $parts);
 }
 

@@ -149,6 +149,7 @@ sub live_turn {
 # "=fetched 0 0 0". A request line of no form ends the page.
 sub live_asked {                          # [C19] the request at the front of what the page wrote: nothing when there is none, 0 while it is not all there, else [its line, its body, the bytes it takes], or [its line] when it is of no form
     my ($live) = @_;
+    return kept_storage_asked($live->{held}) if substr($live->{held}, 0, 7) eq '=store ';
     return ws_asked($live->{held}) if $live->{held} =~ /\A=ws(?:open|send|close) /;
     my $permit = substr($live->{held}, 0, 8) eq '=permit ';    # [C26] a question whether a script may run: one line, no body
     if (substr($live->{held}, 0, 7) eq '=early ') {    # the page as it is before its scripts run: one line "=early BYTES", then that many bytes of a list, answered with nothing (sub live_early)
@@ -209,6 +210,7 @@ sub live_fetched {                        # [C19]
     return live_end($live, 'it wrote a line of no form') unless defined $took;
     substr($live->{held}, 0, $took, '');
     $live->{looked} = 0;
+    return kept_storage_change($live, $body) if substr($line, 0, 7) eq '=store ';
     return ws_request($live, $line, $body) if $line =~ /\A=ws/;
     return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';

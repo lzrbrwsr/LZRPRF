@@ -318,6 +318,8 @@ sub contained {
     my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]" . ($VIEW_SCALE == 2 ? " 2" : "") . "\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
     $frame .= permit_page($url, \$got, $app) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
     $frame .= ($app ? kept_app_jar($app, sub { jar_frame($url) }) : jar_frame($url)) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
+    my ($stored, $epoch) = $app ? kept_storage_frame($app, $url) : ('', undef);
+    $frame .= $stored;
     $frame .= '=live ' . length($got) . "\n" if $keep;
     if (!$app && (my $ran = beside_taken($frame . $got, defined $sheets && !$tool, $url, !$local_home && !$soon))) { return run_read($ran, $keep, $sheets, $tool) }    # the very run, started beside the first (sub beside_begun)
     my ($input, $relay);                  # the keeper's end of the relay and lzrprf's, for a page kept running
@@ -356,7 +358,7 @@ sub contained {
         return (undef, 'unstarted');
     }
     my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
-    $started->{kept_app} = $app if $app;
+    @$started{qw(kept_app storage_epoch)} = ($app, $epoch) if $app;
     if ($soon && $keep) { $started->{fed} = $frame . $got if $soon eq 'beside'; return (undef, undef, $started) }
     beside_begun($started, $sheets, $keep, $tool) unless $app;    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
     return run_read($started, $keep, $sheets, $tool);

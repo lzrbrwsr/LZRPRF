@@ -328,6 +328,7 @@ sub link_command {                        # [C31] one command: checked, written 
         my ($url, $host) = address($arg);
         return link_line('WARN', 'command', 'the address is not one lzrprf fetches', verb => $verb, nonce => $nonce) unless $url;
         my $gone = jar_forget($url);
+        kept_storage_forget_site($url);
         noted("the live debug link cleared the cookies of $host: $gone");
         return link_line('INFO', 'forget', "the cookies of $host were cleared: $gone", nonce => $nonce, cleared => $gone);
     }

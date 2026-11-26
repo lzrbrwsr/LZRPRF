@@ -197,7 +197,11 @@ sub menu {
     if ($what eq 'forget-cookies') {      # [C7] the cookies of the shown tab's site, under every site they were set under
         my ($url, $host) = address($TABS[$TAB]{url} // '');
         return idle('No cookie was cleared: this tab shows no site.') unless $url && length $TABS[$TAB]{url};
-        my $gone = jar_forget($url);
+        my $app = $TABS[$TAB]{kept_app};
+        my $gone = $app ? kept_app_jar($app, sub { jar_clear() }) : jar_forget($url);
+        my $stored = kept_storage_forget_site($url);
+        return idle('The cookies were cleared, but Discord storage could not be cleared.') unless defined $stored;
+        return idle('Discord storage and site cookies were cleared. Reload Discord to sign in again.') if $stored && $app;
         noted("you cleared the cookies of $host: $gone");
         return idle("The cookies of $host were cleared: $gone. Reload the page to see it without them.");
     }
