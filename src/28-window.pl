@@ -3483,6 +3483,7 @@ function face(flags, size, hex) {
         how.setObjectForKey(one, $.NSFontAttributeName);
         how.setObjectForKey(colour(hex), $.NSForegroundColorAttributeName);    // a link too: the page chose its colour, and a white link on a blue button stays white
         if (flags & 8) how.setObjectForKey($.NSNumber.numberWithInt(1), $.NSUnderlineStyleAttributeName);
+        if (flags & 16) how.setObjectForKey($.NSNumber.numberWithInt(1), $.NSStrikethroughStyleAttributeName);    // line-through (laid.rs looks 16)
         typefaces[key] = [how, one.ascender];
     }
     return typefaces[key];
