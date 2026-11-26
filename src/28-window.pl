@@ -385,7 +385,7 @@ function heard(line) {
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
     else if (word == 'tabs') { tabsTold(rest); if (!inspectFits(inspectUI)) inspectClose(); }
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
-    else if (word == 'install') installTold(rest);
+    else if (word == 'install') installTold(rest); else if (word == 'updateoffer') updateOfferTold(rest);
     else if (word == 'checked') checkedTold(rest); else if (word == 'release') releaseNumber = rest;    // for About (28-window-menu.pl)
     else if (word == 'licence') licenceTold(rest);
     else if (word == 'profiles') profilesTold(rest);
@@ -421,7 +421,7 @@ function heard(line) {
     else if (word == 'pictures') { picturesRow = true; picturesBlocked = rest == 'block'; if (cogOpen) cogPlaced(); }
     else if (word == 'marksbar') { marksOn = rest == 'on'; marksView.hidden = !marksOn; if (barMenuItem) barMenuItem.title = $(barToggleWords(marksOn, true)); place(); }
     else if (word == 'flagged' || word == 'flagreport') flagTold(word, rest);    // [C28] LZRDFNDR's red page, and the report of a wrong block before it is sent
-    else if (word == 'permit') permitTold(rest);    // [C26] lzrprf's question about the scripts of the page shown
+    else if (word == 'permit') { if (/^answered [0-9]+$/.test(rest)) { if (rest == 'answered ' + asked) { permitLater = null; if (modalKind == 'permit') closeModal(); if (toolIcon) toolIcon.needsDisplay = true; } } else permitTold(rest); }    // [C26] lzrprf's question about the scripts of the page shown
     else if (word == 'permitscript') permitScriptTold(rest);    // [C26] one script of that question, with its source
     else if (word == 'scripts') scriptsTold(rest);    // [C26] the list of LZRDFNDR scripts
     else if (word == 'webquestion') webQuestionTold(rest);
@@ -3069,7 +3069,7 @@ function modal(title, about, choices, kind) {
 // no key pressed by habit may do. The installer's modal while it runs has no button and no key. A view of no
 // size in the veil hears the two keys (LzrprfKeys), so they work while the veil is up and never otherwise, and in
 // a window that is not in front too, where a button hears no key of its own.
-var MODAL_ESCAPES = ['Cancel', 'Close', 'Got it', 'Hide', 'Back', 'OK'], modalEscape = -1, modalKeys = null;
+var MODAL_ESCAPES = ['Cancel', 'Close', 'Got it', 'Hide', 'Back', 'OK', 'Later'], modalEscape = -1, modalKeys = null;
 function modalKeyed(event) {
     if (!modalOpen || !veil || veil.hidden || (event.modifierFlags & (CMD | CONTROL | OPTION))) return false;
     var code = event.keyCode, which = (code == 36 || code == 76) && modalActions.length == 1 ? 0 : code == 53 ? modalEscape : -1;    // 36: Return, 76: Enter, 53: Escape
@@ -3387,7 +3387,7 @@ function installTold(rest) {
     if (word == 'begin') { modal('Installing a newer release', 'The installer runs here by itself and asks nothing. This cannot be closed until it ends.', [], 'big'); installState = 'fetch'; }
     else if (!modalOpen || modalKind != 'big') return;
     else if (word == 'runs' || word == 'told') installState = word == 'told' && more.slice(-10) == ' undrained' ? 'runs' : word;    // the installer was started; lzrprf stops while it runs, and a process of its own reads its lines on, or none could be started (undrained)
-    else if (word == 'sum') panelSub.stringValue = $('The installer runs here by itself and asks nothing. Its SHA-256: ' + more);
+    else if (word == 'sum') { var checksum = more.split('\t'); panelSub.stringValue = $('Installer SHA-256: ' + checksum[0] + (checksum[1] ? '\nCompare the install.sh entry at ' + checksum[1] : '')); }
     else if (word == 'line') installLine(more.slice(2), more.charAt(0));
     else if (word == 'end') {
         var done = more.slice(0, 5) == 'done ';

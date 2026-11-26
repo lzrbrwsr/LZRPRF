@@ -54,9 +54,9 @@ asked again at the next start. To take a yes back, delete `~/.lzrprf/look`: you 
   and what it cannot keep you from, which stays yours to watch: what you type into a site, what
   a site does with it on its own servers, fake sites, what you take into another program, and
   your internet address. Got it writes the release number to `welcomed`; nothing is fetched.
-- When the number is larger than yours, the window says so and offers the installer. lzrprf
-  replaces nothing itself, not the application and not itself. "Install it" is the yes, and no
-  key is pressed after it (`sub installed`).
+- When a signed newer release is available, a centered modal shows both release numbers.
+  Later or Escape dismisses it. Install it runs the installer in the window and shows its
+  progress. No further confirmation is needed (`sub installed`).
 - Before it offers the release, lzrprf fetches `release.manifest`, `release.manifest.sig` and
   `release.manifest.approval` beside each installer place and checks them `[C25]` (`sub release_signed`):
   the two places must hold the same bytes; the approval must hold for an approval key lzrprf carries
@@ -78,6 +78,7 @@ asked again at the next start. To take a yes back, delete `~/.lzrprf/look`: you 
   character like any other.
 - It writes the installer into `~/.lzrprf/install.NUMBER/install.sh`, a file only you can read,
   shows that file and its SHA-256 in the window, and writes both in the log, before it runs it.
+  The window and installer output give the signed manifest URL and the install.sh entry to compare.
 - It runs it there, outside every container, as `/bin/sh install.sh auto`, through `env -i`
   with only the system's `PATH`, your home folder and `TERM=dumb`: no variable of your shell.
   Nothing is piped into a shell. Every line the installer prints is shown in a modal of

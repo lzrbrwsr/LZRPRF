@@ -580,6 +580,13 @@ function run(argv) {
     view();    // after "ready", which lzrprf hears first: the size the first page is laid out at
     app.run;
 }
+
+// Only the signed release offer uses this modal. Its first button is also Escape.
+function updateOfferTold(rest) {
+    if (!rest) { if (modalOpen && modalKind == 'updateoffer') closeModal(); return; }
+    var parts = rest.split('\t'), versions = parts[0].split(' '), number = ++asked;
+    var answer = function (choice) { return function () { closeModal(); say('button ' + number + ' ' + choice); }; };
+    modal('LZRBRWSR update available', 'Release ' + versions[0] + ' is ready to install. You are using release ' + versions[1] + '. The installer runs in this window and shows its progress here.', [[parts[1], answer(1)], [parts[2], answer(2)]], 'updateoffer');
+}
 END
 }
-

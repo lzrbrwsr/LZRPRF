@@ -9691,7 +9691,7 @@ sub newer_looked {
         aside($says);
         return;
     }
-    return $back->() unless ask("A newer release of $APP is published: $there. You run $release. Install it fetches the installer and runs it here, in this window, with no further question: every line it prints is shown and kept in ${\ shared()}/install.txt.", 'Later', 'Install it') == 2;
+    if (asked("updateoffer $there $release", 'Later', 'Install it') != 2) { window('updateoffer'); return $back->() }
     installed($there, $installer, $same, $signed);
     return $back->();                     # the installer did not run to its end (an install that is done never comes back here): its modal says why, and the window takes a press again
 }
@@ -9823,6 +9823,7 @@ sub install_run {
     print {$INSTALL_LOG} line("you chose to install release $there"), "\n";    # the time, the run, what happened: as a line of the log
     return install_end(0, 'The second place the release file names is not an address lzrprf fetches. Nothing was fetched.') if defined $same && !length $same;
     my @from = ($installer, defined $same ? $same : ());
+    my $manifest_url = $installer =~ s{[^/]+\z}{release.manifest}r;
     my @copies;
     for my $try (1 .. $INSTALL_TRIES) {       # the copies are compared each time anew: one that differs is never run, it is only fetched again later
         @copies = ();
@@ -9841,7 +9842,7 @@ sub install_run {
     return install_end(0, "The two places hold different installers. Nothing was changed: $from[0] and $from[1].") if @copies == 2 && $copies[0] ne $copies[1];
     my $wanted = ref $signed eq 'HASH' && $signed->{release} == $there ? $signed->{files}{'install.sh'} // '' : '';    # [C25]
     my $fetched = Digest::SHA->new(256)->add($copies[0])->hexdigest;
-    return install_end(0, "The installer is not the one the signed manifest of release $there names: it has SHA-256 $fetched" . (length $wanted ? ", the manifest names $wanted" : ', and no signed manifest was read') . '. Nothing was changed.') unless length $wanted && $fetched eq $wanted;
+    return install_end(0, "The installer is not the one the signed manifest of release $there names: it has SHA-256 $fetched" . (length $wanted ? ", the signed manifest at $manifest_url names $wanted" : ', and no signed manifest was read') . '. Nothing was changed.') unless length $wanted && $fetched eq $wanted;
     my ($folder, $out) = ("${\ shared()}/install.$$");
     mkdir $folder, 0700;
     my @folder = lstat $folder;
@@ -9851,8 +9852,8 @@ sub install_run {
     my $sum = Digest::SHA->new(256)->add($copies[0])->hexdigest;
     install_line(@copies == 2 ? 'The installer was fetched from two places, and both hold the same file.' : 'The installer comes from one place.');
     install_line("It is in this file, to read: $file");
-    install_line("Its SHA-256: $sum");
-    window("install sum $sum");
+    install_line("Its SHA-256: $sum. Compare the install.sh entry in the signed release $there manifest: $manifest_url");
+    window("install sum $sum\t$manifest_url");
     record("the installer of release $there has SHA-256 $sum, and runs now in auto: $file") or return install_end(0, $UNWRITTEN);    # [C5]
     return install_end(0, 'lzrprf try: the installer was written and is not run.') if $TRY;
     install_line('It runs now by itself: no question is shown, and each line it prints is shown here.');
@@ -16339,7 +16340,7 @@ function heard(line) {
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
     else if (word == 'tabs') { tabsTold(rest); if (!inspectFits(inspectUI)) inspectClose(); }
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
-    else if (word == 'install') installTold(rest);
+    else if (word == 'install') installTold(rest); else if (word == 'updateoffer') updateOfferTold(rest);
     else if (word == 'checked') checkedTold(rest); else if (word == 'release') releaseNumber = rest;    // for About (28-window-menu.pl)
     else if (word == 'licence') licenceTold(rest);
     else if (word == 'profiles') profilesTold(rest);
@@ -16375,7 +16376,7 @@ function heard(line) {
     else if (word == 'pictures') { picturesRow = true; picturesBlocked = rest == 'block'; if (cogOpen) cogPlaced(); }
     else if (word == 'marksbar') { marksOn = rest == 'on'; marksView.hidden = !marksOn; if (barMenuItem) barMenuItem.title = $(barToggleWords(marksOn, true)); place(); }
     else if (word == 'flagged' || word == 'flagreport') flagTold(word, rest);    // [C28] LZRDFNDR's red page, and the report of a wrong block before it is sent
-    else if (word == 'permit') permitTold(rest);    // [C26] lzrprf's question about the scripts of the page shown
+    else if (word == 'permit') { if (/^answered [0-9]+$/.test(rest)) { if (rest == 'answered ' + asked) { permitLater = null; if (modalKind == 'permit') closeModal(); if (toolIcon) toolIcon.needsDisplay = true; } } else permitTold(rest); }    // [C26] lzrprf's question about the scripts of the page shown
     else if (word == 'permitscript') permitScriptTold(rest);    // [C26] one script of that question, with its source
     else if (word == 'scripts') scriptsTold(rest);    // [C26] the list of LZRDFNDR scripts
     else if (word == 'webquestion') webQuestionTold(rest);
@@ -19023,7 +19024,7 @@ function modal(title, about, choices, kind) {
 // no key pressed by habit may do. The installer's modal while it runs has no button and no key. A view of no
 // size in the veil hears the two keys (LzrprfKeys), so they work while the veil is up and never otherwise, and in
 // a window that is not in front too, where a button hears no key of its own.
-var MODAL_ESCAPES = ['Cancel', 'Close', 'Got it', 'Hide', 'Back', 'OK'], modalEscape = -1, modalKeys = null;
+var MODAL_ESCAPES = ['Cancel', 'Close', 'Got it', 'Hide', 'Back', 'OK', 'Later'], modalEscape = -1, modalKeys = null;
 function modalKeyed(event) {
     if (!modalOpen || !veil || veil.hidden || (event.modifierFlags & (CMD | CONTROL | OPTION))) return false;
     var code = event.keyCode, which = (code == 36 || code == 76) && modalActions.length == 1 ? 0 : code == 53 ? modalEscape : -1;    // 36: Return, 76: Enter, 53: Escape
@@ -19341,7 +19342,7 @@ function installTold(rest) {
     if (word == 'begin') { modal('Installing a newer release', 'The installer runs here by itself and asks nothing. This cannot be closed until it ends.', [], 'big'); installState = 'fetch'; }
     else if (!modalOpen || modalKind != 'big') return;
     else if (word == 'runs' || word == 'told') installState = word == 'told' && more.slice(-10) == ' undrained' ? 'runs' : word;    // the installer was started; lzrprf stops while it runs, and a process of its own reads its lines on, or none could be started (undrained)
-    else if (word == 'sum') panelSub.stringValue = $('The installer runs here by itself and asks nothing. Its SHA-256: ' + more);
+    else if (word == 'sum') { var checksum = more.split('\t'); panelSub.stringValue = $('Installer SHA-256: ' + checksum[0] + (checksum[1] ? '\nCompare the install.sh entry at ' + checksum[1] : '')); }
     else if (word == 'line') installLine(more.slice(2), more.charAt(0));
     else if (word == 'end') {
         var done = more.slice(0, 5) == 'done ';
@@ -20989,9 +20990,16 @@ function run(argv) {
     view();    // after "ready", which lzrprf hears first: the size the first page is laid out at
     app.run;
 }
+
+// Only the signed release offer uses this modal. Its first button is also Escape.
+function updateOfferTold(rest) {
+    if (!rest) { if (modalOpen && modalKind == 'updateoffer') closeModal(); return; }
+    var parts = rest.split('\t'), versions = parts[0].split(' '), number = ++asked;
+    var answer = function (choice) { return function () { closeModal(); say('button ' + number + ' ' + choice); }; };
+    modal('LZRBRWSR update available', 'Release ' + versions[0] + ' is ready to install. You are using release ' + versions[1] + '. The installer runs in this window and shows its progress here.', [[parts[1], answer(1)], [parts[2], answer(2)]], 'updateoffer');
+}
 END
 }
-
 my $command = shift // '';
 if ($command =~ /^(?:run|incognito|tor|keep|log)\z/ && ($ARGV[0] // '') eq '--profile') { (undef, $PROFILE) = splice @ARGV, 0, 2; die "lzrprf: --profile takes the id of a profile, 12 hex digits as lzrprf made it. Nothing was started or changed. \"lzrprf profiles\" lists each id with its name.\n" unless ($PROFILE // '') =~ /\A[0-9a-f]{12}\z/ }    # a profile's window: its id alone is an argument, never its name (sub profile_command)
 if ($command =~ /^(?:run|incognito)\z/ && ($ARGV[0] // '') eq '--open') { ($OPEN, $OPEN_FRAME, @ARGV) = opened_with(\*STDIN, @ARGV); open STDIN, '<', '/dev/null' }

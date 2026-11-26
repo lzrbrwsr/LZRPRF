@@ -719,12 +719,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 19-updates.pl	284	welcomed	C5 C6 C3
 19-updates.pl	331	installed	C25
 19-updates.pl	358	install_run	C25 C5
-19-updates.pl	459	install_drained	-
-19-updates.pl	492	install_guarded	-
-19-updates.pl	507	restarted	C5
-19-updates.pl	539	install_line	-
-19-updates.pl	557	install_end	-
-19-updates.pl	570	body_of	-
+19-updates.pl	460	install_drained	-
+19-updates.pl	493	install_guarded	-
+19-updates.pl	508	restarted	C5
+19-updates.pl	540	install_line	-
+19-updates.pl	558	install_end	-
+19-updates.pl	571	body_of	-
 20-window-side.pl	1	-	C29
 20-window-side.pl	14	window	C12
 20-window-side.pl	24	strip_back	-
