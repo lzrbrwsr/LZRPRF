@@ -3,6 +3,8 @@
 sub window_website_text {
     return <<'END';
 var WEB_PILLS = [['Always allow', 'always'], ['Allow once', 'allow-once'], ['Always Deny', 'deny'], ['Deny once', 'deny-once'], ['Forget', 'forget']];
+// The questions (scripts, redirect, send) offer the four answers: Forget is only in the site's settings.
+var ASK_PILLS = WEB_PILLS.filter(function (pill) { return pill[1] != 'forget'; });
 var WEB_EFFECT = { 'allowed always': 'always', 'allowed once': 'allow-once', 'denied always': 'deny', 'denied once': 'deny-once',
     'proceed always': 'always', 'cancel always': 'deny', proceeded: 'allow-once', cancelled: 'deny-once', pending: 'forget', 'no decision': 'forget' };
 var ESSENTIAL_TITLE = 'Essential Allow and deny list';
@@ -139,9 +141,10 @@ function webQuestionTold(rest) {
     webQuestionShown({ kind: f[0], words: f[1], essential: f[2] != '-', fit: f[3] == '1', titles: f.slice(4), number: number });
 }
 function webQuestionShown(one) {
-    var answerByPosition = [3, 2, 4, 1, 5, 6];
-    var choices = one.titles.map(function (title, i) {
-        return [title, function () { closeModal(); say('button ' + one.number + ' ' + answerByPosition[i]); }];
+    var answerByPosition = [3, 2, 4, 1, 5, 6], choices = [];
+    one.titles.forEach(function (title, i) {
+        if (answerByPosition[i] == 5) return;   // Forget: only in the site's settings, never in the question
+        choices.push([title, function () { closeModal(); say('button ' + one.number + ' ' + answerByPosition[i]); }]);
     });
     modal('LZRDFNDR ' + (one.kind == 'redirect' ? 'redirect' : 'send'), one.words || '', choices, 'tall');
     if (!one.fit) { panelButtons[0].enabled = false; panelButtons[1].enabled = false; }
@@ -172,7 +175,7 @@ function webWarningHidden() {
 function isWebQuestion() { return /^LZRDFNDR (scripts|redirect|send)$/.test(String(panelTitle.stringValue.js)); }
 function webQuestionPlaced(m, w, h) {
     if (!panelButtons.length || !isWebQuestion()) return;
-    var permit = modalKind == 'permit', extra = panelButtons.length > WEB_PILLS.length, count = Math.min(panelButtons.length, WEB_PILLS.length);
+    var permit = modalKind == 'permit', extra = panelButtons.length > ASK_PILLS.length, count = Math.min(panelButtons.length, ASK_PILLS.length);
     var wButton = Math.floor((w - 52 - (count - 1) * 5) / count), line = m + (permit ? 53 : 18);
     for (var i = 0; i < count; i++) {
         var button = panelButtons[i];
