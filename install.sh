@@ -166,12 +166,12 @@ BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 # that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="37ea3f4e9e8267b1fcffb4de280f859c1474c19209d9530eddf82e591f5c381d"
-RELEASE="147"
-LZRPRF_COMMIT="8366c2ecb615c4349b80be79521dcdd94758135a"
+SHA256="1fc6936b3cbb1e8ea47c8fc16dec52925bd6b059e90f148afc19e838ee5887b8"
+RELEASE="148"
+LZRPRF_COMMIT="aa10fcbc54a0005b5cc22a0a23efac4d669b9f07"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="cc788f8ad5a6a808114d591561a49016b5a4e5cc14367cfc16595d89124c11d1"
-SELFTEST_SHA256="e0ebe0a12ebdc08e85df9cbf14a90081c361985319f75c4929894072e568c97e"
+LZRPRF_SHA256="5a6c05af75b0ab51c6f2873e9432cb08c72569669be2569c0ffbaa73011332b4"
+SELFTEST_SHA256="b2fdaa94e32e33c296b3f13688ccfa7c27e42e66a0cad4e6f7b1b07c22dd8f7f"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
 BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
 # RELEASE_KEY: the public half of the release key; a release is installed only when its manifest is signed with it
@@ -787,10 +787,10 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 147
+release 148
 home local
 new Links on busy news sites (yle.fi) take clicks again after the page has been open a while.
-new After an update, the welcome card no longer leaves the page grey and unclickable.
+new LZRDFNDR's questions about scripts, redirects and sends no longer offer Forget; it stays in the site's settings.
 newest https://lzrbrwsr.com/latest
 installer https://lzrbrwsr.com/install.sh
 same https://lzrbrwsr.vercel.app/install.sh
@@ -799,7 +799,7 @@ file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
 file lzrbrwsr-bin 30e0806fd959d28a738d1487337e5f555e1fe68059ad25575e734da65bf6a3c6
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-lzrprf cc788f8ad5a6a808114d591561a49016b5a4e5cc14367cfc16595d89124c11d1
+lzrprf 5a6c05af75b0ab51c6f2873e9432cb08c72569669be2569c0ffbaa73011332b4
 blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."
