@@ -255,8 +255,10 @@ function partsMade() {    // the boxes of the two modals, made once with the pan
 
 function run(argv) {
     NAME = (argv[0] || NAME).replace(/-Staging$/, ' - Staging');    // the staging application, LZRBRWSR-Staging.app, is named "LZRBRWSR - Staging" in the menu bar (Henry, 2026-11-26)
-    TORWINDOW = argv[1] == 'tor';
-    INCOGNITO = argv[1] == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
+    PULLED = /\+$/.test(argv[1] || '');    // T5: "+" after the kind, said by lzrprf for a window a tab was pulled out into (sub pulled_command, --open)
+    var kindWord = (argv[1] || '').replace(/\+$/, '');
+    TORWINDOW = kindWord == 'tor';
+    INCOGNITO = kindWord == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
     if (INCOGNITO) $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSQuitAlwaysKeepsWindows: false, ApplePersistenceIgnoreState: true }));    // in memory only: macOS is asked to keep no window of it to restore (and this container lets it write no file anyway)
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;

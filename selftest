@@ -2329,6 +2329,7 @@ my %about = (
     blockedorder => q{Verifying that a list out of order opens no page.},
     lostblock => q{Verifying that the test detects an lzrprf whose list matches nothing.},
     profilelate => q{Verifying that a first profile's window opened before profiles existed takes its lock once its list is asked for.},
+    pulledkind => q{Verifying that a window a tab was pulled out into runs with no Dock icon of its own.},
 );
 sub run_of {
     my ($name, %how) = @_;
@@ -2804,6 +2805,15 @@ my $find_js = join("\n", 'function run(argv) {',    # Find's and zoom's own func
     q{return found + "\n" + steps + "\n" + up.join(' ') + ' / ' + down.join(' ') + ' / ' + zoomNext(175, 0) + ' ' + zoomNext(33, 1) + ' ' + zoomOf(7) + "\n" + widths + "\n" + said.join(',');},
     '}');
 run_of('findzoom', command => ['/usr/bin/osascript', '-l', 'JavaScript', '-e', $find_js]);
+my $pulled_js = join("\n", 'function run(argv) {',    # T5: the window's own kind and argument reading, read from lzrprf: a window a tab was pulled out into is an accessory, the first window a regular app
+    q{var PULLED = false, said = [];},
+    ($text_of_lzrprf =~ /^(function kind\(\) \{.*?\})/m),
+    q{function read(argv) { PULLED = false; }},
+    'function parse(argv) { ' . (($text_of_lzrprf =~ /^    (PULLED = .*?;)/m)[0] // '') . ' }',
+    q{parse(['LZRBRWSR', 'window', '0 0 1000 760']); said.push(kind()); parse(['LZRBRWSR', 'window+', '5 6 700 500']); said.push(kind()); parse(['LZRBRWSR', 'incognito+', '5 6 700 500']); said.push(kind());},
+    q{return said.join(' ');},
+    '}');
+run_of('pulledkind', command => ['/usr/bin/osascript', '-l', 'JavaScript', '-e', $pulled_js]);
 my ($scroll_due) = $text_of_lzrprf =~ /^    'pageScrollDue:': \{ types: \['void', \['id'\]\], implementation: (function \(sender\) \{.*?\}) \},$/m;
 my $scroll_js = join("\n", 'function run(argv) {',    # the window's own scroll telling, read from lzrprf: the page's view, lzrprf's pipe and the next frame stand in here
     q{var said = [], dues = 0, liveOn = false, liveFocus = false, sheet = {}, limit = 1e9, origin = { x: 0, y: 0 }, selected = 0, homeLoading = false;},
@@ -4868,6 +4878,9 @@ check($closed_order eq '10: 12@11+ 11@10+ 10@9 9@8 8@7 7@6 6@5 5@4 4@3 3@2 empty
     'the closed tabs are held newest first, ten at most, and only the two newest keep their page; a tab with no address is not held: "sub closed_kept", read from lzrprf and run here', $closed_order);
 check((out('reopenstrip') =~ s/\s+$//r) eq 'null,A,B 0,0.1,0.2 100,110,150 0 false null 3 | A,B,null 0.1,0.2,0 110,150,100 2 false null 3 | A,C 0.1,0.3 110,175 0 false null 2 | A,B,C 0.1,0.2,0.3 110,150,175 0 false null 3 viewed=4',
     'the strip, read from lzrprf and run with no window: a reopened tab gets its own place, the tabs after it keeping their drawings, where they were read and their zoom; a pulled tab is let go once lzrprf says the tabs without it, and stays when lzrprf could not start its window; the tab shown then says its zoom\'s width', out('reopenstrip') =~ s/\s+$//r =~ s/\n/ ; /gr || err('reopenstrip') =~ s/\s+/ /gr);
+check((out('pulledkind') =~ s/\s+$//r) eq '0 1 1' && $text_of_lzrprf =~ /\. \(defined \$OPEN_FRAME \? '\+' : ''\), \$OPEN_FRAME \/\/ frame_kept\(\)\)/,
+    'a window a tab was pulled out into runs as an accessory, with no Dock or menu-bar icon of its own, and the first window as a regular app (T5): lzrprf says "+" after the kind to the window of an --open start only, and the window\'s kind() reads it',
+    out('pulledkind') =~ s/\s+$//r || err('pulledkind') =~ s/\s+/ /gr);
 check((out('findzoom') =~ s/\s+$//r) eq "0:0 0:14 2:4 aa=2 empty=0 bound=1000\n0 2 0 2 2 -1 3 of 17|No match\n110 125 150 175 200 200 200 / 90 80 67 50 50 50 / 100 100 100\n800 2000 960 1 1.25 1 1.042 1.875\nview 960 640,view 640 427,view 1920 1280,view 960 640",
     'Find and zoom, read from lzrprf and run with no window: Find finds every match, capitals and small letters alike, none overlapping, a thousand at most, nothing for an empty field, and steps round from the last to the first and back, saying "3 of 17"; zoom steps 50 67 80 90 100 110 125 150 175 200, held at the ends, 0 back to 100; the page is laid for the room divided by the zoom ("view W H", the road a new size takes) and scaled to fill the room, and each tab has its own', out('findzoom') =~ s/\s+$//r =~ s/\n/ ; /gr || err('findzoom') =~ s/\s+/ /gr);
 check(slurp("$base.home/home") eq "$t/home/page\n" && (grep { $_ eq "The home page is set: $t/home/page. A new tab and the next window open it." } words('home', 'idle')) == 1 && asked('/home/page') == 2 && (grep { $_ eq "you opened your home page $t/home/page" } log_of('home')) == 1,

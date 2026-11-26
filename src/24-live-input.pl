@@ -118,6 +118,26 @@ sub live_scroll_back {                    # [C18] the line the window says when 
     return $live && defined $live->{scroll_sent} ? "page scroll $TAB $live->{scroll_sent}" : '';
 }
 
+sub live_home_settling {                  # T3: a home whose answer made layers is said ready only once a frame passes with no new layer, at most $HOME_SETTLE_MOST after its first: the window showed the background grid of a scene laid over several answers
+    my ($live, @layers) = @_;
+    my $grew = grep { /(?:\A|;)n / } @layers;
+    $live->{home_first} //= now();
+    $live->{home_owed} = now() + 2 * $LIVE_FRAME_SECONDS if $grew || !$live->{home_owed};
+    $live->{home_owed} = $live->{home_first} + $HOME_SETTLE_MOST if $live->{home_owed} > $live->{home_first} + $HOME_SETTLE_MOST;
+}
+sub live_home_left {                      # T3: seconds until a settling home is said ready, 0 when now, nothing when none waits
+    my ($live) = @_;
+    return undef unless $live->{home_owed} && !$live->{ended};
+    my $left = $live->{home_owed} - now();
+    return $left > 0 ? $left : 0;
+}
+sub live_home_told {                      # T3: the home's scene stopped growing; the window, if it shows it, shows it whole
+    my ($live) = @_;
+    delete @$live{qw(home_owed home_first)};
+    return if $live->{home_ready} || $live->{tab} != $TABS[$TAB];
+    $live->{home_ready} = 1;
+    window('home ready');
+}
 sub live_scroll_left {                    # [C18] the seconds until a place of the page's own scroll that waits may be told to the window, 0 when it may be now; nothing when none waits for the window
     my ($live) = @_;
     return undef unless defined $live->{scroll_unsent} && !$live->{ended} && $DRAWN && $live->{tab} == $TABS[$TAB];
@@ -281,7 +301,7 @@ sub live_answered {                       # [C18]
         window("cursor $TAB $cursor") if defined $cursor;    # the shape of the pointer over the page shown (CSS cursor)
         if ($shown) { live_scroll_told($live); $quick ? window("patch $TAB @$quick[0, 1]", @{ $quick->[2] }, '.') : live_window_patch($before_shown, $shown); $live->{unsent} = 0; $DRAWN = 1 }    # where it was read in the page is kept, and where its script scrolled it goes just before
         live_told();
-        window('home ready') if @layers && $live->{home} && !$live->{home_ready}++;
+        live_home_settling($live, @layers) if @layers && $live->{home} && !$live->{home_ready};    # T3 (Henry, 2026-11-26): no flash of a half-made home; it is said ready once its scene stops growing (sub live_home_left)
         idle($words) if defined $words;
         if (defined $go && (($go eq $LZRDFNDR_OPEN && $live->{url} =~ $LZRDFNDR_PAGE) || ($live->{home} && $go =~ m{\Ahttps://lzrbrwsr\.invalid/_home/lzrdfndr(?:-other)?\z}))) { noted("the game page asked for LZRDFNDR's panel; it was opened, and nothing was fetched"); game_helper_set(1, 1) if $live->{home}; window('tool show' . ($go =~ /-other\z/ ? ' other' : '')); undef $go }    # [C26] its Activate LZRDFNDR button, or Setup LZRDFNDR (".../lzrdfndr-other": on the panel's Other tab): the page stays, and the window opens the panel as a press on its icon does
         if ($live->{home} && defined $go) {
@@ -453,7 +473,7 @@ sub live_sounded {                        # [C12] what a page's answer sounds, f
 sub live_layers_again {                   # [C18] the page of the tab shown now, whose layers the window does not hold, is written "=layers": it tells every layer gone and makes it again
     my $live = live_of($TABS[$TAB]) or return;
     return unless delete $live->{layers_lost} or %{ $live->{layer_kind} // {} };
-    delete $live->{home_ready} if $live->{home};
+    delete @$live{qw(home_ready home_owed home_first)} if $live->{home};
     live_wrote($live, 'layers') unless $live->{ended};
 }
 

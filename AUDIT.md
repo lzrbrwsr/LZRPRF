@@ -213,12 +213,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 02-limits-and-state.pl	19	unblocked	C20 C16 C17
 02-limits-and-state.pl	32	kept_in	-
 02-limits-and-state.pl	36	shared	C16 C19 C18 C12 C22 C21 C24 C30 C23 C11 C29 C26
-02-limits-and-state.pl	209	sandbox_says	C26 C27 C4
-02-limits-and-state.pl	260	permit_class	C26
-02-limits-and-state.pl	261	permit_kinds	C26
-02-limits-and-state.pl	291	fresh_tab	C19
-02-limits-and-state.pl	307	now	C19 C6 C8 C14 C30
-02-limits-and-state.pl	326	timed	C28
+02-limits-and-state.pl	210	sandbox_says	C26 C27 C4
+02-limits-and-state.pl	261	permit_class	C26
+02-limits-and-state.pl	262	permit_kinds	C26
+02-limits-and-state.pl	292	fresh_tab	C19
+02-limits-and-state.pl	308	now	C19 C6 C8 C14 C30
+02-limits-and-state.pl	327	timed	C28
 03-containers.pl	1	-	C1 C28 C21 C3 C24 C12
 03-containers.pl	185	shell_held	-
 03-containers.pl	190	shell_measured	-
@@ -734,7 +734,7 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 20-window-side.pl	45	said_noted	-
 20-window-side.pl	57	stated	-
 20-window-side.pl	65	hear	C12 C29 C19
-20-window-side.pl	112	window_changed	-
+20-window-side.pl	114	window_changed	-
 21-link.pl	1	-	C31
 21-link.pl	49	link_folder	-
 21-link.pl	50	link_state	C31
@@ -769,13 +769,13 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-live.pl	66	live_read	-
 21-live.pl	79	live_due	C19
 21-live.pl	91	live_turn	C18 C19 C26 C5 C17 C6 C7
-21-live.pl	147	live_asked	C19 C26
-21-live.pl	180	live_early	C19
-21-live.pl	200	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	303	live_parts	C19
-21-live.pl	322	unchunked	-
-21-live.pl	337	live_replied	C19
-21-live.pl	342	live_sent	C19
+21-live.pl	148	live_asked	C19 C26
+21-live.pl	181	live_early	C19
+21-live.pl	201	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
+21-live.pl	304	live_parts	C19
+21-live.pl	323	unchunked	-
+21-live.pl	338	live_replied	C19
+21-live.pl	343	live_sent	C19
 22-essential-web.pl	1	-	-
 22-essential-web.pl	17	essential_web_count	-
 22-essential-web.pl	18	essential_web_clear	-
@@ -875,17 +875,20 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 24-live-input.pl	95	live_stopped	C18
 24-live-input.pl	107	live_scroll_told	C18
 24-live-input.pl	116	live_scroll_back	C18
-24-live-input.pl	121	live_scroll_left	C18
-24-live-input.pl	176	live_unknown	-
-24-live-input.pl	188	live_answered	C18 C19 C12 C7 C9 C26 C29 C4
-24-live-input.pl	316	live_layer	C18
-24-live-input.pl	353	live_layer_gone	C18
-24-live-input.pl	365	live_layers_paid	C18
-24-live-input.pl	390	live_sound	C12
-24-live-input.pl	438	live_sounded	C12
-24-live-input.pl	453	live_layers_again	C18 C9
-24-live-input.pl	469	live_patched	-
-24-live-input.pl	517	live_window_patch	-
+24-live-input.pl	121	live_home_settling	-
+24-live-input.pl	128	live_home_left	-
+24-live-input.pl	134	live_home_told	-
+24-live-input.pl	141	live_scroll_left	C18
+24-live-input.pl	196	live_unknown	-
+24-live-input.pl	208	live_answered	C18 C19 C12 C7 C9 C26 C29 C4
+24-live-input.pl	336	live_layer	C18
+24-live-input.pl	373	live_layer_gone	C18
+24-live-input.pl	385	live_layers_paid	C18
+24-live-input.pl	410	live_sound	C12
+24-live-input.pl	458	live_sounded	C12
+24-live-input.pl	473	live_layers_again	C18 C9
+24-live-input.pl	489	live_patched	-
+24-live-input.pl	537	live_window_patch	-
 24-parts.pl	1	-	-
 24-parts.pl	24	parts_read	-
 24-parts.pl	35	part_on	-
