@@ -254,13 +254,14 @@ function partsMade() {    // the boxes of the two modals, made once with the pan
 }
 
 function run(argv) {
-    NAME = argv[0] || NAME;
+    NAME = (argv[0] || NAME).replace(/-Staging$/, ' - Staging');    // the staging application, LZRBRWSR-Staging.app, is named "LZRBRWSR - Staging" in the menu bar (Henry, 2026-11-26)
     TORWINDOW = argv[1] == 'tor';
     INCOGNITO = argv[1] == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
     if (INCOGNITO) $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSQuitAlwaysKeepsWindows: false, ApplePersistenceIgnoreState: true }));    // in memory only: macOS is asked to keep no window of it to restore (and this container lets it write no file anyway)
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;
     app.setActivationPolicy(kind());
+    menuBarNamed(NAME);
     app.applicationIconImage = icon(256);
     hand = $.LzrprfHand.alloc.init;
     app.delegate = hand;

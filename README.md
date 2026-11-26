@@ -145,6 +145,8 @@ and how `selftest` probes it.
 | `[C30]` | A web font is fetched only when a run handed the page's style sheets names it on its `=webfonts` line, or the first run of a page that names no sheet names it from its own `<style>`: at most 8 fonts on the page's own host, each by up to 4 paths tried in order until one answers 200, each path held to the checks of a style sheet (the illegal-content list, the filter lists as a font, LZRDFNDR's judgement, its line in the log first, the page's own checked addresses, Tor when Tor is on), each at most 2 MiB and 64 KiB and 8 MiB together, all begun within 10 seconds, anything else with length 0. The answers go to the next run after the style sheets (the third, or the second of a page that names no sheet) and are kept in memory for the page shown alone; nothing of a font is written to the disk. The application unpacks and checks each in its container and draws in its own faces wherever one is refused. | `sub fonted`, `sub checked`, `sub visit`, `$FONT_TRIES`, `$FONT_BYTES`, `$FONTS_TOTAL` | Run `webfonts`: the third run is given the sheets and the font answers byte for byte as the site sent them, one over the cap with length 0, and for one whose first path is never answered and second answers 404 its third path's answer, and a new width lays the page out with both again; a third run that names fonts again is not shown, and there is no fourth run; each font has its two lines in the log and is asked for once. Run `inlinefonts`: a page that names no sheet but fonts in its own `<style>` gets them on its second run, which is shown. |
 | `[C31]` | The live debug link sends only while you switched it on in the cogwheel's menu of a window that is neither incognito nor Tor, for at most 24 hours, with its badge shown the whole time; to one fixed address, as a fixed request; timings, scheme, host and path, status codes, sizes and errors only, never a cookie, typed text, form contents, page text, a query or a fragment. It runs only commands signed for the namespace `lzrbrwsr-debug-link` by an approval key lzrprf carries, for this link, with a fresh nonce and an expiry within 15 minutes, and only six: open, reload, measure, snapshot, verbosity, a picture of the window from its own drawing. |
 
+The native Inspect pane adds one local request to [C18]. lzrprf binds it to the current live page and accepts only numbered, bounded plain-text replies. The page runs the explicitly submitted JavaScript in its own container. Console text is left out of window pictures, and paste is refused until the person types `allow pasting`. The relay is in `src/24-inspect.pl` and the native pane in `src/28-window-inspect.pl`.
+
 ## The claims, one by one
 
 The full text of each claim, as a chain of what would have to happen for it to be false and the
@@ -264,18 +266,18 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 130
+    release 134
     home local
-    new A press on a page that keeps loading, such as the yle.fi consent box, now reaches the page.
+    new Right-click Inspect opens a console that runs JavaScript in the page and warns before a paste, like Chrome.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin bf18d8a30c57d89af5107f4d53cdda6e9d002a8d8f4ceb625719951fb5c6ca7f
+    file lzrbrwsr-bin cf0d57187f3169e5f820433dcb7902c4816d2e6824b3600bd7e836cf11240ece
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf 05cadc6cc3589c5b8cb57a5161f944a6633d1e52ca49f6d8b056177635dcbb88
+    lzrprf 3135c42a8b7ebf0fd8d18152c7c5b052b7bd7e86a2aa49b61f059c5cfbd7735a
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

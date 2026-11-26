@@ -248,10 +248,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 04-start.pl	81	removed	-
 04-start.pl	87	incognito_begun	-
 04-start.pl	113	incognito_opened	-
-04-start.pl	120	apart	-
-04-start.pl	151	tab_out	C29
-04-start.pl	168	pulled_command	-
-04-start.pl	174	opened_with	-
+04-start.pl	120	window_opened	-
+04-start.pl	128	help_opened	-
+04-start.pl	137	apart	-
+04-start.pl	168	tab_out	C29
+04-start.pl	185	pulled_command	-
+04-start.pl	191	opened_with	-
 05-profiles.pl	1	-	-
 05-profiles.pl	35	profiles_root	-
 05-profiles.pl	36	profiles_folder	-
@@ -290,12 +292,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	1	-	-
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
-06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C15
-06-behind.pl	155	unheard	-
-06-behind.pl	199	paired	-
-06-behind.pl	214	unnamed	-
-06-behind.pl	221	leave	C17 C7 C29 C12 C16
-06-behind.pl	238	closed	-
+06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C18 C15
+06-behind.pl	160	unheard	-
+06-behind.pl	204	paired	-
+06-behind.pl	219	unnamed	-
+06-behind.pl	226	leave	C17 C7 C29 C12 C16
+06-behind.pl	243	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-
@@ -756,8 +758,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-link.pl	248	link_reaped	C31
 21-link.pl	261	link_checked	C31
 21-link.pl	280	link_command	C31
-21-link.pl	347	link_drew	C31
-21-link.pl	353	link_shot	C31
+21-link.pl	363	link_drew	C31
+21-link.pl	369	link_shot	C31
 21-live.pl	1	-	-
 21-live.pl	8	live_of	-
 21-live.pl	10	live_kept	C18
@@ -839,24 +841,27 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 23-filters.pl	313	filters_told	C27
 23-filters.pl	326	filter_skipped	C27
 23-filters.pl	328	filters_dir	C27
+24-inspect.pl	1	-	C18
+24-inspect.pl	5	inspect_input	-
+24-inspect.pl	19	inspect_answer	-
 24-live-input.pl	1	-	C12
 24-live-input.pl	39	live_input	C18 C29 C12
-24-live-input.pl	74	live_wrote	C18
-24-live-input.pl	86	live_flushed	C18
-24-live-input.pl	94	live_stopped	C18
-24-live-input.pl	106	live_scroll_told	C18
-24-live-input.pl	115	live_scroll_back	C18
-24-live-input.pl	120	live_scroll_left	C18
-24-live-input.pl	175	live_unknown	-
-24-live-input.pl	187	live_answered	C18 C19 C12 C7 C9 C26 C29 C4
-24-live-input.pl	312	live_layer	C18
-24-live-input.pl	349	live_layer_gone	C18
-24-live-input.pl	361	live_layers_paid	C18
-24-live-input.pl	386	live_sound	C12
-24-live-input.pl	434	live_sounded	C12
-24-live-input.pl	449	live_layers_again	C18 C9
-24-live-input.pl	465	live_patched	-
-24-live-input.pl	513	live_window_patch	-
+24-live-input.pl	75	live_wrote	C18
+24-live-input.pl	87	live_flushed	C18
+24-live-input.pl	95	live_stopped	C18
+24-live-input.pl	107	live_scroll_told	C18
+24-live-input.pl	116	live_scroll_back	C18
+24-live-input.pl	121	live_scroll_left	C18
+24-live-input.pl	176	live_unknown	-
+24-live-input.pl	188	live_answered	C18 C19 C12 C7 C9 C26 C29 C4
+24-live-input.pl	314	live_layer	C18
+24-live-input.pl	351	live_layer_gone	C18
+24-live-input.pl	363	live_layers_paid	C18
+24-live-input.pl	388	live_sound	C12
+24-live-input.pl	436	live_sounded	C12
+24-live-input.pl	451	live_layers_again	C18 C9
+24-live-input.pl	467	live_patched	-
+24-live-input.pl	515	live_window_patch	-
 24-parts.pl	1	-	-
 24-parts.pl	24	parts_read	-
 24-parts.pl	35	part_on	-
@@ -1000,8 +1005,13 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 27-proof.pl	101	proven	C16
 27-proof.pl	156	testing	-
 27-proof.pl	162	lookup	C23
+28-window-inspect.pl	1	-	-
+28-window-inspect.pl	4	window_inspect_text	-
+28-window-inspect.pl	206	inspect_window_test_text	-
 28-window-link.pl	1	-	C31
 28-window-link.pl	14	window_link_text	-
+28-window-menu.pl	1	-	-
+28-window-menu.pl	21	window_menu_text	-
 28-window-pointer.pl	1	-	-
 28-window-pointer.pl	23	window_pointer_text	C22
 28-window-sound.pl	1	-	C22

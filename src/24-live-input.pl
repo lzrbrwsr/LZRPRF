@@ -38,9 +38,10 @@
 # ever is; a tab with no page kept running takes none.
 sub live_input {                          # [C18]
     my ($what) = @_;
+    link_line('INFO', 'input', "the window handed lzrprf $what", what => $what, tab => $TAB, live => (live_of($TABS[$TAB]) ? 1 : 0), waiting => (live_of($TABS[$TAB]) && live_of($TABS[$TAB])->{waiting} ? 1 : 0)) if $what =~ /\A(?:click|down|up|context) /;    # [1237] the sniffer (keys and text never, they can be a password): each press that reached lzrprf, while the live debug link is on (staging-control tail shows it); a press the window dropped never appears here
     return trmnl_input($what) if $TABS[$TAB]{trmnl};    # [C29] a terminal's tab: its keys go to its shell, in their fixed forms
     my $live = live_of($TABS[$TAB]) or return;
-    return if $what =~ /^(?:click|move|down|up|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
+    return if $what =~ /^(?:click|move|down|up|context|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
     if ($what =~ /^move /) {
         if ($live->{waiting}) { $live->{move_held} = $what; return }    # the newest place of the pointer waits for the page's answer (sub live_answered), as a scroll does
         return live_wrote($live, $what);
@@ -220,6 +221,7 @@ sub live_answered {                       # [C18]
                 my $wrong = live_sound($live, $line, \@sounds);
                 return live_end($live, "it wrote a sound lzrprf does not take: $wrong") if $wrong;
             }
+            elsif ($line =~ /^=inspect ([1-9][0-9]{0,8}) (-|(?:[0-9a-f]{2}){1,1000}) (-|(?:[0-9a-f]{2}){1,2400})$/) { inspect_answer($live, $1, $2, $3) }    # [C18] bounded, numbered reply to the current native pane
             elsif ($line =~ /^=cursor ([a-z-]{1,16})$/ && $CURSORS{$1}) { $cursor = $1 }    # the cursor over the page, before =again, in any place among the lines above
             elsif ($line =~ /^=keep ([^\x00-\x20\x7f]{1,16000})$/) { jar_kept_write($live, $1) }    # [C7] a cookie the page's script set, before =again in any place: judged by the jar against the page's own address (sub jar_kept_write)
             elsif ($line =~ /^=([a-z0-9-]{1,32})(?: [\x20-\x7e]{0,8192})?$/ && !$LIVE_KNOWN{$1}) { live_unknown($live, $1) }    # a line of a later application: passed over

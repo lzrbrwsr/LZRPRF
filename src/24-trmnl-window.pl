@@ -36,7 +36,7 @@ function trmnlMethods(methods) {    // the methods of LzrprfLaid, with the termi
     var pressed = methods['mouseDown:'].implementation, typed = methods['keyDown:'].implementation;
     methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; pressed(event); } };    // a press starts a selection afresh
     methods['mouseDragged:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragged(event); } };
-    methods['rightMouseDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlContext(event)) canvas.nextResponder.rightMouseDown(event); } };    // on any other page a right press goes where it always went
+    methods['rightMouseDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlContext(event) && !inspectContext(event)) canvas.nextResponder.rightMouseDown(event); } };
     methods['keyDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlShortcut(event)) typed(event); } };
     methods['performKeyEquivalent:'] = { types: ['bool', ['id']], implementation: function (event) { return trmnlShortcut(event); } };    // a key with Command reaches a view before the window's menus: only the terminal's own keys are taken here
     methods['copy:'] = { types: ['void', ['id']], implementation: function (sender) { trmnlCopy(); } };

@@ -265,7 +265,7 @@ my @LIVE_TOLD = ('off', 0);               # what the window was last told of the
 my $LIVE_STOP_SECONDS = 0.25;             # DECLARED(a quarter of a second, many frames of the screen: the window says where it stopped on the frame after it read lzrprf's scroll): how long after the window said a page's own scroll back its next place may say where its view stopped short of it (sub live_input)
 my $LIVE_FRAME_SECONDS = 1 / 60;          # DECLARED(one frame of a screen that draws 60 times a second; the window shows no more places than that): the least time between two places of a page's own scroll that lzrprf tells the window; one sooner waits, and only the newest (sub live_scroll_told)
 my $LIVE_UNKNOWN_NAMES = 16;              # DECLARED(far more than one later application adds at once): the most names of answer lines it does not know that lzrprf writes in the log for one page kept running (sub live_unknown)
-my %LIVE_KNOWN = map { $_ => 1 } qw(focus go statement scroll layers sound samples play hush again patch ready fetch fetched end page live permit permitted permits keep jar);    # the names of the lines of an answer and of the frame around it: one of these out of its form or its place ends the page
+my %LIVE_KNOWN = map { $_ => 1 } qw(focus go statement scroll layers sound samples play hush again patch ready fetch fetched end page live permit permitted permits keep jar inspect);    # the names of the lines of an answer and of the frame around it: one of these out of its form or its place ends the page
 my %CURSORS = map { $_ => 1 } qw(default pointer text vertical-text crosshair move grab grabbing not-allowed no-drop copy alias context-menu col-resize row-resize ew-resize ns-resize e-resize w-resize n-resize s-resize);    # the pointer's shapes a page kept running may ask for ("=cursor"), those the window has a cursor for: the application's own list of them
 my %PERMIT_CAPS = (                       # [C26] the capabilities a script may ask, by name, and who may grant each: "low", the sandbox (E1), a curated rule (E2) or you (E3); "person", only you, by your own rule; "c5", nobody by any script permission: it has its own question each time (C5). A name not here is granted by your rule alone
     dom => 'low', layout => 'low', timers => 'low', 'storage-own' => 'low', 'fetch-same' => 'low',
@@ -1144,7 +1144,7 @@ sub run {
     my $behind = fork // die "lzrprf: cannot fork: $!\n";
     become($from, $to, $TRY ? \*STDOUT : undef, '/usr/bin/perl', $SELF, 'behind', $TRY, defined $PROFILE && !$INCOGNITO ? $ROOT : $DIR, $PEER, $ANSWER, $window, $INCOGNITO ? $ROOT : '-', $PROFILE // '-', $program, @arguments) unless $behind;    # descriptor 0 is what the window says, descriptor 1 what it is told; a profile by its id alone, never by its name, and behind finds its folder from the state folder
     close $_ for $to, $from;
-    my $more = window_pointer_text() . window_trmnl_text() . window_link_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
+    my $more = window_pointer_text() . window_trmnl_text() . window_link_text() . window_menu_text() . window_inspect_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)
@@ -1226,6 +1226,23 @@ sub incognito_opened {                    # "New Incognito Window": a second lzr
     return idle('A new incognito window was asked for: "lzrprf try" starts none.') if $TRY;
     return idle('No incognito window was started: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'incognito', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);    # it reads the settings of this window's profile, named by its id alone
     return idle('An incognito window is opening. It writes nothing: when it closes, it leaves nothing behind.');
+}
+
+sub window_opened {                       # File > New Window: a second lzrprf, of its own, started as "New Incognito Window" starts one, not incognito
+    return idle('A new window was asked for: "lzrprf try" starts none.') if $TRY;
+    return idle("No window was opened: this window has opened $PULLED_MOST windows from its tabs, profiles and File menu, the most one window may. Open it from another window.") if $PULLED >= $PULLED_MOST;
+    return idle('No window was opened: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'run', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);    # this window's profile, by its id alone
+    $PULLED++;
+    return idle('A new window is opening.');
+}
+
+sub help_opened {                         # Help > Privacy Policy or Terms and Conditions: the page of the site the installer comes from, in a new tab, so the text is the web's own
+    my ($which) = @_;
+    my (undef, undef, undef, $installer) = beside();
+    my ($site) = ($installer // '') =~ m{^(https://[A-Za-z0-9.-]{1,253})/};
+    return idle('This application names no site, so it has no privacy policy or terms to open.') unless $site;
+    tabbed('new');
+    go("$site/$which.html", $which eq 'privacy' ? 'you opened the privacy policy from the Help menu' : 'you opened the terms and conditions from the Help menu');
 }
 
 sub apart {                               # a second lzrprf, of its own, that goes through every start check itself; true when it was started. A line given is its standard input, then closed
@@ -1768,6 +1785,7 @@ sub behind {
     elsif (length $pulled) { go($pulled, 'you pulled a tab out into this window') }    # [C4] checked as a typed address is, and [C5] written before its name is looked up: the address of a tab pulled out of another window, handed on a pipe
     elsif (my $home = home()) { go($home, 'you opened your home page') }    # [C4] an address that came from the bar, kept when you made it the home page
     newer() unless $INCOGNITO || $local_home;           # [C16] it would write its answer and an installer's lines. Only now, once the window is idle and its first page is drawn: a look for a newer release never stands before the first drawing
+    window('release ' . ((beside())[0] // '-'));    # the release number, shown in Help > About
     window('checked ' . ($INCOGNITO ? 'none' : checked_kept()));    # when lzrprf last looked for a newer release, shown under Check for updates
     licence_told();                       # whether a licence code is kept, shown under Enter licence code
     support_told();                       # where a support request would go, and whether one is kept to read its answer
@@ -1800,6 +1818,7 @@ sub behind {
         elsif ($event =~ /^page ((?:click|move|down|up|scroll (?:0|[1-9][0-9]?)) (?:0|[1-9][0-9]{0,5}) (?:0|[1-9][0-9]{0,5})|out|key (?:[\x21-\x7e]|Space|Escape|Enter|Tab|Backspace|Delete|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|PageUp|PageDown)(?: shift)?|text [^\x00-\x1f\x7f]{1,$LIVE_TEXT})$/) { live_input($1) }    # a click in the page, the pointer moved over it, its button down or up, the pointer out of it, a key while it has the keyboard, text typed into its field, where the window shows it from: handed to the page kept running, and to nothing else
         elsif ($event =~ /^page ctrl ([a-z@\[\]\\^_])$/) { trmnl_input("ctrl $1") }    # [C29] a key held with Control, in a terminal's tab alone
         elsif ($event =~ /^page ((?:drag|context) (?:0|[1-9][0-9]{0,5}) (?:0|[1-9][0-9]{0,5})|(?:menu|tkey) [a-z]{1,8}(?:-[a-z]{1,8})?|wheel -?[1-9][0-9]{0,2}|copy|pastelong|paste [\x21-\x7e]+)$/) { trmnl_input($1) }    # [C29] in a terminal's tab alone: a drag that selects or moves a divider, a right press, an item of its menus, a key of its own (24-trmnl-panes.pl), the wheel, your copy, and your paste as the window read it from the clipboard
+        elsif ($event =~ /^inspect (0|[1-9][0-9]?) ([1-9][0-9]{0,8}) ([1-9][0-9]{0,8}) (open|-|(?:[0-9a-f]{2}){1,500})$/) { inspect_input($1, $2, $3, $4) }    # [C18] the user opened or typed into the Inspect pane of this tab
         elsif (viewing($event)) { relaid() }    # the window's page has a new size: the page shown is laid out again at its width, from what was kept, and nothing is fetched
         elsif ($event =~ /^tab move (0|[1-9][0-9]?) (0|[1-9][0-9]?)$/) { tab_moved($1, $2) }    # a tab dragged along the strip to another place among the tabs: the page shown stays as it is
         elsif ($event =~ /^tab (new|select|close)(?: (0|[1-9][0-9]?))?( kept)?$/) { tabbed($1, $2, $3); relaid() }    # a tab chosen in the strip: the window shows the drawing it kept of it ("kept"), or lzrprf sends the one it kept, and only a page kept at another width is laid out again; nothing is fetched, unless a new tab opens the home page
@@ -1830,6 +1849,9 @@ sub behind {
         elsif ($event eq 'update-check') { $INCOGNITO ? idle('An incognito window looks for no newer release; a window that is not incognito does, in its cogwheel menu.') : newer(1) }
         elsif ($event =~ /^frame (full|-?[0-9]{1,5} -?[0-9]{1,5} [1-9][0-9]{1,4} [1-9][0-9]{1,4})$/) { frame_said($1) }    # the window was moved, resized or made full screen: kept for the next window
         elsif ($event eq 'incognito') { incognito_opened(); said_noted() }
+        elsif ($event eq 'window new') { window_opened(); said_noted() }    # File > New Window (sub window_opened)
+        elsif ($event eq 'window tor') { tor_window_opened(); said_noted() }    # File > New Tor Window: as the onion icon
+        elsif ($event =~ /^help (privacy|terms)$/) { help_opened($1); relaid() }    # Help > Privacy Policy and Terms and Conditions: the site's own page in a new tab
         elsif ($INCOGNITO && $event =~ /^profiles? /) { profiles_refused('An incognito window has no profile, and opens, makes or changes none.') }
         elsif ($event eq 'sso list') { sso_told() }    # "Connect seamless SSO accounts" was opened: each provider as connected now
         elsif ($event =~ /^sso connect ([a-z]{1,16})$/) { sso_connect($1); relaid() }    # Connect: the provider's own sign-in page in a new tab
@@ -7244,8 +7266,8 @@ sub tor_phase {                           # [C17] the next step of the Tor windo
     return 1;
 }
 
-sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window: a Tor window apart from it, and this one as it was
-    window('tor off');
+sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window, or File > New Tor Window in any window: a Tor window apart from it, and this one as it was
+    window('tor off') unless $TOR_WINDOW;    # the onion of a Tor window stays as its own Tor says
     return idle('LZRTNNL is not installed, so no Tor window opens. Add it in Add or remove LZR modules, in the cogwheel menu.') unless part_on('lzrtnnl');
     return idle('A Tor window was asked for: "lzrprf try" starts none. Tor never carries this window.') if $TRY;
     return idle('No Tor window was started: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'tor', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);
@@ -10395,12 +10417,12 @@ sub link_reaped {                         # [C31] the sender's answer: the comma
 sub link_checked {                        # [C31] a command and its signature: (verb, argument, nonce) when every check holds, else (nothing, why)
     my ($block) = @_;
     my ($command, $signature) = $block =~ /\A([^\n]+)\n(-----BEGIN SSH SIGNATURE-----\n.*)\z/s or return (undef, 'it is not a command and a signature');
-    my ($id, $nonce, $expires, $verb, $arg) = $command =~ /\Alzrbrwsr-debug-link 1 ([0-9a-f]{12}) ([0-9a-f]{16,32}) ([0-9]{10}) (open|reload|measure|snapshot|verbosity|shot|forget|press)(?: ([\x21-\x7e]{1,2000}))?\z/ or return (undef, 'it is not in the one form a command has');
+    my ($id, $nonce, $expires, $verb, $arg) = $command =~ /\Alzrbrwsr-debug-link 1 ([0-9a-f]{12}) ([0-9a-f]{16,32}) ([0-9]{10}) (open|reload|measure|snapshot|verbosity|shot|forget|press|right|move|scroll)(?: ([\x21-\x7e]{1,2000}))?\z/ or return (undef, 'it is not in the one form a command has');
     return (undef, 'it names another link') unless $id eq ($LINK{id} // '');
     my $now = time;
     return (undef, 'it expired') if $expires <= $now;
     return (undef, "its expiry is more than $LINK_COMMAND_SECONDS seconds away") if $expires > $now + $LINK_COMMAND_SECONDS;
-    my %arg_ok = (open => qr{\Ahttps://[\x21-\x7e]+\z}, measure => qr{\Ahttps://[\x21-\x7e]+\z}, reload => qr{\A\z}, snapshot => qr{\A\z}, verbosity => qr{\A[012]\z}, shot => qr{\A(?:page|window)(?:,private)?\z}, forget => qr{\Ahttps://[\x21-\x7e]+\z}, press => qr{\A[0-9]{1,5},[0-9]{1,5}\z});
+    my %arg_ok = (open => qr{\Ahttps://[\x21-\x7e]+\z}, measure => qr{\Ahttps://[\x21-\x7e]+\z}, reload => qr{\A\z}, snapshot => qr{\A\z}, verbosity => qr{\A[012]\z}, shot => qr{\A(?:page|window)(?:,private)?\z}, forget => qr{\Ahttps://[\x21-\x7e]+\z}, press => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, right => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, move => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, scroll => qr{\A[0-9]{1,5},[0-9]{1,5},-?[0-9]{1,5},-?[0-9]{1,5}\z});
     return (undef, "its argument is not one $verb takes") unless ($arg // '') =~ $arg_ok{$verb};
     my $seen = link_folder() . '/nonces';
     my @kept;
@@ -10424,7 +10446,7 @@ sub link_command {                        # [C31] one command: checked, written 
     $LINK{last_command} = time;
     $LINK{next} = 0;
     my $shown = $verb . (length $arg ? ' ' . link_url($arg) : '');
-    $shown = "$verb $arg" if $verb eq 'verbosity' || $verb eq 'shot' || $verb eq 'press';
+    $shown = "$verb $arg" if $verb eq 'verbosity' || $verb eq 'shot' || $verb =~ /\A(?:press|right|move|scroll)\z/;
     noted("the live debug link ran a signed command: $shown");
     link_line('INFO', 'command', "a signed command was run: $shown", verb => $verb, nonce => $nonce, verdict => 'run');
     window("link said $shown");
@@ -10470,6 +10492,22 @@ sub link_command {                        # [C31] one command: checked, written 
         live_input("down $x $y"); live_input("up $x $y");
         noted("the live debug link pressed the page shown at $x,$y");
         return link_line('INFO', 'press', "a press and release were handed to the page at $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
+    }
+    if ($verb eq 'right' || $verb eq 'move') {    # [1237] the secondary button at X,Y (the page's contextmenu), or the pointer moved there (hover, mousemove), handed straight to the page kept running
+        my ($x, $y) = split /,/, $arg;
+        live_input("move $x $y"); live_input("context $x $y") if $verb eq 'right';
+        noted("the live debug link handed the page shown a $verb at $x,$y");
+        return link_line('INFO', $verb, $verb eq 'right' ? "a right press was handed to the page at $x,$y" : "the pointer was moved over the page to $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
+    }
+    if ($verb eq 'scroll') {                # [1237] the wheel at X,Y by DX,DY points: the pointer moved there, then the page shown from its place moved by that much (no less than its top or left)
+        my ($x, $y, $dx, $dy) = split /,/, $arg;
+        my $live = live_of($TABS[$TAB]);
+        my ($sx, $sy) = split / /, ($live && $live->{scrolled} // '0 0');
+        my ($nx, $ny) = (($sx // 0) + $dx, ($sy // 0) + $dy);
+        $nx = 0 if $nx < 0; $ny = 0 if $ny < 0;
+        live_input("move $x $y"); live_input("scroll $TAB $nx $ny");
+        noted("the live debug link scrolled the page shown by $dx,$dy to $nx,$ny");
+        return link_line('INFO', 'scroll', "the page was shown from $nx,$ny (moved by $dx,$dy at $x,$y)", nonce => $nonce, x => $x, y => $y, to => "$nx,$ny", live => ($live ? 1 : 0));
     }
     if ($verb eq 'shot') {
         return link_line('WARN', 'command', "a picture was asked again within $LINK_SHOT_SECONDS seconds; none was taken", nonce => $nonce) if time - ($LINK{shot_at} // 0) < $LINK_SHOT_SECONDS;
@@ -11976,6 +12014,36 @@ sub filters_dir {                         # [C27] "lzrprf filters DIR PAGE TYPE 
     return;
 }
 
+# The page's native Inspect pane: what only the window may ask from the live page [C18].
+# SYNC: managed-projects/lzrbrwsr/ARCHITECTURE.md §7.4 ; src/28-window-inspect.pl
+# TRIAD(tests: managed-projects/lzrbrwsr/src/page/scripted_inspect.rs, docs: managed-projects/lzrbrwsr/ARCHITECTURE.md)
+
+sub inspect_input {
+    my ($tab, $panel, $request, $source) = @_;
+    return if $tab != $TAB || $TABS[$TAB]{trmnl};
+    my $live = live_of($TABS[$TAB]) or return;
+    if ($source eq 'open') {
+        $live->{inspect_panel} = $panel;
+        $source = '-';
+    } else {
+        return unless ($live->{inspect_panel} // '') eq $panel && !defined $live->{inspect_reply};
+    }
+    $live->{inspect_reply} = $request;
+    live_wrote($live, "inspect $request $source");
+}
+
+sub inspect_answer {
+    my ($live, $request, $result, $log) = @_;
+    return unless defined $live->{inspect_reply} && $live->{inspect_reply} eq $request;
+    delete $live->{inspect_reply};
+    return unless $live->{tab} == $TABS[$TAB] && defined $live->{inspect_panel};
+    for my $encoded ($result, $log) {
+        next if $encoded eq '-';
+        my $text = pack 'H*', $encoded;
+        $encoded = '-' unless utf8::decode($text) && $text !~ /(?:(?![\n\t])[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{NChar}])/;
+    }
+    window("inspect $TAB $live->{inspect_panel} $request $result $log");
+}
 # A line of the window for the page kept running with the selected tab, in a
 # form sub behind checked: "click X Y" in CSS pixels of the laid page, where
 # the window found the pointer after its own scrolling, at most 200000 each
@@ -12016,9 +12084,10 @@ sub filters_dir {                         # [C27] "lzrprf filters DIR PAGE TYPE 
 # ever is; a tab with no page kept running takes none.
 sub live_input {                          # [C18]
     my ($what) = @_;
+    link_line('INFO', 'input', "the window handed lzrprf $what", what => $what, tab => $TAB, live => (live_of($TABS[$TAB]) ? 1 : 0), waiting => (live_of($TABS[$TAB]) && live_of($TABS[$TAB])->{waiting} ? 1 : 0)) if $what =~ /\A(?:click|down|up|context) /;    # [1237] the sniffer (keys and text never, they can be a password): each press that reached lzrprf, while the live debug link is on (staging-control tail shows it); a press the window dropped never appears here
     return trmnl_input($what) if $TABS[$TAB]{trmnl};    # [C29] a terminal's tab: its keys go to its shell, in their fixed forms
     my $live = live_of($TABS[$TAB]) or return;
-    return if $what =~ /^(?:click|move|down|up|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
+    return if $what =~ /^(?:click|move|down|up|context|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
     if ($what =~ /^move /) {
         if ($live->{waiting}) { $live->{move_held} = $what; return }    # the newest place of the pointer waits for the page's answer (sub live_answered), as a scroll does
         return live_wrote($live, $what);
@@ -12198,6 +12267,7 @@ sub live_answered {                       # [C18]
                 my $wrong = live_sound($live, $line, \@sounds);
                 return live_end($live, "it wrote a sound lzrprf does not take: $wrong") if $wrong;
             }
+            elsif ($line =~ /^=inspect ([1-9][0-9]{0,8}) (-|(?:[0-9a-f]{2}){1,1000}) (-|(?:[0-9a-f]{2}){1,2400})$/) { inspect_answer($live, $1, $2, $3) }    # [C18] bounded, numbered reply to the current native pane
             elsif ($line =~ /^=cursor ([a-z-]{1,16})$/ && $CURSORS{$1}) { $cursor = $1 }    # the cursor over the page, before =again, in any place among the lines above
             elsif ($line =~ /^=keep ([^\x00-\x20\x7f]{1,16000})$/) { jar_kept_write($live, $1) }    # [C7] a cookie the page's script set, before =again in any place: judged by the jar against the page's own address (sub jar_kept_write)
             elsif ($line =~ /^=([a-z0-9-]{1,32})(?: [\x20-\x7e]{0,8192})?$/ && !$LIVE_KNOWN{$1}) { live_unknown($live, $1) }    # a line of a later application: passed over
@@ -13514,7 +13584,7 @@ function trmnlMethods(methods) {    // the methods of LzrprfLaid, with the termi
     var pressed = methods['mouseDown:'].implementation, typed = methods['keyDown:'].implementation;
     methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; pressed(event); } };    // a press starts a selection afresh
     methods['mouseDragged:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragged(event); } };
-    methods['rightMouseDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlContext(event)) canvas.nextResponder.rightMouseDown(event); } };    // on any other page a right press goes where it always went
+    methods['rightMouseDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlContext(event) && !inspectContext(event)) canvas.nextResponder.rightMouseDown(event); } };
     methods['keyDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlShortcut(event)) typed(event); } };
     methods['performKeyEquivalent:'] = { types: ['bool', ['id']], implementation: function (event) { return trmnlShortcut(event); } };    // a key with Command reaches a view before the window's menus: only the terminal's own keys are taken here
     methods['copy:'] = { types: ['void', ['id']], implementation: function (sender) { trmnlCopy(); } };
@@ -14663,6 +14733,249 @@ sub lookup {                              # every address a name leads to, as nu
     print map { (getnameinfo($_->{addr}, NI_NUMERICHOST | NI_NUMERICSERV))[1] . "\n" } $failed ? () : @all;
 }
 
+# The window's native Inspect pane. It uses the live page relay and never evaluates JavaScript here.
+# SYNC: managed-projects/lzrbrwsr/ARCHITECTURE.md §7.4 ; src/24-inspect.pl
+# TRIAD(tests: managed-projects/lzrbrwsr/src/page/scripted_inspect.rs, docs: managed-projects/lzrbrwsr/ARCHITECTURE.md)
+sub window_inspect_text {
+    return <<'END';
+var inspectUI = null, inspectHand = null, inspectSerial = 0;
+var INSPECT_WARNING = 'Do not paste code you do not understand. It can act as you on this site. Type allow pasting and press Return to enable paste in this pane.';
+var INSPECT_SOURCE_BYTES = 500;    // DECLARED(the bound of the checked page relay, src/24-inspect.pl)
+function inspectAvailable() { return liveOn && !trmnlKeys && pageShown && free && !modalOpen; }
+function inspectFits(one) { return one && liveOn && !trmnlKeys && selected == one.tab && tabs[selected] && tabs[selected].gen == one.gen && current == one.address; }
+function inspectNext() { inspectSerial = inspectSerial % 999999999 + 1; return inspectSerial; }    // DECLARED(the numbered frame allows nine digits)
+function inspectHex(text) {
+    return encodeURIComponent(text).replace(/%([0-9a-f]{2})|./gi, function (part, byte) { return byte ? byte.toLowerCase() : part.charCodeAt(0).toString(16); });
+}
+function inspectText(hex) { return hex == '-' ? '' : decodeURIComponent(hex.replace(/../g, '%$&')); }
+function inspectPaint(one) {
+    var text = [one.note, one.logs, one.result].filter(Boolean).join('\n');
+    if (String(one.output.string.js || '') == text) return;
+    one.output.string = $(text);
+    one.output.scrollRangeToVisible($.NSMakeRange(text.length, 0));
+}
+function inspectMessage(one, text) { one.note = text; inspectPaint(one); }
+function inspectAsk(one, source) {
+    one.pending = inspectNext();
+    one.sent = Date.now();
+    say('inspect ' + one.tab + ' ' + one.panel + ' ' + one.pending + ' ' + source);
+}
+function inspectTold(rest) {
+    var one = inspectUI, reply = /^([0-9]+) ([0-9]+) ([0-9]+) (-|[0-9a-f]+) (-|[0-9a-f]+)$/.exec(rest);
+    if (!inspectFits(one) || !reply || +reply[1] != one.tab || +reply[2] != one.panel || +reply[3] != one.pending) return;
+    one.pending = 0;
+    try {
+        if (one.command !== null) one.result = '> ' + one.command + '\n' + inspectText(reply[4]);
+        one.logs = inspectText(reply[5]);
+    } catch (error) { inspectMessage(one, 'The page returned unreadable console text.'); }
+    one.command = null;
+    one.ready = true;
+    inspectPaint(one);
+}
+function inspectTick() {
+    var one = inspectUI;
+    if (!inspectFits(one)) { inspectClose(); return; }
+    if (modalOpen || !free) return;
+    if (one.pending) {
+        if (Date.now() - one.sent > 3000) inspectMessage(one, 'Waiting for the page to answer.');
+        return;
+    }
+    if (one.ready) inspectAsk(one, '-');
+}
+function inspectRun() {
+    var one = inspectUI;
+    if (!inspectFits(one) || !inspectAvailable()) return;
+    var source = String(one.input.string.js || '');
+    if (!source.trim()) return;
+    if (source == 'allow pasting' && !one.paste) {
+        one.paste = true;
+        one.input.string = $('');
+        inspectMessage(one, 'Paste is enabled until this pane closes.');
+        return;
+    }
+    if (!one.ready || one.pending) { inspectMessage(one, 'Wait for the current console request to finish.'); return; }
+    var encoded;
+    try { encoded = inspectHex(source); } catch (error) { inspectMessage(one, 'The command has text the console cannot read.'); return; }
+    if (encoded.length > 2 * INSPECT_SOURCE_BYTES || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(source)) {
+        inspectMessage(one, 'Use up to ' + INSPECT_SOURCE_BYTES + ' UTF-8 bytes of JavaScript.');
+        return;
+    }
+    one.command = source;
+    one.input.string = $('');
+    one.note = '';
+    inspectPaint(one);
+    inspectAsk(one, encoded);
+}
+function inspectPasteboard(board) {
+    var one = inspectUI;
+    if (!inspectFits(one) || !inspectAvailable()) return false;
+    if (!one.paste) { inspectMessage(one, INSPECT_WARNING); return false; }
+    var text = board.stringForType($('public.utf8-plain-text')).js;
+    if (typeof text != 'string') return false;
+    var old = String(one.input.string.js || ''), at = one.input.selectedRange;
+    var fresh = old.slice(0, at.location) + text + old.slice(at.location + at.length);
+    try {
+        if (inspectHex(fresh).length > 2 * INSPECT_SOURCE_BYTES) { inspectMessage(one, 'The pasted command is too long.'); return false; }
+    } catch (error) { inspectMessage(one, 'The pasted text is unreadable.'); return false; }
+    one.input.string = $(fresh);
+    one.input.selectedRange = $.NSMakeRange(at.location + text.length, 0);
+    return true;
+}
+function inspectPaste() {
+    if (!inspectUI || !inspectUI.paste) {
+        if (inspectUI) inspectMessage(inspectUI, INSPECT_WARNING);
+        return;
+    }
+    inspectPasteboard($.NSPasteboard.generalPasteboard);
+}
+ObjC.registerSubclass({ name: 'LzrprfInspectActions', superclass: 'NSObject', methods: {
+    'openInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectOpen(); } },
+    'runInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectRun(); } },
+    'closeInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectClose(); } },
+    'tickInspect:': { types: ['void', ['id']], implementation: function (timer) { inspectTick(); } },
+    'textView:doCommandBySelector:': { types: ['bool', ['id', 'SEL']], implementation: function (view, command) {
+        var name = ObjC.selectorAsString(command);
+        if (name == 'insertNewline:' && !(app.currentEvent.modifierFlags & SHIFT)) { inspectRun(); return true; }
+        if (name == 'cancelOperation:') { inspectClose(); return true; }
+        return false;
+    } }
+} });
+ObjC.registerSubclass({ name: 'LzrprfInspectInput', superclass: 'NSTextView', methods: {
+    'paste:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },
+    'pasteAsPlainText:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },
+    'pasteAsRichText:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },
+    'readSelectionFromPasteboard:': { types: ['bool', ['id']], implementation: function (board) { return inspectPasteboard(board); } },
+    'readSelectionFromPasteboard:type:': { types: ['bool', ['id', 'id']], implementation: function (board, type) { return inspectPasteboard(board); } },
+    'performDragOperation:': { types: ['bool', ['id']], implementation: function (drag) { return false; } }
+} });
+function inspectActions() {
+    if (!inspectHand) inspectHand = $.LzrprfInspectActions.alloc.init;
+    return inspectHand;
+}
+function inspectMenu(copy) {
+    var menu = $.NSMenu.alloc.initWithTitle($(''));
+    if (copy) menu.addItemWithTitleActionKeyEquivalent($('Copy'), 'copy:', $(''));
+    if (inspectAvailable()) {
+        var item = menu.addItemWithTitleActionKeyEquivalent($('Inspect'), 'openInspect:', $(''));
+        item.target = inspectActions();
+    }
+    return menu;
+}
+function inspectContext(event) {
+    if (!inspectAvailable()) return false;
+    $.NSMenu.popUpContextMenuWithEventForView(inspectMenu(false), event, canvas);
+    return true;
+}
+function inspectTextView(frame, editable) {
+    var scroll = $.NSScrollView.alloc.initWithFrame(frame);
+    scroll.autoresizingMask = 2;
+    scroll.hasVerticalScroller = true;
+    scroll.borderType = 1;
+    var view = editable ? unchecked($.LzrprfInspectInput.alloc.initWithFrame(frame)) : unchecked($.NSTextView.alloc.initWithFrame(frame));
+    view.autoresizingMask = 2;
+    view.editable = editable;
+    view.richText = false;
+    view.backgroundColor = DARK;
+    view.textColor = WHITE;
+    view.insertionPointColor = WHITE;
+    view.font = mono(13, false);
+    view.textContainerInset = $.NSMakeSize(7, 5);
+    view.unregisterDraggedTypes;
+    scroll.documentView = view;
+    return { view: view, scroll: scroll };
+}
+function inspectButton(title, action, frame) {
+    var item = $.NSButton.alloc.initWithFrame(frame);
+    item.title = $(title);
+    item.target = inspectHand;
+    item.action = action;
+    item.bezelStyle = 1;
+    item.autoresizingMask = 1;
+    return item;
+}
+function inspectOpen() {
+    if (!inspectAvailable()) return;
+    if (inspectFits(inspectUI)) { win.makeFirstResponder(inspectUI.input); return; }
+    inspectClose();
+    inspectActions();
+    var wide = Math.max(280, root.bounds.size.width - 44), high = 260;
+    var pane = $.NSBox.alloc.initWithFrame($.NSMakeRect(22, 42, wide, high));
+    pane.autoresizingMask = 2 | 32;
+    pane.boxType = 4;
+    pane.titlePosition = 0;
+    pane.fillColor = DARK;
+    pane.borderColor = EDGE;
+    pane.borderWidth = 1;
+    pane.cornerRadius = 10;
+    var inside = pane.contentView;
+    var title = $.NSTextField.labelWithString($('Inspect JavaScript'));
+    title.frame = $.NSMakeRect(12, high - 31, 205, 20);
+    title.font = sans(14);
+    title.textColor = WHITE;
+    var output = inspectTextView($.NSMakeRect(12, 66, wide - 24, high - 105), false);
+    var input = inspectTextView($.NSMakeRect(12, 12, wide - 100, 44), true);
+    input.view.delegate = inspectHand;
+    inside.addSubview(title);
+    inside.addSubview(output.scroll);
+    inside.addSubview(input.scroll);
+    inside.addSubview(inspectButton('Run', 'runInspect:', $.NSMakeRect(wide - 82, 15, 70, 27)));
+    inside.addSubview(inspectButton('Close', 'closeInspect:', $.NSMakeRect(wide - 82, high - 34, 70, 27)));
+    root.addSubviewPositionedRelativeTo(pane, -1, veil);
+    var one = inspectUI = { pane: pane, input: input.view, output: output.view, tab: selected, gen: tabs[selected].gen, address: current,
+        panel: inspectNext(), pending: 0, command: null, logs: '', result: '', note: '', ready: false, paste: false };
+    one.timer = $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(1, inspectHand, 'tickInspect:', $(), true);
+    win.makeFirstResponder(one.input);
+    inspectAsk(one, 'open');
+}
+function inspectClose() {
+    if (!inspectUI) return;
+    var one = inspectUI;
+    inspectUI = null;
+    if (one.timer) one.timer.invalidate;
+    one.pane.removeFromSuperview;
+}
+END
+}
+
+# Read by selftest from the shipped source and appended only to its hidden window.
+sub inspect_window_test_text {
+    return <<'END';
+// A hidden window in selftest. No clipboard is read and no real page script is executed here.
+function inspectWindowTried() {
+    var state = [liveOn, trmnlKeys, pageShown, free], saveSay = say, lines = [], answer = '';
+    try {
+        liveOn = pageShown = free = true;
+        trmnlKeys = false;
+        say = function (line) { lines.push(line); };
+        var menu = page.menuForEvent(null), laid = inspectMenu(false);
+        var labels = menu.numberOfItems == 2 && menu.itemAtIndex(1).title.js == 'Inspect' && laid.itemAtIndex(0).title.js == 'Inspect';
+        var item = menu.itemAtIndex(1);
+        item.target.openInspect(item);
+        var one = inspectUI, open = lines.length == 1 && /^inspect .+ open$/.test(lines[0]);
+        one.input.paste(null);
+        var blocked = !one.paste && one.note == INSPECT_WARNING && lines.length == 1;
+        inspectTold(one.tab + ' ' + one.panel + ' ' + one.pending + ' - -');
+        one.input.string = $('allow pasting');
+        inspectRun();
+        var enabled = one.paste && one.input.string.js == '' && lines.length == 1;
+        one.input.string = $('6 * 7');
+        inspectRun();
+        var sent = lines.length == 2 && lines[1].slice(-10) == '36202a2037';
+        inspectTold(one.tab + ' ' + one.panel + ' ' + one.pending + ' 3432 6c6f673a206f6b');
+        var output = one.output.string.js.indexOf('42') >= 0 && one.output.string.js.indexOf('log: ok') >= 0;
+        liveOn = false;
+        inspectTick();
+        answer = [labels, open, blocked, enabled, sent, output, inspectUI === null].join(' ');
+    } catch (e) { answer = 'fault ' + String(e).replace(/\s+/g, ' ').slice(0, 170); }
+    finally {
+        inspectClose();
+        liveOn = state[0]; trmnlKeys = state[1]; pageShown = state[2]; free = state[3];
+        say = saveSay;
+    }
+    return answer;
+}
+END
+}
 # The live debug link in the window [C31]: the part of the window's text the
 # link uses, joined after the rest of it by sub run (04-start.pl).
 #   - a row in the cogwheel's menu, "Live debug link", on and off by the same
@@ -14728,6 +15041,80 @@ function linkShot(nonce, which) {    // the window's own drawing of itself, or o
     }
     if (!png) png = windowPicture();
     if (png) say('link shot ' + nonce + ' ' + png.base64EncodedStringWithOptions(0).js);
+}
+END
+}
+
+# The menu bar of the window (Henry, 2026-11-26): the part of the window's text
+# that names the application in the Mac's menu bar and adds its File and Help
+# menus, joined after the rest of it by sub run (04-start.pl).
+#   - the name: macOS names the application in the menu bar after the
+#     process's entry in Launch Services, which for the system's osascript is
+#     "osascript", so the bar never said LZRBRWSR. The entry is renamed to the
+#     application's name, "LZRBRWSR", or "LZRBRWSR - Staging" for
+#     LZRBRWSR-Staging.app (measured 2026-11-26 with osascript: "osascript"
+#     before, the name after);
+#   - File: New Tab, New Window, New Incognito Window, New Tor Window, Close
+#     Tab, Close Window. New Window and New Tor Window are second lzrprfs of
+#     their own ("window new", sub window_opened; "window tor", sub
+#     tor_window_opened, as the onion icon);
+#   - Help: About (a modal with the release number lzrprf says at start,
+#     "release N"), Privacy Policy and Terms and Conditions, each the site's own
+#     page in a new tab ("help privacy", "help terms"; sub help_opened), so the
+#     text has one source, the one the web shows;
+#   - full screen hides the menu bar and shows it when the pointer reaches the
+#     top of the screen: the system's own presentation options, none of ours.
+sub window_menu_text {
+    return <<'END';
+var releaseNumber = '';    // "release N", said by lzrprf at start (06-behind.pl): shown in About
+function menuBarNamed(name) {
+    try {
+        ObjC.bindFunction('_LSGetCurrentApplicationASN', ['id', []]);
+        ObjC.bindFunction('_LSSetApplicationInformationItem', ['int', ['int', 'id', 'id', 'id', 'id']]);
+        $._LSSetApplicationInformationItem(-2, $._LSGetCurrentApplicationASN(), $('LSDisplayName'), $(name), $());    // -2: this login session
+    } catch (e) { }    // a macOS without these calls keeps the name "osascript" in the bar; the window works the same
+}
+ObjC.registerSubclass({ name: 'LzrprfMenu', methods: {
+    'newWindow:': { types: ['void', ['id']], implementation: function (sender) { say('window new'); } },    // lzrprf starts a second lzrprf: this process starts nothing
+    'torWindow:': { types: ['void', ['id']], implementation: function (sender) { say('window tor'); } },
+    'closeWindow:': { types: ['void', ['id']], implementation: function (sender) { win.performClose($()); } },    // as the red dot
+    'about:': { types: ['void', ['id']], implementation: function (sender) { aboutOpened(); } },
+    'privacy:': { types: ['void', ['id']], implementation: function (sender) { if (takes()) sent('help privacy'); } },
+    'terms:': { types: ['void', ['id']], implementation: function (sender) { if (takes()) sent('help terms'); } }
+} });
+var menuHand = null;
+function menusMore(main) {    // called by menus() before the bar is handed to the application
+    menuHand = $.LzrprfMenu.alloc.init;
+    var made = function (menu, words, action, key, mask, target) {
+        var one = menu.addItemWithTitleActionKeyEquivalent($(words), action, $(key));
+        one.target = target;
+        if (mask) one.keyEquivalentModifierMask = mask;
+        return one;
+    };
+    var appMenu = main.itemAtIndex(0).submenu, about = appMenu.insertItemWithTitleActionKeyEquivalentAtIndex($('About ' + NAME), 'about:', $(''), 0);
+    about.target = menuHand;
+    appMenu.insertItemAtIndex($.NSMenuItem.separatorItem, 1);
+    var file = $.NSMenu.alloc.initWithTitle($('File')), fileItem = $.NSMenuItem.alloc.init;
+    made(file, 'New Tab', 'newTab:', 't', 0, hand);
+    made(file, 'New Window', 'newWindow:', 'n', 0, menuHand);
+    made(file, 'New Incognito Window', 'incognito:', 'N', 0, hand);
+    made(file, 'New Tor Window', 'torWindow:', 'n', CMD | OPTION, menuHand);
+    file.addItem($.NSMenuItem.separatorItem);
+    made(file, 'Close Tab', 'closeTab:', 'w', 0, hand);
+    made(file, 'Close Window', 'closeWindow:', 'W', 0, menuHand);
+    fileItem.submenu = file;
+    main.insertItemAtIndex(fileItem, 1);
+    var help = $.NSMenu.alloc.initWithTitle($('Help')), helpItem = $.NSMenuItem.alloc.init;
+    made(help, 'About ' + NAME, 'about:', '', 0, menuHand);
+    made(help, 'Privacy Policy', 'privacy:', '', 0, menuHand);
+    made(help, 'Terms and Conditions', 'terms:', '', 0, menuHand);
+    helpItem.submenu = help;
+    main.addItem(helpItem);
+    app.helpMenu = help;
+}
+function aboutOpened() {
+    if (modalOpen || asking) return;
+    modal('About ' + NAME, NAME + (releaseNumber ? ', release ' + releaseNumber : '') + '.\nIt runs in lzrprf, whose source is open: github.com/lzrbrwsr/lzrprf.', [['Close', closeModal]], 'about');
 }
 END
 }
@@ -15350,14 +15737,14 @@ function heard(line) {
     }
     var at = line.indexOf(' '), word = at < 0 ? line : line.slice(0, at), rest = at < 0 ? '' : line.slice(at + 1);
     var aside = selected != perlTab;    // the window shows a tab lzrprf has not been told of yet: what lzrprf says of its own tab's bar, lock and arrows is said again once it is told
-    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
+    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); if (word == 'page') inspectClose(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
     if (word == 'picture') pictureBegun(rest); else if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
     else if (word == 'patch' || word == 'runs') { var p = (word == 'patch' ? /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/ : /^(\d{1,2}) (\d{1,3})$/).exec(rest); if (p) { listFor = +p[1]; listPatch = word == 'patch' ? [+p[2], +p[3]] : [+p[2]]; list = []; again = true; } }    // runs: several stretches in one list (runsOf, 28-window-pointer.pl)
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
-    else if (word == 'tabs') tabsTold(rest);
+    else if (word == 'tabs') { tabsTold(rest); if (!inspectFits(inspectUI)) inspectClose(); }
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
     else if (word == 'install') installTold(rest);
-    else if (word == 'checked') checkedTold(rest);
+    else if (word == 'checked') checkedTold(rest); else if (word == 'release') releaseNumber = rest;    // for About (28-window-menu.pl)
     else if (word == 'licence') licenceTold(rest);
     else if (word == 'profiles') profilesTold(rest);
     else if (word == 'sso') ssoTold(rest);
@@ -15400,7 +15787,7 @@ function heard(line) {
     else if (word == 'redirects') redirectsTold(rest);    // [C4] LZRDFNDR's Redirects
     else if (word == 'filters') filtersTold(rest);    // [C27] the list page of Filters
     else if (word == 'layers') layersTold(rest);    // [C18] the layers of the page kept running
-    else if (word == 'live') liveTold(rest);
+    else if (word == 'live') { liveTold(rest); if (!liveOn || trmnlKeys) inspectClose(); } else if (word == 'inspect') inspectTold(rest);
     else if (word == 'video') videoTold(rest);
     else if (word == 'scroll') pageScrollTo(rest); else if (word == 'cursor') pointerShaped(rest);    // the pointer's shape over the page (28-window-pointer.pl)
     else if (word == 'quit') app.terminate($());
@@ -16725,7 +17112,10 @@ function supportAbout() {
 function windowPicture() {    // the window's own drawing of itself, at one pixel a point, made smaller until its PNG is one lzrprf sends; null when none is
     var r = root.bounds, big = root.bitmapImageRepForCachingDisplayInRect(r);
     if (!big || big.isNil()) return null;
-    root.cacheDisplayInRectToBitmapImageRep(r, big);
+    var localPane = inspectUI && inspectUI.pane, locallyHidden = localPane && localPane.hidden;
+    if (localPane) localPane.hidden = true;
+    try { root.cacheDisplayInRectToBitmapImageRep(r, big); }
+    finally { if (localPane) localPane.hidden = locallyHidden; }
     for (var scale = 1; scale >= 0.25; scale /= 2) {
         var w = Math.max(1, Math.round(r.size.width * scale)), h = Math.max(1, Math.round(r.size.height * scale));
         var rep = $.NSBitmapImageRep.alloc.initWithBitmapDataPlanesPixelsWidePixelsHighBitsPerSampleSamplesPerPixelHasAlphaIsPlanarColorSpaceNameBytesPerRowBitsPerPixel(null, w, h, 8, 4, true, false, $('NSDeviceRGBColorSpace'), 0, 0);
@@ -18892,12 +19282,8 @@ function viewDrawn(view, paintIt) {
 }
 
 ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: clickThrough({
-    // The page's own menu: Copy, and nothing that looks anything up or opens anything.
-    'menuForEvent:': { types: ['id', ['id']], implementation: function (event) {
-        var menu = $.NSMenu.alloc.initWithTitle($(''));
-        menu.addItemWithTitleActionKeyEquivalent($('Copy'), 'copy:', $(''));
-        return menu;
-    } }
+    // The browser's own Copy and local Inspect actions.
+    'menuForEvent:': { types: ['id', ['id']], implementation: function (event) { return inspectMenu(true); } }
 }) });
 
 ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
@@ -19088,7 +19474,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowDidEndLiveResize:': { types: ['void', ['id']], implementation: function (note) { sizing(false); viewNow(); } },
     'windowDidChangeBackingProperties:': { types: ['void', ['id']], implementation: function (note) { glassPlaced(); view(); } },    // a move to a screen of another scale: the page is drawn again at its pixels
     'windowDidEnterFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
-    'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
+    'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },    // full screen keeps the system's own options, which hide the menu bar and show it at the top: options of its own (auto-hide toolbar on a window with no toolbar) hung a window that opened in full screen (release 131, 2026-11-26)
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },
     'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
@@ -19230,13 +19616,13 @@ var CMD = 1 << 20, SHIFT = 1 << 17, OPTION = 1 << 19, CONTROL = 1 << 18;
 function menus() {
     var main = $.NSMenu.alloc.initWithTitle($(''));
     var tabKeys = [1, 2, 3, 4, 5, 6, 7, 8].map(function (n) { return ['Tab ' + n, 'tabNumber:', String(n), true, CMD, n - 1]; }).concat([['Last Tab', 'tabNumber:', '9', true, CMD, -1]]);
-    [[NAME, [['New Incognito Window', 'incognito:', 'N', true], ['Settings...', 'settings:', ',', true], ['Quit ' + NAME, 'terminate:', 'q', false]]],
+    [[NAME, [['Settings...', 'settings:', ',', true], ['Quit ' + NAME, 'terminate:', 'q', false]]],
      ['Edit', [['Undo', 'undo:', 'z', false], ['Redo', 'redo:', 'Z', false], ['Cut', 'cut:', 'x', false], ['Copy', 'copy:', 'c', false], ['Paste', 'paste:', 'v', false], ['Select All', 'selectAll:', 'a', false],
         ['Find...', 'finding:', 'f', true], ['Find Next', 'findNext:', 'g', true], ['Find Previous', 'findPrevious:', 'g', true, CMD | SHIFT]]],
      ['View', [['Zoom In', 'zoomIn:', '+', true], ['Zoom In', 'zoomIn:', '=', true, CMD, 0, true], ['Zoom Out', 'zoomOut:', '-', true], ['Actual Size', 'zoomReset:', '0', true]]],
      ['Go', [['Address', 'bar:', 'l', true], ['Back', 'back:', '[', true], ['Forward', 'forward:', ']', true], ['Reload', 'reload:', 'r', true], ['Clear Browsing History...', 'clearing:', String.fromCharCode(8), true, CMD | SHIFT], ['Clear Cookies of This Site...', 'cookieSite:', '', true], ['Log', 'log:', '', true]]],
      ['Bookmarks', [['Bookmark This Tab...', 'markThis:', 'd', true], ['Show Bookmarks Bar', 'marksBar:', 'b', true, CMD | SHIFT], ['Bookmark Manager', 'bookmarks:', 'b', true, CMD | OPTION], ['Import Bookmarks...', 'importing:', '', true]]],
-     ['Tab', [['New Tab', 'newTab:', 't', true], ['Close Tab', 'closeTab:', 'w', true], ['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
+     ['Tab', [['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
         ['Select Next Tab', 'nextTab:', String.fromCharCode(0xF703), true, CMD | OPTION], ['Select Previous Tab', 'previousTab:', String.fromCharCode(0xF702), true, CMD | OPTION],
         ['Next Tab', 'nextTab:', '\t', true, CONTROL], ['Previous Tab', 'previousTab:', '\t', true, CONTROL | SHIFT]].concat(tabKeys)]].forEach(function (one) {
         var item = $.NSMenuItem.alloc.init, menu = $.NSMenu.alloc.initWithTitle($(one[0]));
@@ -19252,7 +19638,7 @@ function menus() {
         item.submenu = menu;
         main.addItem(item);
     });
-    app.mainMenu = main;
+    menusMore(main); app.mainMenu = main;    // File and Help, and the name in the bar (28-window-menu.pl)
 }
 
 function tabMoved(by) { if (!modalOpen && !asking && tabs.length > 1) tabSaid('tab select ' + ((selected + by + tabs.length) % tabs.length)); }
@@ -19724,13 +20110,14 @@ function partsMade() {    // the boxes of the two modals, made once with the pan
 }
 
 function run(argv) {
-    NAME = argv[0] || NAME;
+    NAME = (argv[0] || NAME).replace(/-Staging$/, ' - Staging');    // the staging application, LZRBRWSR-Staging.app, is named "LZRBRWSR - Staging" in the menu bar (Henry, 2026-11-26)
     TORWINDOW = argv[1] == 'tor';
     INCOGNITO = argv[1] == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
     if (INCOGNITO) $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSQuitAlwaysKeepsWindows: false, ApplePersistenceIgnoreState: true }));    // in memory only: macOS is asked to keep no window of it to restore (and this container lets it write no file anyway)
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;
     app.setActivationPolicy(kind());
+    menuBarNamed(NAME);
     app.applicationIconImage = icon(256);
     hand = $.LzrprfHand.alloc.init;
     app.delegate = hand;

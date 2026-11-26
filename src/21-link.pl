@@ -261,12 +261,12 @@ sub link_reaped {                         # [C31] the sender's answer: the comma
 sub link_checked {                        # [C31] a command and its signature: (verb, argument, nonce) when every check holds, else (nothing, why)
     my ($block) = @_;
     my ($command, $signature) = $block =~ /\A([^\n]+)\n(-----BEGIN SSH SIGNATURE-----\n.*)\z/s or return (undef, 'it is not a command and a signature');
-    my ($id, $nonce, $expires, $verb, $arg) = $command =~ /\Alzrbrwsr-debug-link 1 ([0-9a-f]{12}) ([0-9a-f]{16,32}) ([0-9]{10}) (open|reload|measure|snapshot|verbosity|shot|forget|press)(?: ([\x21-\x7e]{1,2000}))?\z/ or return (undef, 'it is not in the one form a command has');
+    my ($id, $nonce, $expires, $verb, $arg) = $command =~ /\Alzrbrwsr-debug-link 1 ([0-9a-f]{12}) ([0-9a-f]{16,32}) ([0-9]{10}) (open|reload|measure|snapshot|verbosity|shot|forget|press|right|move|scroll)(?: ([\x21-\x7e]{1,2000}))?\z/ or return (undef, 'it is not in the one form a command has');
     return (undef, 'it names another link') unless $id eq ($LINK{id} // '');
     my $now = time;
     return (undef, 'it expired') if $expires <= $now;
     return (undef, "its expiry is more than $LINK_COMMAND_SECONDS seconds away") if $expires > $now + $LINK_COMMAND_SECONDS;
-    my %arg_ok = (open => qr{\Ahttps://[\x21-\x7e]+\z}, measure => qr{\Ahttps://[\x21-\x7e]+\z}, reload => qr{\A\z}, snapshot => qr{\A\z}, verbosity => qr{\A[012]\z}, shot => qr{\A(?:page|window)(?:,private)?\z}, forget => qr{\Ahttps://[\x21-\x7e]+\z}, press => qr{\A[0-9]{1,5},[0-9]{1,5}\z});
+    my %arg_ok = (open => qr{\Ahttps://[\x21-\x7e]+\z}, measure => qr{\Ahttps://[\x21-\x7e]+\z}, reload => qr{\A\z}, snapshot => qr{\A\z}, verbosity => qr{\A[012]\z}, shot => qr{\A(?:page|window)(?:,private)?\z}, forget => qr{\Ahttps://[\x21-\x7e]+\z}, press => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, right => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, move => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, scroll => qr{\A[0-9]{1,5},[0-9]{1,5},-?[0-9]{1,5},-?[0-9]{1,5}\z});
     return (undef, "its argument is not one $verb takes") unless ($arg // '') =~ $arg_ok{$verb};
     my $seen = link_folder() . '/nonces';
     my @kept;
@@ -290,7 +290,7 @@ sub link_command {                        # [C31] one command: checked, written 
     $LINK{last_command} = time;
     $LINK{next} = 0;
     my $shown = $verb . (length $arg ? ' ' . link_url($arg) : '');
-    $shown = "$verb $arg" if $verb eq 'verbosity' || $verb eq 'shot' || $verb eq 'press';
+    $shown = "$verb $arg" if $verb eq 'verbosity' || $verb eq 'shot' || $verb =~ /\A(?:press|right|move|scroll)\z/;
     noted("the live debug link ran a signed command: $shown");
     link_line('INFO', 'command', "a signed command was run: $shown", verb => $verb, nonce => $nonce, verdict => 'run');
     window("link said $shown");
@@ -336,6 +336,22 @@ sub link_command {                        # [C31] one command: checked, written 
         live_input("down $x $y"); live_input("up $x $y");
         noted("the live debug link pressed the page shown at $x,$y");
         return link_line('INFO', 'press', "a press and release were handed to the page at $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
+    }
+    if ($verb eq 'right' || $verb eq 'move') {    # [1237] the secondary button at X,Y (the page's contextmenu), or the pointer moved there (hover, mousemove), handed straight to the page kept running
+        my ($x, $y) = split /,/, $arg;
+        live_input("move $x $y"); live_input("context $x $y") if $verb eq 'right';
+        noted("the live debug link handed the page shown a $verb at $x,$y");
+        return link_line('INFO', $verb, $verb eq 'right' ? "a right press was handed to the page at $x,$y" : "the pointer was moved over the page to $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
+    }
+    if ($verb eq 'scroll') {                # [1237] the wheel at X,Y by DX,DY points: the pointer moved there, then the page shown from its place moved by that much (no less than its top or left)
+        my ($x, $y, $dx, $dy) = split /,/, $arg;
+        my $live = live_of($TABS[$TAB]);
+        my ($sx, $sy) = split / /, ($live && $live->{scrolled} // '0 0');
+        my ($nx, $ny) = (($sx // 0) + $dx, ($sy // 0) + $dy);
+        $nx = 0 if $nx < 0; $ny = 0 if $ny < 0;
+        live_input("move $x $y"); live_input("scroll $TAB $nx $ny");
+        noted("the live debug link scrolled the page shown by $dx,$dy to $nx,$ny");
+        return link_line('INFO', 'scroll', "the page was shown from $nx,$ny (moved by $dx,$dy at $x,$y)", nonce => $nonce, x => $x, y => $y, to => "$nx,$ny", live => ($live ? 1 : 0));
     }
     if ($verb eq 'shot') {
         return link_line('WARN', 'command', "a picture was asked again within $LINK_SHOT_SECONDS seconds; none was taken", nonce => $nonce) if time - ($LINK{shot_at} // 0) < $LINK_SHOT_SECONDS;

@@ -186,8 +186,8 @@ sub tor_phase {                           # [C17] the next step of the Tor windo
     return 1;
 }
 
-sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window: a Tor window apart from it, and this one as it was
-    window('tor off');
+sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window, or File > New Tor Window in any window: a Tor window apart from it, and this one as it was
+    window('tor off') unless $TOR_WINDOW;    # the onion of a Tor window stays as its own Tor says
     return idle('LZRTNNL is not installed, so no Tor window opens. Add it in Add or remove LZR modules, in the cogwheel menu.') unless part_on('lzrtnnl');
     return idle('A Tor window was asked for: "lzrprf try" starts none. Tor never carries this window.') if $TRY;
     return idle('No Tor window was started: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'tor', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);

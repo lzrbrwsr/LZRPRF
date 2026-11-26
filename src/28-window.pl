@@ -378,14 +378,14 @@ function heard(line) {
     }
     var at = line.indexOf(' '), word = at < 0 ? line : line.slice(0, at), rest = at < 0 ? '' : line.slice(at + 1);
     var aside = selected != perlTab;    // the window shows a tab lzrprf has not been told of yet: what lzrprf says of its own tab's bar, lock and arrows is said again once it is told
-    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
+    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); if (word == 'page') inspectClose(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
     if (word == 'picture') pictureBegun(rest); else if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
     else if (word == 'patch' || word == 'runs') { var p = (word == 'patch' ? /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/ : /^(\d{1,2}) (\d{1,3})$/).exec(rest); if (p) { listFor = +p[1]; listPatch = word == 'patch' ? [+p[2], +p[3]] : [+p[2]]; list = []; again = true; } }    // runs: several stretches in one list (runsOf, 28-window-pointer.pl)
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
-    else if (word == 'tabs') tabsTold(rest);
+    else if (word == 'tabs') { tabsTold(rest); if (!inspectFits(inspectUI)) inspectClose(); }
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
     else if (word == 'install') installTold(rest);
-    else if (word == 'checked') checkedTold(rest);
+    else if (word == 'checked') checkedTold(rest); else if (word == 'release') releaseNumber = rest;    // for About (28-window-menu.pl)
     else if (word == 'licence') licenceTold(rest);
     else if (word == 'profiles') profilesTold(rest);
     else if (word == 'sso') ssoTold(rest);
@@ -428,7 +428,7 @@ function heard(line) {
     else if (word == 'redirects') redirectsTold(rest);    // [C4] LZRDFNDR's Redirects
     else if (word == 'filters') filtersTold(rest);    // [C27] the list page of Filters
     else if (word == 'layers') layersTold(rest);    // [C18] the layers of the page kept running
-    else if (word == 'live') liveTold(rest);
+    else if (word == 'live') { liveTold(rest); if (!liveOn || trmnlKeys) inspectClose(); } else if (word == 'inspect') inspectTold(rest);
     else if (word == 'video') videoTold(rest);
     else if (word == 'scroll') pageScrollTo(rest); else if (word == 'cursor') pointerShaped(rest);    // the pointer's shape over the page (28-window-pointer.pl)
     else if (word == 'quit') app.terminate($());
@@ -1753,7 +1753,10 @@ function supportAbout() {
 function windowPicture() {    // the window's own drawing of itself, at one pixel a point, made smaller until its PNG is one lzrprf sends; null when none is
     var r = root.bounds, big = root.bitmapImageRepForCachingDisplayInRect(r);
     if (!big || big.isNil()) return null;
-    root.cacheDisplayInRectToBitmapImageRep(r, big);
+    var localPane = inspectUI && inspectUI.pane, locallyHidden = localPane && localPane.hidden;
+    if (localPane) localPane.hidden = true;
+    try { root.cacheDisplayInRectToBitmapImageRep(r, big); }
+    finally { if (localPane) localPane.hidden = locallyHidden; }
     for (var scale = 1; scale >= 0.25; scale /= 2) {
         var w = Math.max(1, Math.round(r.size.width * scale)), h = Math.max(1, Math.round(r.size.height * scale));
         var rep = $.NSBitmapImageRep.alloc.initWithBitmapDataPlanesPixelsWidePixelsHighBitsPerSampleSamplesPerPixelHasAlphaIsPlanarColorSpaceNameBytesPerRowBitsPerPixel(null, w, h, 8, 4, true, false, $('NSDeviceRGBColorSpace'), 0, 0);
@@ -3920,12 +3923,8 @@ function viewDrawn(view, paintIt) {
 }
 
 ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: clickThrough({
-    // The page's own menu: Copy, and nothing that looks anything up or opens anything.
-    'menuForEvent:': { types: ['id', ['id']], implementation: function (event) {
-        var menu = $.NSMenu.alloc.initWithTitle($(''));
-        menu.addItemWithTitleActionKeyEquivalent($('Copy'), 'copy:', $(''));
-        return menu;
-    } }
+    // The browser's own Copy and local Inspect actions.
+    'menuForEvent:': { types: ['id', ['id']], implementation: function (event) { return inspectMenu(true); } }
 }) });
 
 ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
@@ -4116,7 +4115,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowDidEndLiveResize:': { types: ['void', ['id']], implementation: function (note) { sizing(false); viewNow(); } },
     'windowDidChangeBackingProperties:': { types: ['void', ['id']], implementation: function (note) { glassPlaced(); view(); } },    // a move to a screen of another scale: the page is drawn again at its pixels
     'windowDidEnterFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
-    'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
+    'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },    // full screen keeps the system's own options, which hide the menu bar and show it at the top: options of its own (auto-hide toolbar on a window with no toolbar) hung a window that opened in full screen (release 131, 2026-11-26)
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },
     'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
@@ -4258,13 +4257,13 @@ var CMD = 1 << 20, SHIFT = 1 << 17, OPTION = 1 << 19, CONTROL = 1 << 18;
 function menus() {
     var main = $.NSMenu.alloc.initWithTitle($(''));
     var tabKeys = [1, 2, 3, 4, 5, 6, 7, 8].map(function (n) { return ['Tab ' + n, 'tabNumber:', String(n), true, CMD, n - 1]; }).concat([['Last Tab', 'tabNumber:', '9', true, CMD, -1]]);
-    [[NAME, [['New Incognito Window', 'incognito:', 'N', true], ['Settings...', 'settings:', ',', true], ['Quit ' + NAME, 'terminate:', 'q', false]]],
+    [[NAME, [['Settings...', 'settings:', ',', true], ['Quit ' + NAME, 'terminate:', 'q', false]]],
      ['Edit', [['Undo', 'undo:', 'z', false], ['Redo', 'redo:', 'Z', false], ['Cut', 'cut:', 'x', false], ['Copy', 'copy:', 'c', false], ['Paste', 'paste:', 'v', false], ['Select All', 'selectAll:', 'a', false],
         ['Find...', 'finding:', 'f', true], ['Find Next', 'findNext:', 'g', true], ['Find Previous', 'findPrevious:', 'g', true, CMD | SHIFT]]],
      ['View', [['Zoom In', 'zoomIn:', '+', true], ['Zoom In', 'zoomIn:', '=', true, CMD, 0, true], ['Zoom Out', 'zoomOut:', '-', true], ['Actual Size', 'zoomReset:', '0', true]]],
      ['Go', [['Address', 'bar:', 'l', true], ['Back', 'back:', '[', true], ['Forward', 'forward:', ']', true], ['Reload', 'reload:', 'r', true], ['Clear Browsing History...', 'clearing:', String.fromCharCode(8), true, CMD | SHIFT], ['Clear Cookies of This Site...', 'cookieSite:', '', true], ['Log', 'log:', '', true]]],
      ['Bookmarks', [['Bookmark This Tab...', 'markThis:', 'd', true], ['Show Bookmarks Bar', 'marksBar:', 'b', true, CMD | SHIFT], ['Bookmark Manager', 'bookmarks:', 'b', true, CMD | OPTION], ['Import Bookmarks...', 'importing:', '', true]]],
-     ['Tab', [['New Tab', 'newTab:', 't', true], ['Close Tab', 'closeTab:', 'w', true], ['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
+     ['Tab', [['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
         ['Select Next Tab', 'nextTab:', String.fromCharCode(0xF703), true, CMD | OPTION], ['Select Previous Tab', 'previousTab:', String.fromCharCode(0xF702), true, CMD | OPTION],
         ['Next Tab', 'nextTab:', '\t', true, CONTROL], ['Previous Tab', 'previousTab:', '\t', true, CONTROL | SHIFT]].concat(tabKeys)]].forEach(function (one) {
         var item = $.NSMenuItem.alloc.init, menu = $.NSMenu.alloc.initWithTitle($(one[0]));
@@ -4280,7 +4279,7 @@ function menus() {
         item.submenu = menu;
         main.addItem(item);
     });
-    app.mainMenu = main;
+    menusMore(main); app.mainMenu = main;    // File and Help, and the name in the bar (28-window-menu.pl)
 }
 
 function tabMoved(by) { if (!modalOpen && !asking && tabs.length > 1) tabSaid('tab select ' + ((selected + by + tabs.length) % tabs.length)); }
