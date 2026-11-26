@@ -166,11 +166,11 @@ BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 # that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="1fc6936b3cbb1e8ea47c8fc16dec52925bd6b059e90f148afc19e838ee5887b8"
-RELEASE="148"
-LZRPRF_COMMIT="aa10fcbc54a0005b5cc22a0a23efac4d669b9f07"
+SHA256="8f584926ace7f4572578d0c1c92959f031f31be249d559fe2ecc2fadcacc975f"
+RELEASE="149"
+LZRPRF_COMMIT="feaf1edfbaaae5f5d0a291b0335cf9d8a1f5dc79"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="5a6c05af75b0ab51c6f2873e9432cb08c72569669be2569c0ffbaa73011332b4"
+LZRPRF_SHA256="bde7b91c64110b03538f9d48eb912f0fceb925c7e299971c891407f59c7aeead"
 SELFTEST_SHA256="b2fdaa94e32e33c296b3f13688ccfa7c27e42e66a0cad4e6f7b1b07c22dd8f7f"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
 BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
@@ -787,19 +787,19 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 148
+release 149
 home local
-new Links on busy news sites (yle.fi) take clicks again after the page has been open a while.
+new A click on a link opens it even when the site's own scripts fail under the click (yle.fi).
 new LZRDFNDR's questions about scripts, redirects and sends no longer offer Forget; it stays in the site's settings.
 newest https://lzrbrwsr.com/latest
 installer https://lzrbrwsr.com/install.sh
 same https://lzrbrwsr.vercel.app/install.sh
 report https://origin.lzrbrwsr.com/report
 file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-file lzrbrwsr-bin 30e0806fd959d28a738d1487337e5f555e1fe68059ad25575e734da65bf6a3c6
+file lzrbrwsr-bin ccd707a6d599f2ab1f75e11cdc98aa53211e88b3b79b4c4fe4bb3bc86002ca31
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-lzrprf 5a6c05af75b0ab51c6f2873e9432cb08c72569669be2569c0ffbaa73011332b4
+lzrprf bde7b91c64110b03538f9d48eb912f0fceb925c7e299971c891407f59c7aeead
 blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."
