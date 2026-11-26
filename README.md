@@ -266,8 +266,9 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 145
+    release 146
     home local
+    new After an update, the welcome card no longer leaves the page grey and unclickable.
     new A tab pulled out into its own window shows no second app icon in the Dock or menu bar.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
@@ -277,7 +278,7 @@ record:
     file lzrbrwsr-bin 0c70a577e95948e4f3f3441607d6af8d6ea5387b8c0457b606493e383f72271a
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf f0afa7c7872aa9f1470ae3b2370d3d258b01aba25fe74dc69283f0608a396699
+    lzrprf cc788f8ad5a6a808114d591561a49016b5a4e5cc14367cfc16595d89124c11d1
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

@@ -277,17 +277,18 @@ sub welcome {
     window(@new ? ("welcome line n What is new in release $release", map { "welcome line b $_" } @new) : ());
     window("welcome line g What $APP keeps you from", (map { "welcome line b $_" } @PROTECTS), "welcome line y What $APP cannot keep you from: yours to watch", map { "welcome line b " . s/\$APP/$APP/gr } @CANNOT);
     window('welcome end');
-    my @held;
-    while (defined(my $line = hear(scalar link_due(undef)))) {    # [C31] with the live debug link on, its commands are still looked at while the welcome waits: a staging browser left on it took none for hours (2026-11-26)
-        if ($line eq '') { eval { link_watch() }; next }
-        if ($line ne 'welcomed') { push @held, $line; next }
-        unlink "${\ shared()}/welcomed";
-        my $out;
-        sysopen($out, "${\ shared()}/welcomed", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600) && print({$out} $release) && close($out);
-        unshift @HELD, @held;
-        return;
-    }
-    leave();                              # the window is gone
+    $WELCOMING = $release;                # nothing waits for "Got it": behind's own loop takes it (sub welcomed). A wait here held every
+    return;                               # other line, the page's answers among them, so a welcome card another modal replaced left the page grey and deaf (2026-11-26)
+}
+
+sub welcomed {                            # "Got it" on the welcome card, taken in behind's own loop: the release is marked welcomed once
+    my $release = $WELCOMING // return;
+    undef $WELCOMING;
+    unlink "${\ shared()}/welcomed";
+    my $out;
+    sysopen($out, "${\ shared()}/welcomed", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600) && print({$out} $release) && close($out);
+    window("welcome kept $release");    # said back once the release is marked, so the window (and its self-test) knows Got it was taken
+    return;
 }
 
 # What "Install it" does, with no key to press after it: the press is the yes.

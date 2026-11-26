@@ -3566,7 +3566,7 @@ function told(word, rest) {
         armed(8, 'welcome');
         if (HOW == 'return') returnDue = true; else posted(one, c[0], c[1]);
     }
-    else if (clickStep == 'welcome' && word == 'idle') {
+    else if (clickStep == 'welcome' && word == 'welcome' && /^kept /.test(rest)) {    // the welcome waits for nothing now: idle comes at once, and Got it is said back as "welcome kept RELEASE"
         say('test welcomed modal=' + modalOpen + ' veil=' + veil.hidden + ' home=' + !homeView.hidden);
         if (HOW == 'return') return ended();
         var c = centre(cog);    // no footer: the log is Show log in the cogwheel's menu, pressed as you press it, the cogwheel first
@@ -5381,7 +5381,7 @@ check(asked('/second/install.sh') == 1 && @uptwo_file == 1 && slurp($uptwo_file[
 check(asked('/second/differ.sh') == 12 && (grep { /^The two places hold different installers for now\. Nothing runs while they differ/ } install_said('updiffer')) == 11 && !installer_files('updiffer') && install_ended('updiffer') eq "failed The two places hold different installers. Nothing was changed: $t/install.sh and $t/second/differ.sh." && !grep({ /has SHA-256/ } log_of('updiffer')),
     'two places that hold different installers: both are fetched again twelve times, nothing is written and nothing runs, and the window says why', install_ended('updiffer') || 'it did not end');
 my @welcome_said = words('welcome', 'welcome');
-check(@welcome_said && $welcome_said[0] eq 'begin 3' && $welcome_said[-1] eq 'end' && (grep { $_ eq 'line n What is new in release 3' } @welcome_said) == 1 && (grep { $_ eq 'line b The first thing that is new' } @welcome_said) == 1 && (grep { $_ eq 'line b A second thing' } @welcome_said) == 1
+check(@welcome_said && $welcome_said[0] eq 'begin 3' && $welcome_said[-2] eq 'end' && $welcome_said[-1] eq 'kept 3' && (grep { $_ eq 'line n What is new in release 3' } @welcome_said) == 1 && (grep { $_ eq 'line b The first thing that is new' } @welcome_said) == 1 && (grep { $_ eq 'line b A second thing' } @welcome_said) == 1
     && (grep { $_ eq 'line g What Test keeps you from' } @welcome_said) == 1 && (grep { $_ eq 'line y What Test cannot keep you from: yours to watch' } @welcome_said) == 1 && (grep { /^line b What you send: / } @welcome_said) == 1 && slurp("$base.welcome/welcomed") eq '3' && asked('/drawn?welcome') == 1,
     'the first start of a release shows the welcome: what is new from the release file without its control characters, what is kept from you and what is yours to watch; Got it keeps the release number and the page is fetched after', join(' | ', @welcome_said) || 'no welcome');
 my @tor_said = words('tor', 'tor');

@@ -176,6 +176,7 @@ my ($TRY, $PEER, $TYPED, $ANSWER, $RUN, $APP, $PROGRAM, @ARGUMENTS) = (0, '-', '
 my $BEGAN;                                # the SHA-256 of the program when this window began: see "sub laid_out"
 my $PROGRAM_SEEN;                         # the file the program was when its SHA-256 was last found to be $BEGAN: see "sub program_same"
 my ($FROM, @EVENTS);                      # what the window says; or, without a window, what a test has typed
+my $WELCOMING;                            # the release whose welcome card is shown, until its Got it (sub welcome, sub welcomed)
 my $FROM_HELD = '';                       # what the window said that is not a whole line yet (sub hear)
 my $IDLE_WORK;                            # a sub run once, the first moment the window and every page are quiet (sub hear), set by sub behind: the identity question, asked before the first address is typed
 my ($SPARE, $SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)

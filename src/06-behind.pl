@@ -128,6 +128,7 @@ sub behind {
         elsif ($event =~ /^tool (open|sense|all)$/) { tool_shown($1) }    # [C20] the application's tool, from its icon in the bottom bar: a look, which changes nothing; "all" from its Show all processes, with every process
         elsif ($event =~ /^tool note ([^\x00-\x1f\x7f]{1,1000})\t([^\x00-\x1f\x7f]{0,2000})\z/) { tool_note($1, $2) }    # [C20] a note you wrote to the processes of a program in Show all processes
         elsif ($event =~ /^tool (act|undo) ((?:0|[1-9][0-9]{0,2})(?:,(?:0|[1-9][0-9]{0,2})){0,199})$/) { tool_done($1, $2) }    # [C20] the rows you ticked, and for a switching off confirmed
+        elsif ($event eq 'welcomed') { welcomed() }    # Got it on the welcome card: the release is marked welcomed, and nothing ever waited for it
         elsif ($event eq '') { tool_watch(); tnnl_watch(); link_watch() }    # [C20] nothing was said for a while: the jobs you switched off are looked at again, and the VPN under Tor
         elsif ($event =~ /^parts set((?: (?:lzrbrwsr|lzrdfndr|lzrtrmnl|lzrtnnl|lzrgm)){0,5})$/) { parts_set(split ' ', $1) }    # Add or remove LZR modules: the set ticked, after Restart with these modules
         elsif ($event eq 'parts list') { parts_told() }
