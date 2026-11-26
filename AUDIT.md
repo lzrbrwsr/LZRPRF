@@ -171,6 +171,7 @@ The parts, in order:
 | `24-trmnl-window.pl` | the terminal tab's part of the window's text (`sub window_trmnl_text`): the wheel, a drag, your copy and your paste `[C29]` |
 | `24-trmnl.pl` | the terminal tab (LZRTRMNL): the shell on a pseudo-terminal, its drawing container, keys in and laid rows out, scrollback, selection, copy, paste and titles `[C29]` |
 | `25-ask-and-address.pl` | a question in the strip, and what is fetched for a text that was typed |
+| `25-cht.pl` | LZRCHT `[C32]`: its three roles started in their containers, the drawing role's pages and copy checked, the keeper's word passed on, and a connector's one connection opened and held by lzrprf to an address its platform publishes |
 | `26-log.pl` | the log, and what is kept |
 | `27-proof.pl` | the proof for this computer (`sub mark`, `sub proven`) and the lookup of a name |
 | `28-window-sound.pl` | the window's part of a video's sound: `sub window_sound_text`, joined after the window's text when it starts |
@@ -207,18 +208,18 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 
 <!-- sub-map begin -->
 ```
-01-header.pl	1	-	C16 C17 C27 C20 C1 C2 C3 C21 C4 C22 C19 C5 C6 C7 C8 C9 C10 C11 C12 C26 C13 C14 C30 C15 C18 C24 C23 C25 C28 C29 C31
+01-header.pl	1	-	C16 C17 C27 C20 C1 C2 C3 C21 C4 C22 C19 C5 C6 C7 C8 C9 C10 C11 C12 C26 C13 C14 C30 C15 C18 C24 C23 C25 C28 C29 C31 C32
 02-limits-and-state.pl	1	-	-
 02-limits-and-state.pl	18	remove_tree	-
 02-limits-and-state.pl	19	unblocked	C20 C16 C17
 02-limits-and-state.pl	32	kept_in	-
-02-limits-and-state.pl	36	shared	C16 C19 C18 C12 C22 C21 C24 C30 C23 C11 C29 C26
-02-limits-and-state.pl	211	sandbox_says	C26 C27 C4
-02-limits-and-state.pl	262	permit_class	C26
-02-limits-and-state.pl	263	permit_kinds	C26
-02-limits-and-state.pl	293	fresh_tab	C19
-02-limits-and-state.pl	309	now	C19 C6 C8 C14 C30
-02-limits-and-state.pl	328	timed	C28
+02-limits-and-state.pl	36	shared	C16 C19 C18 C12 C22 C21 C24 C30 C23 C11 C29 C32 C26
+02-limits-and-state.pl	212	sandbox_says	C26 C27 C4
+02-limits-and-state.pl	263	permit_class	C26
+02-limits-and-state.pl	264	permit_kinds	C26
+02-limits-and-state.pl	294	fresh_tab	C19
+02-limits-and-state.pl	310	now	C19 C6 C8 C14 C30
+02-limits-and-state.pl	329	timed	C28
 03-containers.pl	1	-	C1 C28 C21 C3 C24 C12
 03-containers.pl	185	shell_held	-
 03-containers.pl	190	shell_measured	-
@@ -251,9 +252,9 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 04-start.pl	120	window_opened	-
 04-start.pl	128	help_opened	-
 04-start.pl	137	apart	-
-04-start.pl	168	tab_out	C29
-04-start.pl	185	pulled_command	-
-04-start.pl	191	opened_with	-
+04-start.pl	168	tab_out	C29 C32
+04-start.pl	186	pulled_command	-
+04-start.pl	192	opened_with	-
 05-profiles.pl	1	-	-
 05-profiles.pl	35	profiles_root	-
 05-profiles.pl	36	profiles_folder	-
@@ -296,8 +297,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	173	unheard	-
 06-behind.pl	217	paired	-
 06-behind.pl	232	unnamed	-
-06-behind.pl	239	leave	C17 C7 C29 C12 C16
-06-behind.pl	256	closed	-
+06-behind.pl	239	leave	C17 C7 C29 C32 C12 C16
+06-behind.pl	257	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-
@@ -308,29 +309,29 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 07-visit-beside.pl	75	beside_second	C14 C23 C27 C5 C30 C19
 07-visit-beside.pl	98	run_read	C19 C26 C28
 07-visit.pl	1	-	-
-07-visit.pl	4	visit	C19 C29 C17 C23 C26 C5 C28 C8 C7 C4 C14 C30
-07-visit.pl	243	laid_out	C28 C9
-07-visit.pl	259	outrun	-
-07-visit.pl	274	faces	C13
-07-visit.pl	310	contained	C28 C20 C13 C14 C26 C7 C3
-07-visit.pl	364	page_started	C1 C3
-07-visit.pl	387	spare_for	-
-07-visit.pl	395	spare_taken	-
-07-visit.pl	406	spare_dropped	-
-07-visit.pl	414	spare_work	-
-07-visit.pl	421	idle_taken	C1
-07-visit.pl	433	run_seal	-
-07-visit.pl	459	keeper	C9
-07-visit.pl	547	unhung	-
-07-visit.pl	555	parted	-
-07-visit.pl	564	checked	C30 C9 C22 C14
-07-visit.pl	667	laid	-
-07-visit.pl	680	laid_run	C4
-07-visit.pl	730	redirect_noted	C4
-07-visit.pl	742	redirect_answered	-
-07-visit.pl	749	redirects_listed	C4
-07-visit.pl	762	redirects_told	C4 C23
-07-visit.pl	764	redirects_decide	C4
+07-visit.pl	4	visit	C19 C29 C32 C17 C23 C26 C5 C28 C8 C7 C4 C14 C30
+07-visit.pl	244	laid_out	C28 C9
+07-visit.pl	260	outrun	-
+07-visit.pl	275	faces	C13
+07-visit.pl	311	contained	C28 C20 C13 C14 C26 C7 C3
+07-visit.pl	365	page_started	C1 C3
+07-visit.pl	388	spare_for	-
+07-visit.pl	396	spare_taken	-
+07-visit.pl	407	spare_dropped	-
+07-visit.pl	415	spare_work	-
+07-visit.pl	422	idle_taken	C1
+07-visit.pl	434	run_seal	-
+07-visit.pl	460	keeper	C9
+07-visit.pl	548	unhung	-
+07-visit.pl	556	parted	-
+07-visit.pl	565	checked	C30 C9 C22 C14
+07-visit.pl	668	laid	-
+07-visit.pl	681	laid_run	C4
+07-visit.pl	731	redirect_noted	C4
+07-visit.pl	743	redirect_answered	-
+07-visit.pl	750	redirects_listed	C4
+07-visit.pl	763	redirects_told	C4 C23
+07-visit.pl	765	redirects_decide	C4
 08-pictures.pl	1	-	C7 C5 C17 C8 C22
 08-pictures.pl	46	pictures_state	C28
 08-pictures.pl	57	pictures_begun	C23 C28 C27 C4 C5 C8 C6 C7 C1 C3 C21
@@ -372,29 +373,29 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 09-videos.pl	417	elsewhere	C4
 09-videos.pl	427	under	-
 10-tabs.pl	1	-	-
-10-tabs.pl	11	viewing	C29 C18 C19
-10-tabs.pl	39	relaid	C22
-10-tabs.pl	78	tabbed	C29 C4
-10-tabs.pl	105	closed_kept	-
-10-tabs.pl	116	tab_reopened	C4
-10-tabs.pl	133	lists_bounded	-
-10-tabs.pl	142	tab_moved	-
-10-tabs.pl	158	tab_shown	C29 C18 C12 C7
-10-tabs.pl	192	menu	C7 C16 C4
-10-tabs.pl	251	nav_told	-
-10-tabs.pl	256	navigated	C4
-10-tabs.pl	274	engine_fit	-
-10-tabs.pl	280	engine	-
-10-tabs.pl	290	search_set	C16
-10-tabs.pl	301	typed	C23
-10-tabs.pl	316	secured	-
-10-tabs.pl	338	home	-
-10-tabs.pl	350	go	C7
-10-tabs.pl	375	redirected	-
-10-tabs.pl	383	unfit	-
-10-tabs.pl	394	resolved	-
-10-tabs.pl	419	home_shown	C29
-10-tabs.pl	450	home_arrived	C19
+10-tabs.pl	11	viewing	C32 C29 C18 C19
+10-tabs.pl	40	relaid	C22
+10-tabs.pl	79	tabbed	C32 C29 C4
+10-tabs.pl	107	closed_kept	-
+10-tabs.pl	118	tab_reopened	C4
+10-tabs.pl	135	lists_bounded	-
+10-tabs.pl	144	tab_moved	-
+10-tabs.pl	160	tab_shown	C29 C32 C18 C12 C7
+10-tabs.pl	195	menu	C7 C16 C4
+10-tabs.pl	254	nav_told	-
+10-tabs.pl	259	navigated	C4
+10-tabs.pl	277	engine_fit	-
+10-tabs.pl	283	engine	-
+10-tabs.pl	293	search_set	C16
+10-tabs.pl	304	typed	C23
+10-tabs.pl	319	secured	-
+10-tabs.pl	341	home	-
+10-tabs.pl	353	go	C7
+10-tabs.pl	378	redirected	-
+10-tabs.pl	386	unfit	-
+10-tabs.pl	397	resolved	-
+10-tabs.pl	422	home_shown	C29 C32
+10-tabs.pl	453	home_arrived	C19
 11-bookmarks.pl	1	-	C4
 11-bookmarks.pl	19	marks_root	C16
 11-bookmarks.pl	28	marks_into_bar	C16
@@ -734,8 +735,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 20-window-side.pl	44	noted	C23
 20-window-side.pl	45	said_noted	-
 20-window-side.pl	57	stated	-
-20-window-side.pl	65	hear	C12 C29 C19
-20-window-side.pl	114	window_changed	-
+20-window-side.pl	65	hear	C12 C29 C32 C19
+20-window-side.pl	116	window_changed	-
 21-link.pl	1	-	C31
 21-link.pl	49	link_folder	-
 21-link.pl	50	link_state	C31
@@ -870,26 +871,26 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 24-inspect.pl	5	inspect_input	-
 24-inspect.pl	19	inspect_answer	-
 24-live-input.pl	1	-	C12
-24-live-input.pl	39	live_input	C18 C29 C12
-24-live-input.pl	75	live_wrote	C18
-24-live-input.pl	87	live_flushed	C18
-24-live-input.pl	95	live_stopped	C18
-24-live-input.pl	107	live_scroll_told	C18
-24-live-input.pl	116	live_scroll_back	C18
-24-live-input.pl	121	live_home_settling	-
-24-live-input.pl	128	live_home_left	-
-24-live-input.pl	134	live_home_told	-
-24-live-input.pl	141	live_scroll_left	C18
-24-live-input.pl	196	live_unknown	-
-24-live-input.pl	208	live_answered	C18 C19 C12 C7 C9 C26 C29 C4
-24-live-input.pl	336	live_layer	C18
-24-live-input.pl	373	live_layer_gone	C18
-24-live-input.pl	385	live_layers_paid	C18
-24-live-input.pl	410	live_sound	C12
-24-live-input.pl	458	live_sounded	C12
-24-live-input.pl	473	live_layers_again	C18 C9
-24-live-input.pl	489	live_patched	-
-24-live-input.pl	537	live_window_patch	-
+24-live-input.pl	39	live_input	C18 C32 C29 C12
+24-live-input.pl	76	live_wrote	C18
+24-live-input.pl	88	live_flushed	C18
+24-live-input.pl	96	live_stopped	C18
+24-live-input.pl	108	live_scroll_told	C18
+24-live-input.pl	117	live_scroll_back	C18
+24-live-input.pl	122	live_home_settling	-
+24-live-input.pl	129	live_home_left	-
+24-live-input.pl	135	live_home_told	-
+24-live-input.pl	142	live_scroll_left	C18
+24-live-input.pl	197	live_unknown	-
+24-live-input.pl	209	live_answered	C18 C19 C12 C7 C9 C26 C29 C4
+24-live-input.pl	337	live_layer	C18
+24-live-input.pl	374	live_layer_gone	C18
+24-live-input.pl	386	live_layers_paid	C18
+24-live-input.pl	411	live_sound	C12
+24-live-input.pl	459	live_sounded	C12
+24-live-input.pl	474	live_layers_again	C18 C9
+24-live-input.pl	490	live_patched	-
+24-live-input.pl	538	live_window_patch	-
 24-parts.pl	1	-	-
 24-parts.pl	24	parts_read	-
 24-parts.pl	35	part_on	-
@@ -959,8 +960,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 24-trmnl-panes.pl	582	trmnl_kept	-
 24-trmnl-panes.pl	593	trmnl_read_saved	-
 24-trmnl-panes.pl	610	trmnl_tree_read	-
-24-trmnl-window.pl	1	-	C29
-24-trmnl-window.pl	26	window_trmnl_text	C29
+24-trmnl-window.pl	1	-	C29 C32
+24-trmnl-window.pl	30	window_trmnl_text	C32 C29
 24-trmnl.pl	1	-	C29
 24-trmnl.pl	85	trmnl_opened	-
 24-trmnl.pl	102	trmnl_program	-
@@ -970,33 +971,62 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 24-trmnl.pl	175	trmnl_send	-
 24-trmnl.pl	181	trmnl_fed	-
 24-trmnl.pl	189	trmnl_keys	-
-24-trmnl.pl	202	trmnl_input	-
-24-trmnl.pl	224	trmnl_viewed	C29
-24-trmnl.pl	235	trmnl_pasted	C29
-24-trmnl.pl	252	trmnl_copied	C29
-24-trmnl.pl	268	trmnl_titled	C29
-24-trmnl.pl	283	trmnl_replied	C29
-24-trmnl.pl	293	trmnl_reported	C29
-24-trmnl.pl	303	trmnl_moded	-
-24-trmnl.pl	315	trmnl_wrote	-
-24-trmnl.pl	329	trmnl_gone	-
-24-trmnl.pl	343	trmnl_read	-
-24-trmnl.pl	381	trmnl_block	C29 C9
-24-trmnl.pl	404	trmnl_drawn	-
-24-trmnl.pl	417	trmnl_shown	-
-24-trmnl.pl	432	trmnl_pane_end	-
-24-trmnl.pl	442	trmnl_lost	-
-24-trmnl.pl	451	trmnl_end	-
-24-trmnl.pl	463	trmnl_all	-
-24-trmnl.pl	465	trmnl_select	-
-24-trmnl.pl	475	trmnl_heard	-
-24-trmnl.pl	490	trmnl_fds	-
+24-trmnl.pl	202	trmnl_input	C32
+24-trmnl.pl	225	trmnl_viewed	C29
+24-trmnl.pl	236	trmnl_pasted	C29
+24-trmnl.pl	253	trmnl_copied	C29
+24-trmnl.pl	269	trmnl_titled	C29
+24-trmnl.pl	284	trmnl_replied	C29
+24-trmnl.pl	294	trmnl_reported	C29
+24-trmnl.pl	304	trmnl_moded	-
+24-trmnl.pl	316	trmnl_wrote	-
+24-trmnl.pl	330	trmnl_gone	-
+24-trmnl.pl	344	trmnl_read	-
+24-trmnl.pl	382	trmnl_block	C29 C9
+24-trmnl.pl	405	trmnl_drawn	-
+24-trmnl.pl	418	trmnl_shown	-
+24-trmnl.pl	433	trmnl_pane_end	-
+24-trmnl.pl	443	trmnl_lost	-
+24-trmnl.pl	452	trmnl_end	-
+24-trmnl.pl	464	trmnl_all	-
+24-trmnl.pl	466	trmnl_select	-
+24-trmnl.pl	476	trmnl_heard	-
+24-trmnl.pl	491	trmnl_fds	-
 25-ask-and-address.pl	1	-	-
 25-ask-and-address.pl	10	ask	-
 25-ask-and-address.pl	12	asked_later	-
 25-ask-and-address.pl	14	asked	-
 25-ask-and-address.pl	48	address	C23 C8
 25-ask-and-address.pl	65	own_network	-
+25-cht.pl	1	-	C32
+25-cht.pl	50	cht_opened	-
+25-cht.pl	69	cht_program	-
+25-cht.pl	77	cht_box	C32 C3
+25-cht.pl	98	cht_keeper	C32
+25-cht.pl	122	cht_send	-
+25-cht.pl	129	cht_fed	-
+25-cht.pl	137	cht_tell	-
+25-cht.pl	143	cht_sized	-
+25-cht.pl	152	cht_input	C32
+25-cht.pl	159	cht_shown	-
+25-cht.pl	174	cht_units	-
+25-cht.pl	202	cht_drew	C32
+25-cht.pl	223	cht_paged	C32 C9
+25-cht.pl	241	cht_copied	C32
+25-cht.pl	252	cht_kept	C32
+25-cht.pl	264	cht_linked	C32
+25-cht.pl	274	cht_reachable	C32
+25-cht.pl	287	cht_heard_link	C32
+25-cht.pl	307	cht_dialed	C32
+25-cht.pl	317	cht_hung	-
+25-cht.pl	326	cht_net	-
+25-cht.pl	350	cht_box_end	-
+25-cht.pl	360	cht_unlinked	-
+25-cht.pl	369	cht_end	-
+25-cht.pl	381	cht_boxes	-
+25-cht.pl	383	cht_select	-
+25-cht.pl	397	cht_heard	-
+25-cht.pl	415	cht_fds	-
 26-log.pl	1	-	C12
 26-log.pl	13	log_shown	C16
 26-log.pl	50	choose_keeping	-

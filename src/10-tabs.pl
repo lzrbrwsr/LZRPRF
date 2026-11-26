@@ -12,6 +12,7 @@ sub viewing {
     my ($event) = @_;
     my ($wide, $high, $scale) = $event =~ /^view ([1-9][0-9]{0,4}) ([1-9][0-9]{0,4})(?: (2))?$/ or return; $VIEW_SCALE = $scale ? 2 : 1;
     @TRMNL_VIEW = ($wide, $high);
+    cht_sized($TABS[$TAB]) if $TABS[$TAB]{cht};    # [C32] LZRCHT is drawn at that size too
     trmnl_relaid($TABS[$TAB]) if $TABS[$TAB]{trmnl};    # [C29] a terminal fills the page as it is, not as a page is laid: its panes laid out again in it
     ($wide, $high) = map { my $step = $VIEW_STEP[$_]; $step * int(($_ ? $high : $wide) / $step + 0.5) } 0, 1;
     @VIEW = ($wide < $VIEW_WIDE[0] ? $VIEW_WIDE[0] : $wide > $VIEW_WIDE[1] ? $VIEW_WIDE[1] : $wide, $high < $VIEW_HIGH[0] ? $VIEW_HIGH[0] : $high > $VIEW_HIGH[1] ? $VIEW_HIGH[1] : $high);
@@ -84,6 +85,7 @@ sub tabbed {
     elsif ($how eq 'close' && defined $n && $n < @TABS) {
         my $live = live_of($TABS[$n]);
         live_end($live, 'its tab was closed', 1) if $live;
+        cht_end($TABS[$n], 'its tab was closed') if $TABS[$n]{cht};    # [C32]
         trmnl_end($TABS[$n], 'its tab was closed') if $TABS[$n]{trmnl};    # [C29]    # at once: a closed tab's page is not waited for, and the window is not kept waiting the moment it took to end by itself (17 to 40 ms a close, measured 2026-11-23)
         noted(($pulled ? 'you pulled a tab out into a new window' : 'you closed a tab') . (length($TABS[$n]{url} // '') ? ": $TABS[$n]{url}" : ''));
         my ($gone) = splice @TABS, $n, 1;
@@ -160,6 +162,7 @@ sub tab_shown {
     my $tab = $TABS[$TAB];
     window('tabs ' . @TABS . " $TAB", map { "title $_ $TABS[$_]{title}" } 0 .. $#TABS);
     return trmnl_shown($tab) if $tab->{trmnl};    # [C29]
+    return cht_shown($tab) if $tab->{cht};    # [C32]
     window("address $tab->{url}");
     my $live = live_of($tab);
     my $list = $live && $live->{shown} && ($live->{home} || $live->{wide} == $VIEW[0] && ($live->{scale} // 1) == $VIEW_SCALE) ? $live->{shown} : $SHOWN && $SHOWN->{list} && $SHOWN->{wide} == $VIEW[0] && ($SHOWN->{scale} // 1) == $VIEW_SCALE ? $SHOWN->{list} : undef;
@@ -420,7 +423,7 @@ sub home_shown {
     my ($wide, $high, $game) = @_;
     my $fit = $wide > $VIEW_WIDE[1] ? $VIEW_WIDE[1] / $wide : 1;    # a window wider than a page is ever laid: the home is laid at the widest and as much lower, and the window scales it to its room as it does a page (function fit). The application refuses a =view outside the bounds and ends, which left the home black in a window 1611 wide (release 98)
     ($wide, $high) = map { my ($least, $most) = $_ ? @VIEW_HIGH : @VIEW_WIDE; my $is = int(($_ ? $high : $wide) * $fit + 0.5); $is < $least ? $least : $is > $most ? $most : $is } 0, 1;
-    return if $TABS[$TAB]{trmnl};         # [C29] a terminal's tab is no home
+    return if $TABS[$TAB]{trmnl} || $TABS[$TAB]{cht};    # [C29] [C32] a terminal's tab is no home, nor LZRCHT's
     if (length($TABS[$TAB]{url} // '')) {
         return unless $game && @TABS < $TABS_MOST;
         $TABS[$TAB]{shown} = $SHOWN; push @TABS, fresh_tab(); $TAB = $#TABS; undef $SHOWN; tab_shown();

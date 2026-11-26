@@ -39,6 +39,7 @@
 sub live_input {                          # [C18]
     my ($what) = @_;
     link_line('INFO', 'input', "the window handed lzrprf $what", what => $what, tab => $TAB, live => (live_of($TABS[$TAB]) ? 1 : 0), waiting => (live_of($TABS[$TAB]) && live_of($TABS[$TAB])->{waiting} ? 1 : 0)) if $what =~ /\A(?:click|down|up|context) /;    # [1237] the sniffer (keys and text never, they can be a password): each press that reached lzrprf, while the live debug link is on (staging-control tail shows it); a press the window dropped never appears here
+    return cht_input($what) if $TABS[$TAB]{cht};    # [C32] LZRCHT's tab: a press and the wheel, to its drawing role
     return trmnl_input($what) if $TABS[$TAB]{trmnl};    # [C29] a terminal's tab: its keys go to its shell, in their fixed forms
     my $live = live_of($TABS[$TAB]) or return;
     return if $what =~ /^(?:click|move|down|up|context|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
@@ -305,7 +306,7 @@ sub live_answered {                       # [C18]
         idle($words) if defined $words;
         if (defined $go && (($go eq $LZRDFNDR_OPEN && $live->{url} =~ $LZRDFNDR_PAGE) || ($live->{home} && $go =~ m{\Ahttps://lzrbrwsr\.invalid/_home/lzrdfndr(?:-other)?\z}))) { noted("the game page asked for LZRDFNDR's panel; it was opened, and nothing was fetched"); game_helper_set(1, 1) if $live->{home}; window('tool show' . ($go =~ /-other\z/ ? ' other' : '')); undef $go }    # [C26] its Activate LZRDFNDR button, or Setup LZRDFNDR (".../lzrdfndr-other": on the panel's Other tab): the page stays, and the window opens the panel as a press on its icon does
         if ($live->{home} && defined $go) {
-            if ($go =~ m{^https://lzrbrwsr\.invalid/_home/(search|marks|tabs|new|trmnl)$} && now() - ($live->{pressed} // 0) <= 1) { $1 eq 'trmnl' ? ($TRMNL_OPEN = 1) : window("homeaction $1") }    # [C29] the terminal icon: lzrprf opens it itself, within a second of your press
+            if ($go =~ m{^https://lzrbrwsr\.invalid/_home/(search|marks|tabs|new|trmnl|cht)$} && now() - ($live->{pressed} // 0) <= 1) { $1 eq 'trmnl' ? ($TRMNL_OPEN = 1) : $1 eq 'cht' ? ($CHT_OPEN = 1) : window("homeaction $1") }    # [C29] the terminal icon: lzrprf opens it itself, within a second of your press
             undef $go;    # a local home never follows an address, even if its program asks
         }
         link_line('INFO', 'go', 'the page asked to go to another address', home => ($live->{home} ? 1 : 0)) if defined $go;    # [1238] the address itself is not logged

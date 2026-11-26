@@ -71,6 +71,7 @@
 #   [C29] A terminal (LZRTRMNL) starts only on a press of the local home's terminal icon, and never in an incognito or Tor window. lzrprf opens the system's pseudo-terminal and starts your login shell, one /etc/shells lists, as you, with no descriptor of lzrprf's; the screen is drawn by core-lzrbrwsr-trmnl in a container of its own that may read only its program, the system's library cache and the root folder, and holds no descriptor of the terminal. Only your keys are written to the shell, each named key in one fixed form, and of the container's words only the answers a program asked its terminal for, once per question, in their one form. Every line it draws is checked as a laid page's line is. What you paste is written to the shell as text with no control character but tabs and line ends, bracketed when the shell asked for it; the window reads the clipboard only on your paste, and writes it only with the text you selected, on your copy, checked as text. A title a program sets is the tab's title as plain text of at most 80 characters, and nothing a program writes reaches the clipboard. A pane split from another, or a terminal tab added, starts another such shell only on your press, an item of the terminal's menus or one of its own keys; Save tabs and views writes only the tabs, the splits and their sizes and each shell's working folder to the file trmnl of this profile's folder, readable by you alone, and a pane opened from it is a new login shell in that folder. A press of yours is written to the shell, as the one report of a press and its release, only while the program asked for presses, seen by lzrprf itself in what it wrote, and only for a click you made in the window, at the cell the container named within the screen. The terminal opens with a picture of its name drawn by the container, and its last lines say how to start with lzr.
 #   [C30] A web font is fetched only when a run handed the page's style sheets names it on its =webfonts line, or the first run of a page that names no sheet names it from its own <style>: at most 8 fonts, each by up to 4 paths on the page's own host tried in order until one answers 200 (a src entry that fails falls through to the next), each path held to the checks of a sheet ([C23], then [C27] as a font, [C28], [C5] its line in the log first, [C6] [C7] through the page's own checked addresses and through Tor when Tor is on), each at most 2 MiB and 64 KiB, at most 8 MiB together, all begun within 10 seconds; anything else goes with length 0. The answers are handed to the next run in front of the answer, after the style sheets (the third, or the second of a page that names no sheet), and kept in memory for the page shown alone: nothing of a font is written to the disk, in an incognito window or any. The application unpacks and checks each in its container and draws text in its own faces wherever a font is refused.
 #   [C31] The live debug link sends only while you switched it on in the cogwheel's menu of a window that is neither incognito nor Tor, for at most 24 hours from that press, and the window shows its badge with its id the whole time. It sends to one fixed address, https://staging.lzrbrwsr.com/link/ followed by its id, as a fixed request is sent (sub fixed: written down first, curl in its container): the times of each load, request, lookup and application run, each address as its scheme, host and path alone, status codes, sizes and errors in lzrprf's own words; never a cookie, what you type or paste, a form's contents, a page's text, a query or a fragment. Its answer may hold commands; lzrprf runs one only when it is signed for the namespace lzrbrwsr-debug-link by an approval key lzrprf carries, names this link's id, carries a nonce never seen before and an expiry within 15 minutes, and is one of six: open an address in a new tab (an address so opened is checked as a typed one is [C4]), reload the tab shown, measure a load, a snapshot of the tabs and timings, the verbosity of the lines, a picture of the window from its own drawing. Anything else is refused and written down; no command runs a program, reads a file or reaches a shell.
+#   [C32] LZRCHT starts only on a press of the local home's LZRCHT icon, and never in an incognito or Tor window. Each of its three roles is core-lzrbrwsr-cht in a container of its own: the drawing role and every connector in the terminal's container (no network, no file written, no program started), the keeper in that container with read alone of LZRCHT's config and the files that config names. lzrprf reads of that config its first line and its paths, never a file it names; the keeper hands lzrprf only whether each platform's credentials are in place, and lzrprf hands the drawing role that word alone. A connector is started only when the drawing role asks for it in its answer to a press of yours, and only once the keeper said that platform's credentials are in place. Its one connection is opened and held by lzrprf as you, TCP to an IPv4 address inside a range that platform publishes as its own (Telegram's alone; Discord publishes none and our own LZRCHT service is coming, so none of theirs is opened), on 443, 80 or 5222, at most one at a time and 16 in a connector's life, each a line of the log; the connector sees only the bytes. Every line a role writes has one form and a role that writes one of no form ends; each page is checked as a laid page is; one line of text, checked as text, reaches the clipboard only in the drawing role's answer to a press of yours and within five seconds of that press, and nothing reads the clipboard. Its tab ends every role and connection, as does an address opened in it or its window's close.
 #
 # This file is the whole program. Its parts, in order: the containers, the
 # proof that they hold, one visit, the fetch, the window's side, the log, the
@@ -261,6 +262,7 @@ my ($CURL_SPARE, $CURL_WANTED) = (undef, 1);    # curl started before its reques
 my @LIVE;                                 # the pages kept running with their tabs, the oldest first (sub live_kept)
 my $LAID_TALLY;                           # what the last laid list checked holds: its counts, text, pixels and tiles (sub laid), kept by a page kept running for a splice of it (sub live_patched)
 my $TRMNL_OPEN = 0;                       # [C29] the local home's terminal icon was pressed: a terminal is opened once the answer that said so is taken (sub trmnl_opened)
+my $CHT_OPEN = 0;                         # [C32] the local home's LZRCHT icon was pressed: LZRCHT is opened once the answer that said so is taken (sub cht_opened)
 my @TRMNL_VIEW;                           # the size of the window's page as it said it, before it is held to a page's steps: a terminal's screen fills it (sub trmnl_sized)
 my @LIVE_TOLD = ('off', 0);               # what the window was last told of the selected tab's page kept running (sub live_told)
 my $LIVE_STOP_SECONDS = 0.25;             # DECLARED(a quarter of a second, many frames of the screen: the window says where it stopped on the frame after it read lzrprf's scroll): how long after the window said a page's own scroll back its next place may say where its view stopped short of it (sub live_input)
@@ -1283,6 +1285,7 @@ sub tab_out {
     return if $n >= @TABS || @TABS < 2;
     my ($url) = address($TABS[$n]{url} // '');
     my $stays = $TABS[$n]{trmnl} ? 'The tab stays here: a terminal does not move to another window, as its shell is a process of this one.'    # [C29]
+        : $TABS[$n]{cht} ? 'The tab stays here: LZRCHT does not move to another window, as its connections are processes of this one.'    # [C32]
         : $PULLED >= $PULLED_MOST ? "The tab stays here: this window has opened $PULLED_MOST windows from its tabs and profiles, the most one window may. Open a new window for more."
         : defined $PROFILE && !profile_folder($PROFILE) ? "The tab stays here. $GONE"
         : !$TRY && !apart($url // '', pulled_command($frame)) ? 'The tab stays here: lzrprf could not start a process for its new window.' : '';
@@ -1805,7 +1808,7 @@ sub behind {
         if ($event =~ /^go ([\x20-\x7f]{1,2100})$/) { typed($1) }    # [C4] the one place an address comes from: the bar of lzrprf's own window; a size said while it was fetched and laid out is the size it is laid out again at
         elsif ($event =~ /^home ([1-9][0-9]{2,3}) ([1-9][0-9]{1,3})(?: (game))?$/ && $1 <= 8192 && $2 <= 8192) { home_shown(0+$1, 0+$2, $3) }
         elsif ($event =~ /^page refresh (0|[1-9][0-9]?)$/ && $1 == $TAB) { my $live = live_of($TABS[$TAB]); named_again(); my $list = $live && $live->{shown} ? $live->{shown} : $SHOWN && $SHOWN->{list}; window("relaid $TAB", @$list, '.') if $list; live_layers_again() }
-        elsif ($event eq 'live') { live_turn(); trmnl_opened() if $TRMNL_OPEN; permits_later(); my $home = live_of($TABS[$TAB]); if ($home_update_due && $home && $home->{home_ready}) { $home_update_due = 0; newer() } $IDLE_WORK //= \&identity_asked if $local_home && $home && $home->{home_ready} }    # a page kept running with its tab answered, or is to end (sub live_answered); [C26] what it asked meanwhile is put to you after
+        elsif ($event eq 'live') { live_turn(); trmnl_opened() if $TRMNL_OPEN; cht_opened() if $CHT_OPEN; permits_later(); my $home = live_of($TABS[$TAB]); if ($home_update_due && $home && $home->{home_ready}) { $home_update_due = 0; newer() } $IDLE_WORK //= \&identity_asked if $local_home && $home && $home->{home_ready} }    # a page kept running with its tab answered, or is to end (sub live_answered); [C26] what it asked meanwhile is put to you after
         elsif ($event =~ /^scripts (list|reset|revoke|set)(?: (0|[1-9][0-9]{0,3}))?(?: (always|deny))?$/ && ($1 eq 'revoke' ? defined $2 && !defined $3 : $1 eq 'set' ? defined $2 && defined $3 : !defined $2 && !defined $3)) { scripts_set($1, $2, $3); said_noted() }    # [C26] [C4] LZRDFNDR scripts, from the cogwheel's menu
         elsif ($event =~ /^scripts (e1|curated)(?: (0|[1-9][0-9]{0,3}))? (on|off)$/ && ($1 eq 'curated') == defined $2) { scripts_set($1, $2, $3); said_noted() }    # [C26] the switch of the sandbox (E1), or of one curated rule (E2)
         elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-5])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
@@ -1968,6 +1971,7 @@ sub leave {
     live_end($_, 'the window closed', 1) for @live;    # no page kept running outlives its window
     jar_end();                            # [C7] nor the cookie jar: its lasting cookies written first, in a window of a profile
     trmnl_end($_, 'its window closed') for grep { $_->{trmnl} } @TABS;    # [C29] nor a terminal: its shell is hung up
+    cht_end($_, 'its window closed') for grep { $_->{cht} } @TABS;    # [C32] nor LZRCHT: its roles and connections
     kill 'KILL', $witness if $witness;
     spare_dropped();                      # a page run's process started before its run, never handed anything
     curl_ended($CURL_SPARE);              # and curl started before its request
@@ -2139,6 +2143,7 @@ sub visit {
     $DRAWN = 0;
     prefetch_end();                       # [C19] nothing fetched ahead or kept for the page before is handed to this one
     trmnl_end($TABS[$TAB], 'an address was opened in its tab') if $TABS[$TAB]{trmnl};    # [C29]
+    cht_end($TABS[$TAB], 'an address was opened in its tab') if $TABS[$TAB]{cht};    # [C32]
     return idle('This Tor window is closing: nothing more is fetched.') if $TOR_SESSION && $TOR_SESSION->{phase} !~ /^(?:made|connecting|sealed|browsing)$/;    # [C17] from the first step of its end, no new navigation
     pictures_before($SHOWN, $TABS[$TAB]) unless !$SHOWN && ($how // '') =~ /redirect to$/;    # a redirect followed is the same visit: what was kept for it stays
     undef $SHOWN;                         # a page asked for anew is laid out again only once it is shown
@@ -2462,7 +2467,7 @@ sub contained {
         return (undef, 'unstarted');
     }
     if (!$feeder) {                       # the keeper of this page
-        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
+        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), cht_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
         keeper($held, $answer_in, "=seal $seal\n" . $frame . $got, $page, $input);
         POSIX::_exit(0);                  # the keeper never returns; were it ever to, it ends here and does not go on as a second lzrprf
     }
@@ -3933,6 +3938,7 @@ sub viewing {
     my ($event) = @_;
     my ($wide, $high, $scale) = $event =~ /^view ([1-9][0-9]{0,4}) ([1-9][0-9]{0,4})(?: (2))?$/ or return; $VIEW_SCALE = $scale ? 2 : 1;
     @TRMNL_VIEW = ($wide, $high);
+    cht_sized($TABS[$TAB]) if $TABS[$TAB]{cht};    # [C32] LZRCHT is drawn at that size too
     trmnl_relaid($TABS[$TAB]) if $TABS[$TAB]{trmnl};    # [C29] a terminal fills the page as it is, not as a page is laid: its panes laid out again in it
     ($wide, $high) = map { my $step = $VIEW_STEP[$_]; $step * int(($_ ? $high : $wide) / $step + 0.5) } 0, 1;
     @VIEW = ($wide < $VIEW_WIDE[0] ? $VIEW_WIDE[0] : $wide > $VIEW_WIDE[1] ? $VIEW_WIDE[1] : $wide, $high < $VIEW_HIGH[0] ? $VIEW_HIGH[0] : $high > $VIEW_HIGH[1] ? $VIEW_HIGH[1] : $high);
@@ -4005,6 +4011,7 @@ sub tabbed {
     elsif ($how eq 'close' && defined $n && $n < @TABS) {
         my $live = live_of($TABS[$n]);
         live_end($live, 'its tab was closed', 1) if $live;
+        cht_end($TABS[$n], 'its tab was closed') if $TABS[$n]{cht};    # [C32]
         trmnl_end($TABS[$n], 'its tab was closed') if $TABS[$n]{trmnl};    # [C29]    # at once: a closed tab's page is not waited for, and the window is not kept waiting the moment it took to end by itself (17 to 40 ms a close, measured 2026-11-23)
         noted(($pulled ? 'you pulled a tab out into a new window' : 'you closed a tab') . (length($TABS[$n]{url} // '') ? ": $TABS[$n]{url}" : ''));
         my ($gone) = splice @TABS, $n, 1;
@@ -4081,6 +4088,7 @@ sub tab_shown {
     my $tab = $TABS[$TAB];
     window('tabs ' . @TABS . " $TAB", map { "title $_ $TABS[$_]{title}" } 0 .. $#TABS);
     return trmnl_shown($tab) if $tab->{trmnl};    # [C29]
+    return cht_shown($tab) if $tab->{cht};    # [C32]
     window("address $tab->{url}");
     my $live = live_of($tab);
     my $list = $live && $live->{shown} && ($live->{home} || $live->{wide} == $VIEW[0] && ($live->{scale} // 1) == $VIEW_SCALE) ? $live->{shown} : $SHOWN && $SHOWN->{list} && $SHOWN->{wide} == $VIEW[0] && ($SHOWN->{scale} // 1) == $VIEW_SCALE ? $SHOWN->{list} : undef;
@@ -4341,7 +4349,7 @@ sub home_shown {
     my ($wide, $high, $game) = @_;
     my $fit = $wide > $VIEW_WIDE[1] ? $VIEW_WIDE[1] / $wide : 1;    # a window wider than a page is ever laid: the home is laid at the widest and as much lower, and the window scales it to its room as it does a page (function fit). The application refuses a =view outside the bounds and ends, which left the home black in a window 1611 wide (release 98)
     ($wide, $high) = map { my ($least, $most) = $_ ? @VIEW_HIGH : @VIEW_WIDE; my $is = int(($_ ? $high : $wide) * $fit + 0.5); $is < $least ? $least : $is > $most ? $most : $is } 0, 1;
-    return if $TABS[$TAB]{trmnl};         # [C29] a terminal's tab is no home
+    return if $TABS[$TAB]{trmnl} || $TABS[$TAB]{cht};    # [C29] [C32] a terminal's tab is no home, nor LZRCHT's
     if (length($TABS[$TAB]{url} // '')) {
         return unless $game && @TABS < $TABS_MOST;
         $TABS[$TAB]{shown} = $SHOWN; push @TABS, fresh_tab(); $TAB = $#TABS; undef $SHOWN; tab_shown();
@@ -10143,11 +10151,13 @@ sub hear {                                # the next thing the window says; noth
             $wait = $home if defined $home && $home < $wait;
         }
         trmnl_select(\$ready, \$writable);    # [C29] each terminal's shell and container, heard as the window is
+        cht_select(\$ready, \$writable);    # [C32] each LZRCHT's roles and connections
         if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
         prefetch_select(\$ready);         # [C19] the scripts begun ahead are read as they come (17-prefetch.pl)
         select($ready, $writable, undef, $wait) > 0 or next;
         prefetch_heard($ready);
         trmnl_heard($ready, $writable);
+        cht_heard($ready, $writable);
         live_flushed($_) for grep { length($_->{input_held} // '') && vec($writable, fileno $_->{relay}, 1) } @LIVE;
         live_read($_) for grep { !live_due($_) && vec($ready, fileno $_->{from}, 1) } @LIVE;
         sound_flushed() if $SOUND && length $SOUND->{out} && vec($writable, fileno $SOUND->{to}, 1);
@@ -10601,7 +10611,7 @@ sub live_dropped {                        # a run that kept its page and is not 
 
 sub live_told {                           # the window is told whether the page shown is kept running, and whether a text field of it has the focus: "live on|off 1|0"
     my $live = live_of($TABS[$TAB]);
-    my @now = $TABS[$TAB]{trmnl} ? ('on', 1, 'trmnl') : $live ? ('on', $live->{focus} ? 1 : 0) : ('off', 0);    # [C29] a terminal's tab takes every key, and keys held with Control
+    my @now = $TABS[$TAB]{trmnl} ? ('on', 1, 'trmnl') : $TABS[$TAB]{cht} ? ('on', 0, 'cht') : $live ? ('on', $live->{focus} ? 1 : 0) : ('off', 0);    # [C29] a terminal's tab takes every key, and keys held with Control
     return if "@now" eq "@LIVE_TOLD";
     @LIVE_TOLD = @now;
     window("live @now");
@@ -12416,6 +12426,7 @@ sub inspect_answer {
 sub live_input {                          # [C18]
     my ($what) = @_;
     link_line('INFO', 'input', "the window handed lzrprf $what", what => $what, tab => $TAB, live => (live_of($TABS[$TAB]) ? 1 : 0), waiting => (live_of($TABS[$TAB]) && live_of($TABS[$TAB])->{waiting} ? 1 : 0)) if $what =~ /\A(?:click|down|up|context) /;    # [1237] the sniffer (keys and text never, they can be a password): each press that reached lzrprf, while the live debug link is on (staging-control tail shows it); a press the window dropped never appears here
+    return cht_input($what) if $TABS[$TAB]{cht};    # [C32] LZRCHT's tab: a press and the wheel, to its drawing role
     return trmnl_input($what) if $TABS[$TAB]{trmnl};    # [C29] a terminal's tab: its keys go to its shell, in their fixed forms
     my $live = live_of($TABS[$TAB]) or return;
     return if $what =~ /^(?:click|move|down|up|context|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
@@ -12682,7 +12693,7 @@ sub live_answered {                       # [C18]
         idle($words) if defined $words;
         if (defined $go && (($go eq $LZRDFNDR_OPEN && $live->{url} =~ $LZRDFNDR_PAGE) || ($live->{home} && $go =~ m{\Ahttps://lzrbrwsr\.invalid/_home/lzrdfndr(?:-other)?\z}))) { noted("the game page asked for LZRDFNDR's panel; it was opened, and nothing was fetched"); game_helper_set(1, 1) if $live->{home}; window('tool show' . ($go =~ /-other\z/ ? ' other' : '')); undef $go }    # [C26] its Activate LZRDFNDR button, or Setup LZRDFNDR (".../lzrdfndr-other": on the panel's Other tab): the page stays, and the window opens the panel as a press on its icon does
         if ($live->{home} && defined $go) {
-            if ($go =~ m{^https://lzrbrwsr\.invalid/_home/(search|marks|tabs|new|trmnl)$} && now() - ($live->{pressed} // 0) <= 1) { $1 eq 'trmnl' ? ($TRMNL_OPEN = 1) : window("homeaction $1") }    # [C29] the terminal icon: lzrprf opens it itself, within a second of your press
+            if ($go =~ m{^https://lzrbrwsr\.invalid/_home/(search|marks|tabs|new|trmnl|cht)$} && now() - ($live->{pressed} // 0) <= 1) { $1 eq 'trmnl' ? ($TRMNL_OPEN = 1) : $1 eq 'cht' ? ($CHT_OPEN = 1) : window("homeaction $1") }    # [C29] the terminal icon: lzrprf opens it itself, within a second of your press
             undef $go;    # a local home never follows an address, even if its program asks
         }
         link_line('INFO', 'go', 'the page asked to go to another address', home => ($live->{home} ? 1 : 0)) if defined $go;    # [1238] the address itself is not logged
@@ -13930,9 +13941,13 @@ sub trmnl_tree_read {                     # one tree of the saved lines, taken f
 #     and lzrprf answers it with that menu the same way;
 #   a key of TRMNL_SHORTCUTS, while the terminal has the keyboard: "page tkey
 #     ID", and the key goes nowhere else (24-trmnl-panes.pl lists them).
+# LZRCHT's tab ("live on 0 cht", [C32]) takes the wheel and the press of this
+# part and nothing else of it: no key of the terminal's, no paste and no read
+# of the clipboard, and a copy it hands back ("trmnlcopy TEXT", sub
+# cht_copied) is written only within five seconds of your press in it.
 sub window_trmnl_text {
     return <<'END';
-var TRMNL_PASTE = 65536, trmnlCopyAsked = 0, trmnlWheelHeld = 0, trmnlDragSaid = '';    // DECLARED(lzrprf $TRMNL_PASTE)
+var TRMNL_PASTE = 65536, trmnlCopyAsked = 0, trmnlWheelHeld = 0, trmnlDragSaid = '', trmnlPressAt = 0, chtTab = false;    // DECLARED(lzrprf $TRMNL_PASTE); chtTab: the tab shown is LZRCHT's [C32]
 var TRMNL_SHORTCUTS = { 'c \\': 'split-right', 'cs d': 'split-down', 'cs w': 'close-pane', 'cs left': 'focus-left', 'cs right': 'focus-right', 'cs up': 'focus-up', 'cs down': 'focus-down',
     'ct left': 'size-left', 'ct right': 'size-right', 'ct up': 'size-up', 'ct down': 'size-down', 'ct =': 'equalise', 'ts t': 'tab-new', 'ts w': 'tab-close',
     't pagedown': 'tab-next', 't pageup': 'tab-prev', 'ts pagedown': 'tab-right', 'ts pageup': 'tab-left', 'c s': 'save' };    // DECLARED(lzrprf %TRMNL_KEYED): none of them is a key of the window's menus
@@ -13941,17 +13956,17 @@ var trmnlOffered = [], trmnlHand = null;
 function trmnlMethods(methods) {    // the methods of LzrprfLaid, with the terminal's own added
     methods['scrollWheel:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlWheeled(event)) canvas.nextResponder.scrollWheel(event); } };    // on any other page the wheel goes where it always went
     var pressed = methods['mouseDown:'].implementation, typed = methods['keyDown:'].implementation;
-    methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; pressed(event); } };    // a press starts a selection afresh
+    methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; trmnlPressAt = Date.now(); pressed(event); } };    // a press starts a selection afresh, and is the press a copy of LZRCHT's answers [C32]
     methods['mouseDragged:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragged(event); } };
     methods['rightMouseDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlContext(event) && !inspectContext(event)) canvas.nextResponder.rightMouseDown(event); } };
     methods['keyDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlShortcut(event)) typed(event); } };
     methods['performKeyEquivalent:'] = { types: ['bool', ['id']], implementation: function (event) { return trmnlShortcut(event); } };    // a key with Command reaches a view before the window's menus: only the terminal's own keys are taken here
     methods['copy:'] = { types: ['void', ['id']], implementation: function (sender) { trmnlCopy(); } };
     methods['paste:'] = { types: ['void', ['id']], implementation: function (sender) { trmnlPaste(); } };
-    methods['validateMenuItem:'] = { types: ['bool', ['id']], implementation: function (item) { return trmnlKeys && !modalOpen; } };    // Copy and Paste, the two items of the menu this view answers
+    methods['validateMenuItem:'] = { types: ['bool', ['id']], implementation: function (item) { return trmnlKeys && !chtTab && !modalOpen; } };    // Copy and Paste, the two items of the menu this view answers
     return methods;
 }
-function trmnlTakes() { return trmnlKeys && liveOn && sheet && free && !modalOpen && canvas && win.firstResponder.isEqual(canvas); }    // the terminal is shown and has the keyboard
+function trmnlTakes() { return trmnlKeys && !chtTab && liveOn && sheet && free && !modalOpen && canvas && win.firstResponder.isEqual(canvas); }    // the terminal is shown and has the keyboard
 function trmnlKeyOf(event) {    // a key as TRMNL_SHORTCUTS names it: its modifiers (c Command, t Control, o Option, s Shift) and the key
     var flags = event.modifierFlags, mods = (flags & CMD ? 'c' : '') + (flags & CONTROL ? 't' : '') + (flags & OPTION ? 'o' : '') + (flags & SHIFT ? 's' : '');
     var key = TRMNL_NAMED_KEYS[event.keyCode] || String(event.charactersIgnoringModifiers.js || '').toLowerCase();
@@ -13965,7 +13980,7 @@ function trmnlShortcut(event) {
     return true;
 }
 function trmnlContext(event) {
-    if (!trmnlKeys || !liveOn || !sheet || !free || modalOpen) return false;
+    if (!trmnlKeys || chtTab || !liveOn || !sheet || !free || modalOpen) return false;
     win.makeFirstResponder(canvas);
     var at = pointIn(canvas, event), x = Math.round(at.x), y = Math.round(at.y);
     if (x >= 0 && y >= 0 && x < sheet.wide && y < sheet.high) say('page context ' + x + ' ' + y);
@@ -14025,26 +14040,26 @@ function trmnlWheeled(event) {
     return true;
 }
 function trmnlDragged(event) {
-    if (!trmnlKeys || !sheet || !free || modalOpen) return;
+    if (!trmnlKeys || chtTab || !sheet || !free || modalOpen) return;
     var at = pointIn(canvas, event), x = Math.max(0, Math.min(sheet.wide - 1, Math.round(at.x))), y = Math.max(0, Math.min(sheet.high - 1, Math.round(at.y)));
     if (x + ' ' + y == trmnlDragSaid) return;
     trmnlDragSaid = x + ' ' + y;
     say('page drag ' + trmnlDragSaid);
 }
 function trmnlCopy() {
-    if (!trmnlKeys || modalOpen) return;
+    if (!trmnlKeys || chtTab || modalOpen) return;
     trmnlCopyAsked = Date.now();
     say('page copy');
 }
 function trmnlCopied(rest) {    // lzrprf's answer to your copy: the selected text, written to the clipboard
-    if (!trmnlKeys || Date.now() - trmnlCopyAsked > 5000) return;
-    trmnlCopyAsked = 0;
+    if (!trmnlKeys || Date.now() - (chtTab ? trmnlPressAt : trmnlCopyAsked) > 5000) return;    // LZRCHT's: within five seconds of your press [C32]
+    trmnlCopyAsked = trmnlPressAt = 0;
     var text;
     try { text = decodeURIComponent(rest); } catch (fault) { return; }
     clipboardWrite(text);
 }
 function trmnlPaste() {
-    if (!trmnlKeys || modalOpen) return;
+    if (!trmnlKeys || chtTab || modalOpen) return;
     var got = $.NSPasteboard.generalPasteboard.stringForType($('public.utf8-plain-text'));    // [C29] the one read of the clipboard, on your paste
     if (!got || got.isNil()) return;
     var said;
@@ -14258,6 +14273,7 @@ sub trmnl_keys {                          # your keys, written into the terminal
 # wheel, a copy, a paste) is sub trmnl_viewed's, for the focused pane.
 sub trmnl_input {
     my ($what) = @_;
+    return cht_input($what) if $TABS[$TAB]{cht};    # [C32] the wheel in LZRCHT's tab, which takes the terminal's part of the window
     my $w = $TABS[$TAB]{trmnl} or return;
     return trmnl_pressed($TABS[$TAB], $what) if $what =~ /^(?:click|drag|context|menu|tkey) /;
     my $t = trmnl_shown_tab($w)->{focus};
@@ -14617,6 +14633,421 @@ sub own_network {
     return $yes ? undef : 'you said no to a host inside your own network';
 }
 
+
+# LZRCHT, one place for your Telegram and Discord messages, in a tab
+# [C32]. It starts on a press of its icon on the local home and on nothing
+# else, and never in an incognito or a Tor window. Everything of it is the
+# application's program core-lzrbrwsr-cht, run as three roles, each in a
+# container of its own; lzrprf holds only what keeps them apart and you safe:
+#
+# - the drawing role, in the terminal's container ($TRMNL_CONTAINER: no
+#   network, no file but its program and the system's libraries, nothing
+#   started): it keeps your conversations and draws the tab as the lines of a
+#   laid page, each page checked as a page is (sub laid_run). It is told the
+#   tab's size, your presses and the wheel, and what the other roles may say.
+# - the keeper, in that container and the config of LZRCHT
+#   ($CHT_CONFIG under your home) and the files it names, to read and nothing
+#   more: it says, for each platform, only whether LZRBRWSR's credentials for
+#   it are in place, "=auth SERVICE 0|1". lzrprf reads of that config its
+#   first line and the paths alone, never a file it names, and hands the
+#   drawing role the word and nothing else (sub cht_kept).
+# - a connector, one an account, in the terminal's container too: no network
+#   and no file. It speaks the platform's protocol over the one connection
+#   lzrprf opens and holds for it (sub cht_dialed): TCP to an IPv4 address
+#   that platform publishes as its own, on a port it serves, and nothing else.
+#   It is started only when the drawing role asks for it in its answer to a
+#   press of yours, and only once the keeper said that platform's credentials
+#   are in place. Discord publishes no addresses, and our own LZRCHT service
+#   is coming, so no connector of theirs is ever given a connection.
+#
+# The drawing role may hand the clipboard one line of text, checked as text,
+# only in its answer to a press of yours, and the window writes it only
+# within five seconds of that press (sub cht_copied). Nothing reads the
+# clipboard. Every line any role writes has one form, and a role that writes
+# one of no form ends; the drawing role's end is LZRCHT's. Its tab ends every
+# role, its connections with them, as does an address opened in it or its
+# window's close. Each connection and each connector is a line of the log.
+my $CHT_PROGRAM = 'core-lzrbrwsr-cht';    # its file name is the name Activity Monitor shows (docs/process-names.md)
+my $CHT_CONFIG = '.config/lzrbrwsr/lzrcht.conf';    # under your home (DECLARED: src/cht/config.rs CONFIG_PATH)
+my $CHT_HEAD = 'lzrcht-app-credentials 1';    # its first line (DECLARED: src/cht/config.rs HEAD)
+my %CHT_NAMED = map { $_ => 1 } qw(telegram.api_id telegram.api_hash discord.client_id);    # the names of its paths (DECLARED: src/cht/config.rs locations)
+my @CHT_SERVICES = qw(lzrcht telegram discord);    # in the keeper's order (DECLARED: src/cht/adapter.rs Service::ALL)
+my $CHT_LINE = 65_536;                    # the longest line a role may write: a copy of one message, or a laid line
+my $CHT_PAGE = 200_000;                   # the most lines of one page, and its bytes below
+my $CHT_PAGE_BYTES = 16 << 20;
+my $CHT_NET = 65_536;                     # the most bytes of one "=net" (DECLARED: src/cht/link.rs)
+my $CHT_EVENT = 1 << 20;                  # the most bytes of one "=ev" (DECLARED: src/cht/link.rs, src/cht/main.rs)
+my $CHT_HELD = 4 << 20;                   # the most held for a role or a connection before lzrprf reads no more of what feeds it
+my $CHT_DIALS = 16;                       # the most connections one connector may ask for in its life
+my %CHT_RANGES = (telegram => [qw(91.108.56.0/22 91.108.4.0/22 91.108.8.0/22 91.108.16.0/22 91.108.12.0/22 149.154.160.0/20 91.105.192.0/23 91.108.20.0/22 185.76.151.0/24)]);    # Telegram's own, as it publishes them (https://core.telegram.org/resources/cidr.txt, IPv4, read 2026-11-24); Discord publishes none
+my @CHT_PORTS = (443, 80, 5222);          # the ports Telegram's servers serve
+
+sub cht_opened {                          # the press: a new tab, its drawing role and its keeper started
+    $CHT_OPEN = 0;
+    return idle('An incognito or Tor window opens no LZRCHT: your messages would be kept on your disk, which such a window promises not to do.') if $INCOGNITO || $TOR_WINDOW;
+    return idle("A window holds $TABS_MOST tabs at most: close one to open LZRCHT.") if @TABS >= $TABS_MOST;
+    my ($program, $why) = cht_program();
+    return idle("$why.") unless $program;
+    my $draw = cht_box($program, 'draw', $TRMNL_CONTAINER, []) or return idle('LZRCHT could not be started: the system did not say that its container holds. Nothing was opened.');
+    my $c = { program => $program, draw => $draw, links => {}, auth => {}, told => 0, asked => [], list => [] };
+    $c->{keep} = cht_keeper($program);    # none: every platform waits for its credentials, as when none are placed
+    $TABS[$TAB]{shown} = $SHOWN;
+    push @TABS, fresh_tab();
+    $TAB = $#TABS;
+    undef $SHOWN;
+    @{ $TABS[$TAB] }{qw(title cht says)} = ('LZRCHT', $c, 'LZRCHT: your messages, drawn by a container of its own that has no network; each platform connects only once it allows the connection.');
+    noted('you opened LZRCHT: its drawing role and its keeper, each in a container of its own');
+    tab_shown();
+    live_told();
+}
+
+sub cht_program {                         # the program beside this application, as it was installed: its path, or nothing and why in full
+    my $program = dirname($PROGRAM) . "/$CHT_PROGRAM";
+    my ($named) = map { /^file \Q$CHT_PROGRAM\E ([0-9a-f]{64})$/ ? $1 : () } release_lines();
+    return (undef, 'LZRCHT is not installed beside this application, so nothing was opened') unless -f $program && -x _;
+    return (undef, 'LZRCHT is not the program this application was installed with, so nothing was opened. Installing again mends it') if $PROGRAM =~ m{\.app/Contents/MacOS/} && (!defined $named || $named ne (sum_of($program) // ''));
+    return $program;
+}
+
+sub cht_box {                             # [C32] one role in its container, said by the system to be contained, handed its seal: its record, or nothing
+    my ($program, $role, $profile, $defines, @words) = @_;
+    return if $program =~ /["\\\n]/;
+    pipe(my $in, my $to) && pipe(my $from, my $out) or return;
+    my $seal = run_seal() // return;
+    my $box = fork // return;
+    if (!$box) {
+        %ENV = (LZRPRF_SEAL => $seal);
+        chdir '/';
+        become($in, $out, $TRY ? \*STDERR : undef, '/bin/sh', '-c', $TRMNL_LIMITS, 'lzrprf', '/usr/bin/sandbox-exec', '-D', "APP=$program", @$defines, '-p', $profile, $program, @words);    # [C32]
+    }
+    close $_ for $in, $out;
+    if (!inside($box)) {                  # [C3]
+        kill 'KILL', $box;
+        waitpid $box, 0;
+        return;
+    }
+    fcntl($_, POSIX::F_SETFL(), O_NONBLOCK) for $to, $from;
+    return { role => $role, box => $box, to => $to, from => $from, feed => "=seal $seal\n", heard => '', out => '' };
+}
+
+sub cht_keeper {                          # [C32] the keeper, which may read the config and the paths it names: lzrprf reads its first line and its paths, never a file it names
+    my ($program) = @_;
+    my $home = (getpwuid $<)[7] // return;
+    my @read = ("$home/$CHT_CONFIG");
+    if (sysopen my $in, $read[0], O_RDONLY | O_NOFOLLOW | O_NONBLOCK) {
+        my $text = '';
+        1 while length $text <= 4096 && sysread($in, $text, 4097 - length $text, length $text);
+        my @lines = split /\n/, $text;
+        my @paths;
+        my $fit = length $text <= 4096 && @lines && shift(@lines) eq $CHT_HEAD;    # DECLARED: src/cht/config.rs MOST_FILE
+        for (@lines) {
+            next if /^\s*$/ || /^#/;
+            my ($name, $path) = m{^([a-z._]{1,40}) (/[A-Za-z0-9 _.\@+~/-]{1,1024})$} or ($fit = 0, last);
+            ($fit = 0, last) unless $CHT_NAMED{$name} && $path !~ m{/\.\.(?:/|$)};
+            push @paths, $path;
+        }
+        push @read, @paths if $fit;       # a config of no form: the keeper reads it, refuses it whole, and says every platform waits
+    }
+    my $profile = $TRMNL_CONTAINER . '(allow file-read* ' . join(' ', map { "(literal (param \"F$_\"))" } 0 .. $#read) . ")\n";
+    my $keep = cht_box($program, 'keep', $profile, [map { ('-D', "F$_=$read[$_]") } 0 .. $#read], 'keep', $read[0]) or return;
+    noted('LZRCHT started its keeper, which may read its config and the ' . (@read - 1) . ' files it names, and nothing else');
+    return $keep;
+}
+
+sub cht_send {                            # bytes for a role, written as it takes them
+    my ($b, $bytes) = @_;
+    return if $b->{ended};
+    $b->{feed} .= $bytes;
+    cht_fed($b);
+}
+
+sub cht_fed {
+    my ($b) = @_;
+    return unless !$b->{ended} && length $b->{feed};
+    my $n = syswrite($b->{to}, $b->{feed});
+    if (defined $n) { substr($b->{feed}, 0, $n, '') }
+    elsif (!$!{EAGAIN} && !$!{EINTR}) { $b->{lost} = 'stopped reading' }
+}
+
+sub cht_tell {                            # a frame for the drawing role, which answers each with one page; what it answers to is kept, so a copy and a connector are taken only in an answer to a press
+    my ($c, $frame, $kind) = @_;
+    push @{ $c->{asked} }, $kind;
+    cht_send($c->{draw}, $frame);
+}
+
+sub cht_sized {                           # the size of the tab, in points, to the drawing role, when it is not the size it was told last
+    my ($tab) = @_;
+    my $c = $tab->{cht} or return;
+    my ($wide, $high) = trmnl_page();
+    return if "$wide $high" eq ($c->{size} // '');
+    $c->{size} = "$wide $high";
+    cht_tell($c, "s $wide $high\n", 's');
+}
+
+sub cht_input {                           # [C32] what the window says in LZRCHT's tab: a press and the wheel reach its drawing role, and nothing else does
+    my ($what) = @_;
+    my $c = $TABS[$TAB]{cht} or return;
+    if ($what =~ /^click $N $N$/ && $1 <= 200_000 && $2 <= 200_000) { cht_tell($c, "p $1 $2\n", 'p') }
+    elsif ($what =~ /^wheel (-?)([1-9][0-9]{0,2})$/) { cht_tell($c, ($1 ? 'd' : 'u') . " $2\n", 'w') }
+}
+
+sub cht_shown {                           # LZRCHT's tab chosen: its last page, at the window's size
+    my ($tab) = @_;
+    my $c = $tab->{cht};
+    window('address LZRCHT');
+    cht_sized($tab);
+    my ($wide, $high) = trmnl_page();
+    my $list = @{ $c->{list} } ? $c->{list} : ["L${wide}x$high", "R0,0,$wide,$high,0c0f12ff"];    # before its first page: its ground (DECLARED: src/cht/paint.rs BG)
+    window("page $TAB", @$list, '.');
+    $c->{sent} = $list;
+    $DRAWN = 1;
+    window('secure none');
+    nav_told();
+    idle($tab->{says});
+}
+
+sub cht_units {                           # what a role wrote: its lines, and after "=net N" or "=ev N" those N bytes; and why it ended, when it did
+    my ($b) = @_;
+    my $got = sysread($b->{from}, $b->{heard}, 262_144, length $b->{heard});
+    return ([]) if !defined $got && ($!{EAGAIN} || $!{EINTR});
+    my @units;
+    while (1) {
+        if (my $need = $b->{need}) {
+            last if length $b->{heard} < $need->[1];
+            push @units, [$need->[0], substr($b->{heard}, 0, $need->[1], '')];
+            delete $b->{need};
+            next;
+        }
+        my $end = index($b->{heard}, "\n");
+        last if $end < 0;
+        my $line = substr($b->{heard}, 0, $end + 1, '');
+        chop $line;
+        return (\@units, 'wrote a line too long') if length $line > $CHT_LINE;
+        if ($b->{role} eq 'link' && $line =~ /^=(net|ev) ([1-9][0-9]{0,6})$/) {
+            return (\@units, 'wrote a count past its bound') if $2 > ($1 eq 'net' ? $CHT_NET : $CHT_EVENT);
+            $b->{need} = [$1, 0 + $2];
+            next;
+        }
+        push @units, [$line];
+    }
+    return (\@units, 'wrote a line too long') if !$b->{need} && length $b->{heard} > $CHT_LINE;
+    return (\@units, $got ? undef : 'ended');
+}
+
+sub cht_drew {                            # [C32] what the drawing role wrote: whole pages, each checked; a copy and a connector asked for only in its answer to a press
+    my ($tab, $c, $units) = @_;
+    for (@$units) {
+        my $line = $_->[0];
+        if (my $page = $c->{page}) {
+            return 'drew a page past its bound' if ($page->{bytes} += length $line) > $CHT_PAGE_BYTES;
+            push @{ $page->{lines} }, $line;
+            next if --$page->{left};
+            delete $c->{page};
+            cht_paged($tab, $c, $page->{lines}) or return 'drew a page that is not fit';
+        }
+        elsif (delete $c->{copying}) { cht_copied($tab, $line) or return 'handed a copy that is not text' }
+        elsif ($line =~ /^=page ([1-9][0-9]{0,5})$/ && $1 <= $CHT_PAGE && @{ $c->{asked} }) { $c->{page} = { left => 0 + $1, lines => [], bytes => 0 } }
+        elsif ($line eq '=copy 1' && ($c->{asked}[0] // '') eq 'p' && !$c->{copied}++) { $c->{copying} = 1 }
+        elsif ($line =~ /^=link (lzrcht|telegram|discord) 0$/ && ($c->{asked}[0] // '') eq 'p') { cht_linked($c, $1, 0) }
+        elsif ($line eq '=drawn' && @{ $c->{asked} }) { shift @{ $c->{asked} }; $c->{copied} = 0 }
+        else { return 'wrote a line of no form' }
+    }
+    return;
+}
+
+sub cht_paged {                           # [C32] [C9] a whole page the drawing role drew: the lines of a laid page, checked as every laid line is, then drawn when its tab is shown
+    my ($tab, $c, $lines) = @_;
+    no warnings 'utf8';
+    my ($wide, $high) = $lines->[0] =~ /^L${N}x$N$/ or return;
+    return unless $wide >= 1 && $high >= 1 && $wide <= 20_000 && $high <= 20_000 && ($lines->[1] // '') =~ /^R/;
+    utf8::decode($_) or return for @$lines;
+    my $state = { wide => $wide, high => $high, text => 0, pixels => 0, rows => 0, row_bytes => 0, row_chars => 0, count => {}, tile => {} };
+    laid_run($lines, 1, $#$lines, $state, [], []) or return;
+    return if $state->{rows};             # a picture cut short
+    utf8::encode($_) for @$lines;
+    $c->{list} = $lines;
+    return 1 unless $tab == $TABS[$TAB];
+    live_window_patch($c->{sent}, $lines);
+    $c->{sent} = $lines;
+    $DRAWN = 1;
+    return 1;
+}
+
+sub cht_copied {                          # [C32] the text of a Copy you pressed: one line, text with no control character, handed to the window, which writes it to the clipboard only within five seconds of your press
+    my ($tab, $text) = @_;
+    my $chars = $text;
+    return unless utf8::decode($chars) && $chars !~ /\p{Cc}/;
+    return 1 unless length $text && $tab == $TABS[$TAB];
+    (my $said = $text) =~ s/(%)/%25/g;
+    window("trmnlcopy $said");
+    aside('Copied ' . length($chars) . (length($chars) == 1 ? ' character' : ' characters') . ' to the clipboard.');
+    return 1;
+}
+
+sub cht_kept {                            # [C32] what the keeper said: whether each platform's credentials are in place, once each, in its order, to the drawing role as a word and nothing more
+    my ($c, $units) = @_;
+    for (@$units) {
+        my $service = $CHT_SERVICES[$c->{told}] // return 'said more than it has to say';
+        my ($placed) = $_->[0] =~ /^=auth \Q$service\E ([01])$/ or return 'wrote a line of no form';
+        $c->{told}++;
+        $c->{auth}{$service} = 0 + $placed;
+        cht_tell($c, "a $service $placed\n", 'a');
+    }
+    return;
+}
+
+sub cht_linked {                          # [C32] a connector asked for in the answer to your press: started in a container with no network, once its platform's credentials are in place
+    my ($c, $service, $slot) = @_;
+    return if $c->{links}{"$service $slot"};
+    return cht_tell($c, "x $service $slot LZRBRWSR is not yet authorized by $service\n", 'x') unless $c->{auth}{$service};
+    my $link = cht_box($c->{program}, 'link', $TRMNL_CONTAINER, [], 'link', $service, $slot) or return cht_tell($c, "x $service $slot its container did not start\n", 'x');
+    @$link{qw(service slot dials)} = ($service, $slot, 0);
+    $c->{links}{"$service $slot"} = $link;
+    noted("LZRCHT started a $service connector, in a container of its own with no network");
+}
+
+sub cht_reachable {                       # [C32] whether lzrprf opens a connection for a connector of $service to $ip, port $port: an IPv4 address in its one form inside a range that platform publishes, on a port it serves
+    my ($service, $ip, $port) = @_;
+    my $byte = qr/(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])/;
+    return 0 unless $ip =~ /\A$byte\.$byte\.$byte\.$byte\z/ && grep { $_ == $port } @CHT_PORTS;
+    my $at = unpack 'N', pack 'C4', split /\./, $ip;    # numbers alone: nothing here can look a name up
+    for (@{ $CHT_RANGES{$service} // [] }) {
+        my ($net, $bits) = split m{/};
+        my $mask = (0xffffffff << (32 - $bits)) & 0xffffffff;
+        return 1 if ($at & $mask) == (unpack('N', pack 'C4', split /\./, $net) & $mask);
+    }
+    return 0;
+}
+
+sub cht_heard_link {                      # [C32] what a connector wrote: a connection to open, bytes for it, an event for the drawing role, or its end
+    my ($c, $link, $units) = @_;
+    my ($service, $slot) = @$link{qw(service slot)};
+    for (@$units) {
+        my ($kind, $bytes) = @$_;
+        if ($kind eq 'net') { return 'wrote for a connection it does not have' unless $link->{up}; $link->{out} .= $bytes }
+        elsif ($kind eq 'ev') { cht_tell($c, "e $service $slot " . length($bytes) . "\n$bytes", 'e') }
+        elsif ($kind =~ /^=dial ([0-9.]{7,15}) ([1-9][0-9]{0,4})$/) {
+            my ($ip, $port) = ($1, $2);
+            return "asked for $ip port $port, which is no address $service publishes" unless cht_reachable($service, $ip, $port);
+            return 'asked for a second connection' if $link->{sock};
+            return "asked for more than $CHT_DIALS connections" if ++$link->{dials} > $CHT_DIALS;
+            cht_dialed($link, $ip, $port);
+        }
+        elsif ($kind =~ /^=down ([\x20-\x7e]{1,200})$/) { return $1 }
+        else { return 'wrote a line of no form' }
+    }
+    return;
+}
+
+sub cht_dialed {                          # [C32] a connector's one connection, opened and held by lzrprf as you: TCP to an address its platform publishes, a line of the log
+    my ($link, $ip, $port) = @_;
+    noted("LZRCHT's $link->{service} connector asked for $ip port $port, an address $link->{service} publishes: lzrprf opened that connection for it");
+    socket(my $sock, AF_INET, SOCK_STREAM, 0) or return cht_send($link, "=gone no socket was to be had\n");
+    fcntl($sock, POSIX::F_SETFL(), O_NONBLOCK);
+    if (connect($sock, pack_sockaddr_in($port, pack 'C4', split /\./, $ip))) { @$link{qw(sock up)} = ($sock, 1); return cht_send($link, "=up\n") }    # [C32] the address cht_reachable checked, as four numbers
+    return cht_send($link, "=gone the connection was refused\n") unless $!{EINPROGRESS};
+    @$link{qw(sock dialing)} = ($sock, 1);
+}
+
+sub cht_hung {                            # a connector's connection closed, and the connector told why
+    my ($link, $why) = @_;
+    close delete $link->{sock};
+    delete @$link{qw(up dialing)};
+    $link->{out} = '';
+    noted("a connection of LZRCHT's $link->{service} connector closed: $why");
+    cht_send($link, "=gone $why\n");
+}
+
+sub cht_net {                             # a connection ready: its opening finished, bytes read for the connector, bytes written from it
+    my ($link, $ready, $writable) = @_;
+    my $sock = $link->{sock};
+    if ($link->{dialing}) {
+        return unless vec($writable, fileno $sock, 1);
+        my $error = unpack 'i', getsockopt($sock, SOL_SOCKET, SO_ERROR) // pack('i', 1);
+        return cht_hung($link, 'the connection could not be opened') if $error;
+        delete $link->{dialing};
+        $link->{up} = 1;
+        return cht_send($link, "=up\n");
+    }
+    if (vec($ready, fileno $sock, 1)) {
+        my $got = sysread($sock, my $bytes, $CHT_NET);
+        return if !defined $got && ($!{EAGAIN} || $!{EINTR});
+        return cht_hung($link, 'the other end closed the connection') unless $got;
+        cht_send($link, "=net $got\n$bytes");
+    }
+    if (length $link->{out} && vec($writable, fileno $sock, 1)) {
+        my $n = syswrite($sock, $link->{out});
+        if (defined $n) { substr($link->{out}, 0, $n, '') }
+        elsif (!$!{EAGAIN} && !$!{EINTR}) { cht_hung($link, 'the connection failed') }
+    }
+}
+
+sub cht_box_end {                         # a role ended, its connection closed, and waited for
+    my ($b) = @_;
+    return if $b->{ended}++;
+    close delete $b->{sock} if $b->{sock};
+    kill 'KILL', $b->{box};
+    waitpid $b->{box}, 0;
+    close $_ for grep { defined } @$b{qw(to from)};
+    delete @$b{qw(to from)};
+}
+
+sub cht_unlinked {                        # a connector ended: its connection with it, and the drawing role told why
+    my ($c, $link, $why) = @_;
+    cht_box_end($link);
+    delete $c->{links}{"$link->{service} $link->{slot}"};
+    noted("LZRCHT's $link->{service} connector ended: $why");
+    $why =~ s/[^\x20-\x7e]//g;
+    cht_tell($c, "x $link->{service} $link->{slot} $why\n", 'x');
+}
+
+sub cht_end {                             # LZRCHT ended: every role and every connection
+    my ($tab, $why) = @_;
+    my $c = delete $tab->{cht} or return;
+    cht_box_end($_) for cht_boxes($c);
+    noted("LZRCHT ended: $why");
+    $tab->{says} = "LZRCHT ended: $why.";
+    return unless $tab == $TABS[$TAB];
+    window("page $TAB", @{ $c->{sent} // [] }, '.');
+    live_told();
+    idle($tab->{says});
+}
+
+sub cht_boxes { my ($c) = @_; return grep { defined && !$_->{ended} } $c->{draw}, $c->{keep}, values %{ $c->{links} } }
+
+sub cht_select {                          # the roles' descriptors and the connections, for the wait of sub hear; what feeds a role that does not read is not read
+    my ($ready, $writable) = @_;
+    for my $c (map { $_->{cht} // () } @TABS) {
+        my $full = length $c->{draw}{feed} > $CHT_HELD;
+        for my $b (cht_boxes($c)) {
+            vec($$ready, fileno $b->{from}, 1) = 1 if $b == $c->{draw} || !$full && length $b->{out} < $CHT_HELD;
+            vec($$writable, fileno $b->{to}, 1) = 1 if length $b->{feed};
+            my $sock = $b->{sock} or next;
+            vec($$ready, fileno $sock, 1) = 1 if !$b->{dialing} && length $b->{feed} < $CHT_HELD;
+            vec($$writable, fileno $sock, 1) = 1 if $b->{dialing} || length $b->{out};
+        }
+    }
+}
+
+sub cht_heard {                           # what the wait of sub hear found ready, for each role of each LZRCHT
+    my ($ready, $writable) = @_;
+    for my $tab (grep { $_->{cht} } @TABS) {
+        my $c = $tab->{cht};
+        for my $b (cht_boxes($c)) {
+            last unless $tab->{cht};
+            next if $b->{ended};
+            cht_fed($b) if vec($writable, fileno $b->{to}, 1);
+            cht_net($b, $ready, $writable) if $b->{sock};
+            my ($units, $why) = vec($ready, fileno $b->{from}, 1) ? cht_units($b) : ([]);
+            $why //= $b->{lost};
+            if ($b->{role} eq 'draw') { my $wrong = cht_drew($tab, $c, $units) // $why; cht_end($tab, "its drawing container $wrong") if defined $wrong }
+            elsif ($b->{role} eq 'keep') { my $wrong = cht_kept($c, $units) // $why; if (defined $wrong) { cht_box_end($b); delete $c->{keep}; noted("LZRCHT's keeper $wrong") } }
+            else { my $wrong = cht_heard_link($c, $b, $units) // ($why && "its container $why"); cht_unlinked($c, $b, $wrong) if defined $wrong }
+        }
+    }
+}
+
+sub cht_fds { return map { my $c = $_->{cht}; $c ? map({ grep { defined } @$_{qw(to from sock)} } cht_boxes($c)) : () } @TABS }    # for a copy of lzrprf that goes on as perl: it lets go of every role and connection
 # The log in the window: this window's lines where a page stands, and under
 # them the log on this computer when there is one; one sentence on what is
 # kept; the button that clears the log whenever there is one; and, while a
@@ -16017,7 +16448,7 @@ var PAGE_KEYS = { 53: 'Escape', 36: 'Enter', 76: 'Enter', 48: 'Tab', 51: 'Backsp
 function liveTold(rest) {
     var parts = rest.split(' '), was = liveOn;
     if (parts[0] != 'on' && parts[0] != 'off') return;    // "live end ...": lzrprf's words why a page kept running ended; "live off" follows
-    liveOn = parts[0] == 'on'; liveFocus = liveOn && parts[1] == '1'; trmnlKeys = liveOn && parts[2] == 'trmnl'; if (trmnlKeys && canvas) win.makeFirstResponder(canvas);    // a terminal opened or chosen has the keyboard at once
+    liveOn = parts[0] == 'on'; liveFocus = liveOn && parts[1] == '1'; trmnlKeys = liveOn && (parts[2] == 'trmnl' || parts[2] == 'cht'); chtTab = trmnlKeys && parts[2] == 'cht'; if (trmnlKeys && canvas) win.makeFirstResponder(canvas);    // a terminal opened or chosen has the keyboard at once
     if (!liveOn && canvas && win.firstResponder.isEqual(canvas)) win.makeFirstResponder(win);
     if (liveOn && !was) pageScrollTell(true);    // a page kept running is told where it is shown at its start
     if (!liveOn && homeLoading && pageShown) { homeLoading = false; pieces(); }    // a home tab shown again whose page no longer runs: its drawing, not the picture of a home (homeKept)

@@ -6,6 +6,7 @@ sub visit {
     $DRAWN = 0;
     prefetch_end();                       # [C19] nothing fetched ahead or kept for the page before is handed to this one
     trmnl_end($TABS[$TAB], 'an address was opened in its tab') if $TABS[$TAB]{trmnl};    # [C29]
+    cht_end($TABS[$TAB], 'an address was opened in its tab') if $TABS[$TAB]{cht};    # [C32]
     return idle('This Tor window is closing: nothing more is fetched.') if $TOR_SESSION && $TOR_SESSION->{phase} !~ /^(?:made|connecting|sealed|browsing)$/;    # [C17] from the first step of its end, no new navigation
     pictures_before($SHOWN, $TABS[$TAB]) unless !$SHOWN && ($how // '') =~ /redirect to$/;    # a redirect followed is the same visit: what was kept for it stays
     undef $SHOWN;                         # a page asked for anew is laid out again only once it is shown
@@ -329,7 +330,7 @@ sub contained {
         return (undef, 'unstarted');
     }
     if (!$feeder) {                       # the keeper of this page
-        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
+        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), cht_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
         keeper($held, $answer_in, "=seal $seal\n" . $frame . $got, $page, $input);
         POSIX::_exit(0);                  # the keeper never returns; were it ever to, it ends here and does not go on as a second lzrprf
     }

@@ -62,7 +62,7 @@ var PAGE_KEYS = { 53: 'Escape', 36: 'Enter', 76: 'Enter', 48: 'Tab', 51: 'Backsp
 function liveTold(rest) {
     var parts = rest.split(' '), was = liveOn;
     if (parts[0] != 'on' && parts[0] != 'off') return;    // "live end ...": lzrprf's words why a page kept running ended; "live off" follows
-    liveOn = parts[0] == 'on'; liveFocus = liveOn && parts[1] == '1'; trmnlKeys = liveOn && parts[2] == 'trmnl'; if (trmnlKeys && canvas) win.makeFirstResponder(canvas);    // a terminal opened or chosen has the keyboard at once
+    liveOn = parts[0] == 'on'; liveFocus = liveOn && parts[1] == '1'; trmnlKeys = liveOn && (parts[2] == 'trmnl' || parts[2] == 'cht'); chtTab = trmnlKeys && parts[2] == 'cht'; if (trmnlKeys && canvas) win.makeFirstResponder(canvas);    // a terminal opened or chosen has the keyboard at once
     if (!liveOn && canvas && win.firstResponder.isEqual(canvas)) win.makeFirstResponder(win);
     if (liveOn && !was) pageScrollTell(true);    // a page kept running is told where it is shown at its start
     if (!liveOn && homeLoading && pageShown) { homeLoading = false; pieces(); }    // a home tab shown again whose page no longer runs: its drawing, not the picture of a home (homeKept)

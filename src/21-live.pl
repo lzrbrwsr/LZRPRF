@@ -27,7 +27,7 @@ sub live_dropped {                        # a run that kept its page and is not 
 
 sub live_told {                           # the window is told whether the page shown is kept running, and whether a text field of it has the focus: "live on|off 1|0"
     my $live = live_of($TABS[$TAB]);
-    my @now = $TABS[$TAB]{trmnl} ? ('on', 1, 'trmnl') : $live ? ('on', $live->{focus} ? 1 : 0) : ('off', 0);    # [C29] a terminal's tab takes every key, and keys held with Control
+    my @now = $TABS[$TAB]{trmnl} ? ('on', 1, 'trmnl') : $TABS[$TAB]{cht} ? ('on', 0, 'cht') : $live ? ('on', $live->{focus} ? 1 : 0) : ('off', 0);    # [C29] a terminal's tab takes every key, and keys held with Control
     return if "@now" eq "@LIVE_TOLD";
     @LIVE_TOLD = @now;
     window("live @now");
