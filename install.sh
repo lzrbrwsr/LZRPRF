@@ -166,8 +166,8 @@ BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 # that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="4dabe04b05e7f302c0ab56a332ff02a60a2503c648697846fed9ef3ad40bbe0d"
-RELEASE="143"
+SHA256="c914d447a981c6dc6f5428ad212c3f3273e063b12ee36d33e597de5d955f13c4"
+RELEASE="145"
 LZRPRF_COMMIT="295af4369647bb4036dd27fadb071c0e319a3663"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
 LZRPRF_SHA256="f0afa7c7872aa9f1470ae3b2370d3d258b01aba25fe74dc69283f0608a396699"
@@ -787,7 +787,7 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 143
+release 145
 home local
 new A tab pulled out into its own window shows no second app icon in the Dock or menu bar.
 newest https://lzrbrwsr.com/latest
