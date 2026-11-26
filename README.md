@@ -266,19 +266,19 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 148
+    release 149
     home local
-    new Links on busy news sites (yle.fi) take clicks again after the page has been open a while.
+    new A click on a link opens it even when the site's own scripts fail under the click (yle.fi).
     new LZRDFNDR's questions about scripts, redirects and sends no longer offer Forget; it stays in the site's settings.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin 30e0806fd959d28a738d1487337e5f555e1fe68059ad25575e734da65bf6a3c6
+    file lzrbrwsr-bin ccd707a6d599f2ab1f75e11cdc98aa53211e88b3b79b4c4fe4bb3bc86002ca31
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf 5a6c05af75b0ab51c6f2873e9432cb08c72569669be2569c0ffbaa73011332b4
+    lzrprf bde7b91c64110b03538f9d48eb912f0fceb925c7e299971c891407f59c7aeead
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

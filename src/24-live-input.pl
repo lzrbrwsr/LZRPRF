@@ -241,7 +241,7 @@ sub live_answered {                       # [C18]
                 my $wrong = live_sound($live, $line, \@sounds);
                 return live_end($live, "it wrote a sound lzrprf does not take: $wrong") if $wrong;
             }
-            elsif ($line =~ /^=pressed (a|a-nohref|button|input|none) (click|noclick) (acts|canceled|-)$/) { link_line('INFO', 'pressed', "the page met the press: $1, $2, $3", met => $1, click => $2, outcome => $3) }    # [1238] what a released press met, for the live debug link's log alone, before =again in any place
+            elsif ($line =~ /^=pressed (a|a-nohref|button|input|none) (click|noclick) (acts|canceled|stopped|throw|nopress|-)$/) { link_line('INFO', 'pressed', "the page met the press: $1, $2, $3", met => $1, click => $2, outcome => $3) }    # [1238] what a released press met, for the live debug link's log alone, before =again in any place
             elsif ($line =~ /^=inspect ([1-9][0-9]{0,8}) (-|(?:[0-9a-f]{2}){1,1000}) (-|(?:[0-9a-f]{2}){1,2400})$/) { inspect_answer($live, $1, $2, $3) }    # [C18] bounded, numbered reply to the current native pane
             elsif ($line =~ /^=cursor ([a-z-]{1,16})$/ && $CURSORS{$1}) { $cursor = $1 }    # the cursor over the page, before =again, in any place among the lines above
             elsif ($line =~ /^=keep ([^\x00-\x20\x7f]{1,16000})$/) { jar_kept_write($live, $1) }    # [C7] a cookie the page's script set, before =again in any place: judged by the jar against the page's own address (sub jar_kept_write)
