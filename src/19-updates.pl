@@ -235,7 +235,7 @@ sub newer_looked {
         aside($says);
         return;
     }
-    return $back->() unless ask("A newer release of $APP is published: $there. You run $release. Install it fetches the installer and runs it here, in this window, with no further question: every line it prints is shown and kept in ${\ shared()}/install.txt.", 'Later', 'Install it') == 2;
+    if (asked("updateoffer $there $release", 'Later', 'Install it') != 2) { window('updateoffer'); return $back->() }
     installed($there, $installer, $same, $signed);
     return $back->();                     # the installer did not run to its end (an install that is done never comes back here): its modal says why, and the window takes a press again
 }
@@ -367,6 +367,7 @@ sub install_run {
     print {$INSTALL_LOG} line("you chose to install release $there"), "\n";    # the time, the run, what happened: as a line of the log
     return install_end(0, 'The second place the release file names is not an address lzrprf fetches. Nothing was fetched.') if defined $same && !length $same;
     my @from = ($installer, defined $same ? $same : ());
+    my $manifest_url = $installer =~ s{[^/]+\z}{release.manifest}r;
     my @copies;
     for my $try (1 .. $INSTALL_TRIES) {       # the copies are compared each time anew: one that differs is never run, it is only fetched again later
         @copies = ();
@@ -385,7 +386,7 @@ sub install_run {
     return install_end(0, "The two places hold different installers. Nothing was changed: $from[0] and $from[1].") if @copies == 2 && $copies[0] ne $copies[1];
     my $wanted = ref $signed eq 'HASH' && $signed->{release} == $there ? $signed->{files}{'install.sh'} // '' : '';    # [C25]
     my $fetched = Digest::SHA->new(256)->add($copies[0])->hexdigest;
-    return install_end(0, "The installer is not the one the signed manifest of release $there names: it has SHA-256 $fetched" . (length $wanted ? ", the manifest names $wanted" : ', and no signed manifest was read') . '. Nothing was changed.') unless length $wanted && $fetched eq $wanted;
+    return install_end(0, "The installer is not the one the signed manifest of release $there names: it has SHA-256 $fetched" . (length $wanted ? ", the signed manifest at $manifest_url names $wanted" : ', and no signed manifest was read') . '. Nothing was changed.') unless length $wanted && $fetched eq $wanted;
     my ($folder, $out) = ("${\ shared()}/install.$$");
     mkdir $folder, 0700;
     my @folder = lstat $folder;
@@ -395,8 +396,8 @@ sub install_run {
     my $sum = Digest::SHA->new(256)->add($copies[0])->hexdigest;
     install_line(@copies == 2 ? 'The installer was fetched from two places, and both hold the same file.' : 'The installer comes from one place.');
     install_line("It is in this file, to read: $file");
-    install_line("Its SHA-256: $sum");
-    window("install sum $sum");
+    install_line("Its SHA-256: $sum. Compare the install.sh entry in the signed release $there manifest: $manifest_url");
+    window("install sum $sum\t$manifest_url");
     record("the installer of release $there has SHA-256 $sum, and runs now in auto: $file") or return install_end(0, $UNWRITTEN);    # [C5]
     return install_end(0, 'lzrprf try: the installer was written and is not run.') if $TRY;
     install_line('It runs now by itself: no question is shown, and each line it prints is shown here.');
