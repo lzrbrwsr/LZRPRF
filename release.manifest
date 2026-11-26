@@ -1,7 +1,7 @@
 lzrbrwsr release manifest 1
-release 159
-signed 2026-11-26T17:37:09Z
-expires 2027-05-25T17:37:09Z
-file install.sh 6b312e2172c8d185a85386cc0d35d48516edad753ef45ee7b399953a168e4fb4
-file lzrbrwsr-macos-arm64.tar.gz 4382339d34b09e5aee6d28da4f6c41c6210e6eceb74976b5475427eb5b444adb
-file release.txt c25c238c15c47d26fac44eab72c6690441e302157dcedc9e4357da21dad8791d
+release 162
+signed 2026-11-26T22:53:00Z
+expires 2027-05-25T22:53:00Z
+file install.sh 31bf4b1231dba115c61a0428c1ef6f7003a9fc913d2f9ac317a14c238124288d
+file lzrbrwsr-macos-arm64.tar.gz bfe4a075b1e05df748f498cce8f7ea4cae1800a58dd3ed5ce8ae5e8bdc8fa04a
+file release.txt a6c1bec67890d3ff7d4564447d6588c4e92de1f09bc6fc93620b61369d4438a4
