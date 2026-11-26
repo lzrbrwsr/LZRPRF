@@ -48,7 +48,7 @@ sub relaid {
         $SHOWN->{wide} = $VIEW[0]; $SHOWN->{scale} = $VIEW_SCALE;
         my $kept = live_of($TABS[$TAB]);
         if ($kept && $kept->{wide} == $VIEW[0] && ($kept->{scale} // 1) == $VIEW_SCALE && $kept->{shown}) { window("relaid $TAB", @{ $kept->{shown} }, '.'); $kept->{unsent} = 0; $DRAWN = 1; next }    # the page kept running was laid at this width: its last drawing, as its scripts left it, and nothing is laid out
-        $OUTRUN = 1; my @again = laid_out($SHOWN->{url}, $SHOWN->{got}, $SHOWN->{frame}, 1); $OUTRUN = 0;    # a newer size said while it runs ends it ('outrun'), and the newest is laid next
+        $OUTRUN = 1; my @again = laid_out($SHOWN->{url}, $SHOWN->{got}, $SHOWN->{frame}, 1, $TABS[$TAB]{kept_app}); $OUTRUN = 0;    # a newer size said while it runs ends it ('outrun'), and the newest is laid next
         if (!$again[0] || $SHOWN->{two} && @{ $again[4] }) { live_dropped($again[5]); next }    # not shown: the page as it is shown stays, and so does the run kept running with it
         my ($shown) = pictured($again[0], $again[2], $SHOWN->{host}, undef, undef, $SHOWN->{pictures});
         window("relaid $TAB", @$shown, '.');
@@ -59,7 +59,7 @@ sub relaid {
         live_kept($again[5], $TABS[$TAB], $again[0], $again[2], $SHOWN->{host}, $SHOWN->{pictures}, $shown, $again[6]) if $again[5];
     }
     $CURL_WANTED = 1;
-    if ($SHOWN) { $SPARE_WANTED = $SHOWN->{url} } else { spare_dropped() }    # a process for the page shown's next run, at the next quiet moment (sub spare_work); none waits for a page that is not shown
+    if ($SHOWN && !$TABS[$TAB]{kept_app}) { $SPARE_WANTED = $SHOWN->{url} } else { spare_dropped() }    # a process for the page shown's next run, at the next quiet moment (sub spare_work); none waits for a page that is not shown
     live_told();
 }
 

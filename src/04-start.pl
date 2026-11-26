@@ -170,6 +170,7 @@ sub tab_out {
     return if $n >= @TABS || @TABS < 2;
     my ($url) = address($TABS[$n]{url} // '');
     my $stays = $TABS[$n]{trmnl} ? 'The tab stays here: a terminal does not move to another window, as its shell is a process of this one.'    # [C29]
+        : $TABS[$n]{kept_app} ? 'The tab stays here: Discord keeps its connections in this window.'
         : $TABS[$n]{cht} ? 'The tab stays here: LZRCHT does not move to another window, as its connections are processes of this one.'    # [C32]
         : $PULLED >= $PULLED_MOST ? "The tab stays here: this window has opened $PULLED_MOST windows from its tabs and profiles, the most one window may. Open a new window for more."
         : defined $PROFILE && !profile_folder($PROFILE) ? "The tab stays here. $GONE"

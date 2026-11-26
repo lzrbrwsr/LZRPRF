@@ -3,6 +3,7 @@
 # is fetched. There is no other way to the fetch.
 sub visit {
     my ($typed, $how, $mark, $auto) = @_;   # whether a redirect to the same site was followed already in this visit; what was typed, how its line in the log begins ("you typed", "you opened your home page", "you opened a bookmark", "you chose to follow a redirect to"), and the bookmark it came from
+    return kept_app_visit($TABS[$TAB], $typed, $how) if $TABS[$TAB]{kept_app};
     $DRAWN = 0;
     prefetch_end();                       # [C19] nothing fetched ahead or kept for the page before is handed to this one
     trmnl_end($TABS[$TAB], 'an address was opened in its tab') if $TABS[$TAB]{trmnl};    # [C29]
@@ -242,9 +243,9 @@ sub visit {
 # the run is asked to keep its page running with the tab (sub contained), and
 # the run that does so comes last; a first list that is unfit ends it.
 sub laid_out {
-    my ($url, $got, $sheets, $keep) = @_;
+    my ($url, $got, $sheets, $keep, $app) = @_;
     $LAID_WIDE = $VIEW[0];                # the width contained asks for in its =view frame, and the one width sub laid takes
-    my ($wrote, $why, $live) = contained($url, $got, $sheets, $keep);
+    my ($wrote, $why, $live) = contained($url, $got, $sheets, $keep, undef, undef, undef, $app);
     timed('page-read');                   # what the application wrote is all here: the time to "laid" is lzrprf's check of it (sub checked)
     return (undef, $why) unless defined $wrote;
     return (live_dropped($live), flagged_by($wrote)) if substr($wrote, 0, 9) eq '=flagged ';    # [C28] LZRDFNDR blocked the page: its one line, and nothing of the page
@@ -309,18 +310,19 @@ sub faces {                               # [C13]
 # from a line of the window it checked (sub live_input); every answer of the
 # page is checked before anything of it is drawn (sub live_answered).
 sub contained {
-    my ($url, $got, $sheets, $keep, $tool, $local_home, $soon) = @_;    # $soon: a page kept running is handed back once it is contained, and its first list read in the loop of sub behind (sub home_arrived)    # $tool 'judge': LZRDFNDR's verdicts on addresses before they are fetched ([C28], sub shield_asked); else the run is the application's tool ([C20], sub tool_shown): handed lzrprf's look at this computer as a picture run is handed a picture, and read to its end
+    my ($url, $got, $sheets, $keep, $tool, $local_home, $soon, $app) = @_;    # $soon: a page kept running is handed back once it is contained, and its first list read in the loop of sub behind (sub home_arrived)    # $tool 'judge': LZRDFNDR's verdicts on addresses before they are fetched ([C28], sub shield_asked); else the run is the application's tool ([C20], sub tool_shown): handed lzrprf's look at this computer as a picture run is handed a picture, and read to its end
+    if ($app && (!kept_app_valid($app, $url) || !$keep || !defined $sheets || $tool || $local_home || $soon)) { return (undef, 'unstarted') }
     $READ_ASKED = 0;                      # this run has asked for nothing yet, whatever way it ends
     return (undef, 'changed') unless program_same();    # read again before every run: the program on the disk is the file this window began with, or nothing is laid out
     $keep = 0 unless defined $sheets;     # a picture run is never kept
     my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]" . ($VIEW_SCALE == 2 ? " 2" : "") . "\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
-    $frame .= permit_page($url, \$got) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
-    $frame .= jar_frame($url) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
+    $frame .= permit_page($url, \$got, $app) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
+    $frame .= ($app ? kept_app_jar($app, sub { jar_frame($url) }) : jar_frame($url)) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
     $frame .= '=live ' . length($got) . "\n" if $keep;
-    if (my $ran = beside_taken($frame . $got, defined $sheets && !$tool, $url, !$local_home && !$soon)) { return run_read($ran, $keep, $sheets, $tool) }    # the very run, started beside the first (sub beside_begun)
+    if (!$app && (my $ran = beside_taken($frame . $got, defined $sheets && !$tool, $url, !$local_home && !$soon))) { return run_read($ran, $keep, $sheets, $tool) }    # the very run, started beside the first (sub beside_begun)
     my ($input, $relay);                  # the keeper's end of the relay and lzrprf's, for a page kept running
     if ($keep) { pipe($input, $relay) or return (undef, 'unstarted') }
-    my $run = spare_taken($url, $sheets, $tool, $local_home) // page_started($url, $sheets, $tool, $local_home) // return (undef, 'unstarted');    # its process, started for this one run, here or a moment before (sub spare_for)
+    my $run = (!$app ? spare_taken($url, $sheets, $tool, $local_home) : undef) // page_started($url, $sheets, $tool, $local_home, $app) // return (undef, 'unstarted');    # its process, started for this one run, here or a moment before (sub spare_for)
     my ($page, $answer_in, $from_page, $seal) = @$run{qw(page in from seal)};
     pipe(my $held, my $hold) or do { kill 'KILL', $page; waitpid $page, 0; return (undef, 'unstarted') };
     my $feeder = fork;
@@ -354,8 +356,9 @@ sub contained {
         return (undef, 'unstarted');
     }
     my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
+    $started->{kept_app} = $app if $app;
     if ($soon && $keep) { $started->{fed} = $frame . $got if $soon eq 'beside'; return (undef, undef, $started) }
-    beside_begun($started, $sheets, $keep, $tool);    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
+    beside_begun($started, $sheets, $keep, $tool) unless $app;    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
     return run_read($started, $keep, $sheets, $tool);
 }
 
@@ -363,12 +366,12 @@ sub contained {
 # its keeper hands over only after the system said it is contained (sub contained). Its variables
 # are those of the run, the address among them: nothing of the answer is in it yet.
 sub page_started {
-    my ($url, $sheets, $tool, $local_home) = @_;
+    my ($url, $sheets, $tool, $local_home, $app) = @_;
     pipe(my $answer_out, my $answer_in) && pipe(my $from_page, my $to_lzrprf) or return;
     my $seal = run_seal() // return;      # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
     my $page = fork // return;
     if (!$page) {
-        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
+        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$app && !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
         chdir '/';
         the_program($answer_out, $to_lzrprf);    # [C1]
     }

@@ -35,11 +35,14 @@ my $JAR_LINE = 16384;                    # DECLARED: the longest line of one coo
 my $JAR_SEALED = 64 * 1024 * 1024;       # DECLARED: the longest jar file, in hex digits: above the application's largest sealed jar
 my $JAR_EVERY = 2;                       # DECLARED: seconds between two writes of the file while cookies keep coming; the last is written when the window ends
 my $JAR_SET_MOST = 64;                   # DECLARED: Set-Cookie lines of one answer handed to the jar
-my ($JAR, $JAR_STARTS, $JAR_SAVED) = (undef, 0, 0);
+our ($JAR, $JAR_STARTS, $JAR_SAVED) = (undef, 0, 0);
+our $JAR_FOLDER;
 sub jar_kept { !$INCOGNITO && !$TOR_WANTED && !$TOR && !$TOR_SESSION }    # [C16] [C17] only a window of a profile keeps a cookie past its end
-sub jar_file { "$DIR/cookies" }
+sub jar_directory { $JAR_FOLDER // $DIR }
+sub jar_file { jar_directory() . '/cookies' }
 sub jar_skips {                           # D18: a host of a provider you connected or are connecting keeps that provider's own store, and the jar is not asked
     my ($url) = @_;
+    return 0 if defined $JAR_FOLDER;
     return 0 unless sso_on();
     my ($host) = $url =~ m{\Ahttps://([^/:]+)} or return 1;
     my $key = sso_of($host) // return 0;
@@ -81,13 +84,13 @@ sub jar_started {                         # the window's jar: running already, o
 
 sub jar_locked {                          # one step on the profile's jar file, under a lock against another window of the profile
     my ($step) = @_;
-    open my $lock, '>>', "$DIR/cookies.lock" or return 'its lock could not be had';
+    sysopen(my $lock, jar_directory() . '/cookies.lock', O_WRONLY | O_CREAT | O_NOFOLLOW, 0600) or return 'its lock could not be had';
     flock $lock, LOCK_EX or return 'its lock could not be had';
     return $step->();
 }
 
 sub jar_key {                             # the profile's key for its jar file: 64 hex digits in cookies.key, made once of 32 random bytes; nothing when it is not a plain file of yours alone
-    my $file = "$DIR/cookies.key";
+    my $file = jar_directory() . '/cookies.key';
     if (sysopen(my $in, $file, O_RDONLY | O_NOFOLLOW)) {
         my @is = stat $in;
         return unless -f _ && $is[4] == $< && !($is[2] & 077) && $is[7] <= 65;
@@ -133,7 +136,7 @@ sub jar_save {                            # the jar into its file, merged first 
         my $new = jar_file() . ".new.$$";
         unlink $new;
         put($new, O_EXCL, $sealed) && rename($new, jar_file()) or (unlink($new), return 'it could not be written');
-        synced($DIR);
+        synced(jar_directory());
         $JAR->{seen} = jar_stamp();
         $JAR->{dirty} = 0;
         return;
@@ -228,9 +231,14 @@ sub jar_heard {                           # each Set-Cookie line of an answer to
 
 sub jar_kept_write {                      # a line =keep of a page kept running: the page's script set a cookie, judged by the jar against the page's address as lzrprf knows it
     my ($live, $raw) = @_;
+    if ($live->{kept_app} && !defined $JAR_FOLDER) {
+        my $app = $live->{kept_app};
+        return unless kept_app_valid($app, $live->{url});
+        return kept_app_jar($app, sub { jar_kept_write($live, $raw) });
+    }
     return if $live->{home} || jar_skips($live->{url});    # the local home has no site; a provider's family keeps its own store
     my ($rules) = permit_rules();
-    return if permit_site("https://$live->{host}", $rules, $live->{url}) eq 'sandbox';    # [C26] E1 writes nothing for the site
+    return if !defined $JAR_FOLDER && permit_site("https://$live->{host}", $rules, $live->{url}) eq 'sandbox';    # [C26] E1 writes nothing for the site
     my $said = jar_said('=script ', join(' ', time, $live->{url}, $raw) . "\n") // return;
     $JAR->{dirty} = 1 if $said eq "=kept\n";
     jar_save();

@@ -253,8 +253,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 04-start.pl	128	help_opened	-
 04-start.pl	137	apart	-
 04-start.pl	168	tab_out	C29 C32
-04-start.pl	186	pulled_command	-
-04-start.pl	192	opened_with	-
+04-start.pl	187	pulled_command	-
+04-start.pl	193	opened_with	-
 05-profiles.pl	1	-	-
 05-profiles.pl	35	profiles_root	-
 05-profiles.pl	36	profiles_folder	-
@@ -310,28 +310,28 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 07-visit-beside.pl	98	run_read	C19 C26 C28
 07-visit.pl	1	-	-
 07-visit.pl	4	visit	C19 C29 C32 C17 C23 C26 C5 C28 C8 C7 C4 C14 C30
-07-visit.pl	244	laid_out	C28 C9
-07-visit.pl	260	outrun	-
-07-visit.pl	275	faces	C13
-07-visit.pl	311	contained	C28 C20 C13 C14 C26 C7 C3
-07-visit.pl	365	page_started	C1 C3
-07-visit.pl	388	spare_for	-
-07-visit.pl	396	spare_taken	-
-07-visit.pl	407	spare_dropped	-
-07-visit.pl	415	spare_work	-
-07-visit.pl	422	idle_taken	C1
-07-visit.pl	434	run_seal	-
-07-visit.pl	460	keeper	C9
-07-visit.pl	548	unhung	-
-07-visit.pl	556	parted	-
-07-visit.pl	565	checked	C30 C9 C22 C14
-07-visit.pl	668	laid	-
-07-visit.pl	681	laid_run	C4
-07-visit.pl	731	redirect_noted	C4
-07-visit.pl	743	redirect_answered	-
-07-visit.pl	750	redirects_listed	C4
-07-visit.pl	763	redirects_told	C4 C23
-07-visit.pl	765	redirects_decide	C4
+07-visit.pl	245	laid_out	C28 C9
+07-visit.pl	261	outrun	-
+07-visit.pl	276	faces	C13
+07-visit.pl	312	contained	C28 C20 C13 C14 C26 C7 C3
+07-visit.pl	368	page_started	C1 C3
+07-visit.pl	391	spare_for	-
+07-visit.pl	399	spare_taken	-
+07-visit.pl	410	spare_dropped	-
+07-visit.pl	418	spare_work	-
+07-visit.pl	425	idle_taken	C1
+07-visit.pl	437	run_seal	-
+07-visit.pl	463	keeper	C9
+07-visit.pl	551	unhung	-
+07-visit.pl	559	parted	-
+07-visit.pl	568	checked	C30 C9 C22 C14
+07-visit.pl	671	laid	-
+07-visit.pl	684	laid_run	C4
+07-visit.pl	734	redirect_noted	C4
+07-visit.pl	746	redirect_answered	-
+07-visit.pl	753	redirects_listed	C4
+07-visit.pl	766	redirects_told	C4 C23
+07-visit.pl	768	redirects_decide	C4
 08-pictures.pl	1	-	C7 C5 C17 C8 C22
 08-pictures.pl	46	pictures_state	C28
 08-pictures.pl	57	pictures_begun	C23 C28 C27 C4 C5 C8 C6 C7 C1 C3 C21
@@ -623,37 +623,38 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 17-fetch.pl	65	identity_site	-
 17-fetch.pl	75	identity_headers	C7 C19
 17-fetch.pl	102	fetch	C7 C23 C28 C19 C3
-17-fetch.pl	225	curl_started	C3
-17-fetch.pl	251	curl_for	-
-17-fetch.pl	264	curl_taken	-
-17-fetch.pl	273	curl_ended	-
-17-fetch.pl	281	alive	-
-17-fetch.pl	283	public	-
-17-fetch.pl	296	public4	C4
-17-fetch.pl	314	fixed	C23 C5
+17-fetch.pl	227	curl_started	C3
+17-fetch.pl	253	curl_for	-
+17-fetch.pl	266	curl_taken	-
+17-fetch.pl	275	curl_ended	-
+17-fetch.pl	283	alive	-
+17-fetch.pl	285	public	-
+17-fetch.pl	298	public4	C4
+17-fetch.pl	316	fixed	C23 C5
 17-jar.pl	1	-	C7 C12 C16 C17 C26
-17-jar.pl	39	jar_kept	C16 C17
-17-jar.pl	40	jar_file	-
-17-jar.pl	41	jar_skips	-
-17-jar.pl	48	jar_encoded	-
-17-jar.pl	50	jar_started	C1 C3
-17-jar.pl	82	jar_locked	-
-17-jar.pl	89	jar_key	-
-17-jar.pl	104	jar_stamp	-
-17-jar.pl	106	jar_merged	-
-17-jar.pl	122	jar_save	-
-17-jar.pl	145	jar_wrote	-
-17-jar.pl	160	jar_line	-
-17-jar.pl	177	jar_said	-
-17-jar.pl	184	jar_lost	-
-17-jar.pl	195	jar_end	-
-17-jar.pl	201	jar_context	-
-17-jar.pl	207	jar_cookie	-
-17-jar.pl	216	jar_heard	-
-17-jar.pl	229	jar_kept_write	C26
-17-jar.pl	239	jar_frame	-
-17-jar.pl	257	jar_clear	-
-17-jar.pl	266	jar_forget	-
+17-jar.pl	40	jar_kept	C16 C17
+17-jar.pl	41	jar_directory	-
+17-jar.pl	42	jar_file	-
+17-jar.pl	43	jar_skips	-
+17-jar.pl	51	jar_encoded	-
+17-jar.pl	53	jar_started	C1 C3
+17-jar.pl	85	jar_locked	-
+17-jar.pl	92	jar_key	-
+17-jar.pl	107	jar_stamp	-
+17-jar.pl	109	jar_merged	-
+17-jar.pl	125	jar_save	-
+17-jar.pl	148	jar_wrote	-
+17-jar.pl	163	jar_line	-
+17-jar.pl	180	jar_said	-
+17-jar.pl	187	jar_lost	-
+17-jar.pl	198	jar_end	-
+17-jar.pl	204	jar_context	-
+17-jar.pl	210	jar_cookie	-
+17-jar.pl	219	jar_heard	-
+17-jar.pl	232	jar_kept_write	C26
+17-jar.pl	247	jar_frame	-
+17-jar.pl	265	jar_clear	-
+17-jar.pl	274	jar_forget	-
 17-prefetch.pl	1	-	C19
 17-prefetch.pl	26	prefetch_end	-
 17-prefetch.pl	41	prefetch_begin	C17 C26 C14 C23
@@ -720,12 +721,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 19-updates.pl	284	welcomed	C5 C6 C3
 19-updates.pl	331	installed	C25
 19-updates.pl	358	install_run	C25 C5
-19-updates.pl	460	install_drained	-
-19-updates.pl	493	install_guarded	-
-19-updates.pl	508	restarted	C5
-19-updates.pl	540	install_line	-
-19-updates.pl	558	install_end	-
-19-updates.pl	571	body_of	-
+19-updates.pl	462	install_drained	-
+19-updates.pl	495	install_guarded	-
+19-updates.pl	510	restarted	C5
+19-updates.pl	542	install_line	-
+19-updates.pl	560	install_end	-
+19-updates.pl	573	body_of	-
 20-window-side.pl	1	-	C29
 20-window-side.pl	14	window	C12
 20-window-side.pl	24	strip_back	-
@@ -736,7 +737,17 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 20-window-side.pl	45	said_noted	-
 20-window-side.pl	57	stated	-
 20-window-side.pl	65	hear	C12 C29 C32 C19
-20-window-side.pl	116	window_changed	-
+20-window-side.pl	120	window_changed	-
+21-kept-app.pl	1	-	C32
+21-kept-app.pl	11	kept_app_discord	-
+21-kept-app.pl	19	kept_app_valid	-
+21-kept-app.pl	27	kept_app_budget	-
+21-kept-app.pl	40	kept_app_folder	-
+21-kept-app.pl	55	kept_app_jar	-
+21-kept-app.pl	66	kept_app_fetched	-
+21-kept-app.pl	77	kept_app_response	-
+21-kept-app.pl	100	kept_app_open_tab	-
+21-kept-app.pl	120	kept_app_visit	-
 21-link.pl	1	-	C31
 21-link.pl	49	link_folder	-
 21-link.pl	50	link_state	C31
@@ -768,16 +779,33 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-live.pl	22	live_dropped	-
 21-live.pl	28	live_told	C29
 21-live.pl	36	live_end	-
-21-live.pl	66	live_read	-
-21-live.pl	79	live_due	C19
-21-live.pl	91	live_turn	C18 C19 C26 C5 C17 C6 C7
-21-live.pl	148	live_asked	C19 C26
-21-live.pl	181	live_early	C19
-21-live.pl	201	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	304	live_parts	C19
-21-live.pl	323	unchunked	-
-21-live.pl	338	live_replied	C19
-21-live.pl	343	live_sent	C19
+21-live.pl	67	live_read	-
+21-live.pl	80	live_due	C19
+21-live.pl	92	live_turn	C18 C19 C26 C5 C17 C6 C7
+21-live.pl	150	live_asked	C19 C26
+21-live.pl	184	live_early	C19
+21-live.pl	204	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
+21-live.pl	309	live_parts	C19
+21-live.pl	328	unchunked	-
+21-live.pl	343	live_replied	C19
+21-live.pl	348	live_sent	C19
+21-websocket.pl	1	-	-
+21-websocket.pl	4	ws_asked	-
+21-websocket.pl	26	ws_request	-
+21-websocket.pl	40	ws_frame	-
+21-websocket.pl	51	ws_read_frame	-
+21-websocket.pl	75	ws_valid_text	-
+21-websocket.pl	81	ws_endpoint	-
+21-websocket.pl	94	ws_open	-
+21-websocket.pl	129	ws_upgrade	-
+21-websocket.pl	152	ws_reply	-
+21-websocket.pl	162	ws_close_socket	-
+21-websocket.pl	174	ws_queue_frame	-
+21-websocket.pl	183	ws_page_frame	-
+21-websocket.pl	199	ws_frames_heard	-
+21-websocket.pl	235	ws_pump	-
+21-websocket.pl	245	ws_step	-
+21-websocket.pl	281	ws_end	-
 22-essential-web.pl	1	-	-
 22-essential-web.pl	17	essential_web_count	-
 22-essential-web.pl	18	essential_web_clear	-
@@ -1011,22 +1039,22 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 25-cht.pl	159	cht_shown	-
 25-cht.pl	174	cht_units	-
 25-cht.pl	202	cht_drew	C32
-25-cht.pl	223	cht_paged	C32 C9
-25-cht.pl	241	cht_copied	C32
-25-cht.pl	252	cht_kept	C32
-25-cht.pl	264	cht_linked	C32
-25-cht.pl	274	cht_reachable	C32
-25-cht.pl	287	cht_heard_link	C32
-25-cht.pl	307	cht_dialed	C32
-25-cht.pl	317	cht_hung	-
-25-cht.pl	326	cht_net	-
-25-cht.pl	350	cht_box_end	-
-25-cht.pl	360	cht_unlinked	-
-25-cht.pl	369	cht_end	-
-25-cht.pl	381	cht_boxes	-
-25-cht.pl	383	cht_select	-
-25-cht.pl	397	cht_heard	-
-25-cht.pl	415	cht_fds	-
+25-cht.pl	227	cht_paged	C32 C9
+25-cht.pl	245	cht_copied	C32
+25-cht.pl	256	cht_kept	C32
+25-cht.pl	268	cht_linked	C32
+25-cht.pl	278	cht_reachable	C32
+25-cht.pl	291	cht_heard_link	C32
+25-cht.pl	311	cht_dialed	C32
+25-cht.pl	321	cht_hung	-
+25-cht.pl	330	cht_net	-
+25-cht.pl	354	cht_box_end	-
+25-cht.pl	364	cht_unlinked	-
+25-cht.pl	373	cht_end	-
+25-cht.pl	385	cht_boxes	-
+25-cht.pl	387	cht_select	-
+25-cht.pl	401	cht_heard	-
+25-cht.pl	419	cht_fds	-
 26-log.pl	1	-	C12
 26-log.pl	13	log_shown	C16
 26-log.pl	50	choose_keeping	-

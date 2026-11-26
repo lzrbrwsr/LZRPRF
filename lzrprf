@@ -1285,6 +1285,7 @@ sub tab_out {
     return if $n >= @TABS || @TABS < 2;
     my ($url) = address($TABS[$n]{url} // '');
     my $stays = $TABS[$n]{trmnl} ? 'The tab stays here: a terminal does not move to another window, as its shell is a process of this one.'    # [C29]
+        : $TABS[$n]{kept_app} ? 'The tab stays here: Discord keeps its connections in this window.'
         : $TABS[$n]{cht} ? 'The tab stays here: LZRCHT does not move to another window, as its connections are processes of this one.'    # [C32]
         : $PULLED >= $PULLED_MOST ? "The tab stays here: this window has opened $PULLED_MOST windows from its tabs and profiles, the most one window may. Open a new window for more."
         : defined $PROFILE && !profile_folder($PROFILE) ? "The tab stays here. $GONE"
@@ -2090,7 +2091,8 @@ sub beside_second {                       # the wait for the sheets begun ahead,
 sub run_read {                            # ($run, $keep, $sheets, $tool): the second half of sub contained: a run that is started and contained, read to its first list or to its end
     my ($run, $keep, $sheets, $tool) = @_;
     my ($page, $feeder, $relay, $from_page, $hold, $local_home, $url) = @$run{qw(page keeper relay from hold home url)};
-    my ($wrote, $until, $open, $looked, $ready_at, $early, $outrun) = ('', now() + $PAGE_SECONDS, 1, 0, -1); prefetch_later() if ($sheets // q{}) ne "=sheets\n";    # [C19] the run with its sheets is started: what the page names is judged and begun while it lays the page (17-prefetch.pl)
+    my $app = $run->{kept_app};
+    my ($wrote, $until, $open, $looked, $ready_at, $early, $outrun) = ('', now() + $PAGE_SECONDS, 1, 0, -1); prefetch_later() if !$app && ($sheets // q{}) ne "=sheets\n";    # [C19] the run with its sheets is started: what the page names is judged and begun while it lays the page (17-prefetch.pl)
     while ($open && now() < $until && length $wrote <= $PAGE_BYTES && alive()) {
         my $ready = '';
         vec($ready, fileno $from_page, 1) = 1;
@@ -2099,11 +2101,12 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
         if ($OUTRUN && $FROM && vec($ready, fileno $FROM, 1)) { last if $outrun = outrun(); next unless vec($ready, fileno $from_page, 1) }
         $open = sysread($from_page, $wrote, 65536, length $wrote) // $!{EINTR};
         next unless $keep;
-        while ($wrote =~ /\A=(?:fetch|permit|early|soon) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
+        while ($wrote =~ /\A=(?:fetch|permit|early|soon|wsopen|wssend|wsclose) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
             $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0 };
+            $early->{kept_app} = $app if $app;
             $early->{held} = $wrote;
             my $asked = live_asked($early) or last;    # not all there yet
-            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ' || $asked->[0] eq '=early' || substr($asked->[0], 0, 6) eq '=soon ';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
+            $READ_ASKED++ unless substr($asked->[0], 0, 8) eq '=permit ' || $asked->[0] eq '=early' || substr($asked->[0], 0, 6) eq '=soon ' || substr($asked->[0], 0, 3) eq '=ws';    # counted whatever comes of it: fetched, or refused by lzrprf; a question to run a script asks for no address
             live_fetched($early, $asked);
             return (undef, 'ended') if $early->{ended};    # a request of no form, or a reply the page did not take: it is ended as a page kept running is (sub live_end)
             ($wrote, $looked) = ($early->{held}, 0);
@@ -2115,7 +2118,7 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
     timed("run-read $$ " . length $wrote) if $TIMED;
     if ($outrun) { kill 'KILL', $feeder, $page; waitpid $_, 0 for $feeder, $page; return (undef, 'outrun') }    # a newer width was said: this run is of no use, and the next is not kept waiting behind it
     if ($ready_at >= 0 && length $wrote <= $PAGE_BYTES) {    # the page is kept running: its first list, and what it wrote after "=ready" is the beginning of its next answer
-        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $LIVE_SECONDS, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
+        return (substr($wrote, 0, $ready_at + 1), undef, { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => substr($wrote, $ready_at + 8), looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => $app ? $app->{until} : now() + $LIVE_SECONDS, kept_app => $app, bytes => length($wrote) - $ready_at - 8, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => $early ? $early->{fetches} : 0, heard => now() });
     }
     if ($tool && $tool eq 'judge' && !$open && length $wrote <= $PAGE_BYTES) {    # [C28] complete output is not enough: the judge must exit successfully within the same clock
         my $exit;
@@ -2140,6 +2143,7 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
 # is fetched. There is no other way to the fetch.
 sub visit {
     my ($typed, $how, $mark, $auto) = @_;   # whether a redirect to the same site was followed already in this visit; what was typed, how its line in the log begins ("you typed", "you opened your home page", "you opened a bookmark", "you chose to follow a redirect to"), and the bookmark it came from
+    return kept_app_visit($TABS[$TAB], $typed, $how) if $TABS[$TAB]{kept_app};
     $DRAWN = 0;
     prefetch_end();                       # [C19] nothing fetched ahead or kept for the page before is handed to this one
     trmnl_end($TABS[$TAB], 'an address was opened in its tab') if $TABS[$TAB]{trmnl};    # [C29]
@@ -2379,9 +2383,9 @@ sub visit {
 # the run is asked to keep its page running with the tab (sub contained), and
 # the run that does so comes last; a first list that is unfit ends it.
 sub laid_out {
-    my ($url, $got, $sheets, $keep) = @_;
+    my ($url, $got, $sheets, $keep, $app) = @_;
     $LAID_WIDE = $VIEW[0];                # the width contained asks for in its =view frame, and the one width sub laid takes
-    my ($wrote, $why, $live) = contained($url, $got, $sheets, $keep);
+    my ($wrote, $why, $live) = contained($url, $got, $sheets, $keep, undef, undef, undef, $app);
     timed('page-read');                   # what the application wrote is all here: the time to "laid" is lzrprf's check of it (sub checked)
     return (undef, $why) unless defined $wrote;
     return (live_dropped($live), flagged_by($wrote)) if substr($wrote, 0, 9) eq '=flagged ';    # [C28] LZRDFNDR blocked the page: its one line, and nothing of the page
@@ -2446,18 +2450,19 @@ sub faces {                               # [C13]
 # from a line of the window it checked (sub live_input); every answer of the
 # page is checked before anything of it is drawn (sub live_answered).
 sub contained {
-    my ($url, $got, $sheets, $keep, $tool, $local_home, $soon) = @_;    # $soon: a page kept running is handed back once it is contained, and its first list read in the loop of sub behind (sub home_arrived)    # $tool 'judge': LZRDFNDR's verdicts on addresses before they are fetched ([C28], sub shield_asked); else the run is the application's tool ([C20], sub tool_shown): handed lzrprf's look at this computer as a picture run is handed a picture, and read to its end
+    my ($url, $got, $sheets, $keep, $tool, $local_home, $soon, $app) = @_;    # $soon: a page kept running is handed back once it is contained, and its first list read in the loop of sub behind (sub home_arrived)    # $tool 'judge': LZRDFNDR's verdicts on addresses before they are fetched ([C28], sub shield_asked); else the run is the application's tool ([C20], sub tool_shown): handed lzrprf's look at this computer as a picture run is handed a picture, and read to its end
+    if ($app && (!kept_app_valid($app, $url) || !$keep || !defined $sheets || $tool || $local_home || $soon)) { return (undef, 'unstarted') }
     $READ_ASKED = 0;                      # this run has asked for nothing yet, whatever way it ends
     return (undef, 'changed') unless program_same();    # read again before every run: the program on the disk is the file this window began with, or nothing is laid out
     $keep = 0 unless defined $sheets;     # a picture run is never kept
     my $frame = defined $sheets ? "=view $VIEW[0] $VIEW[1]" . ($VIEW_SCALE == 2 ? " 2" : "") . "\n" . faces() . $sheets : '';    # the size first, numbers lzrprf holds to its bounds (sub viewing); [C13] [C14] the fonts read here, before the keeper is a copy of this process, so once in a window; handed over by the keeper alone, after the same word as the answer
-    $frame .= permit_page($url, \$got) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
-    $frame .= jar_frame($url) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
+    $frame .= permit_page($url, \$got, $app) if defined $sheets && !$tool;    # [C26] the decisions lzrprf holds for the site, after the style sheets; a site whose scripts are not allowed is handed its page with them taken out
+    $frame .= ($app ? kept_app_jar($app, sub { jar_frame($url) }) : jar_frame($url)) if defined $sheets && !$tool && !$local_home;    # [C7] the cookies of the page's own site its script may see, after the permissions (sub jar_frame)
     $frame .= '=live ' . length($got) . "\n" if $keep;
-    if (my $ran = beside_taken($frame . $got, defined $sheets && !$tool, $url, !$local_home && !$soon)) { return run_read($ran, $keep, $sheets, $tool) }    # the very run, started beside the first (sub beside_begun)
+    if (!$app && (my $ran = beside_taken($frame . $got, defined $sheets && !$tool, $url, !$local_home && !$soon))) { return run_read($ran, $keep, $sheets, $tool) }    # the very run, started beside the first (sub beside_begun)
     my ($input, $relay);                  # the keeper's end of the relay and lzrprf's, for a page kept running
     if ($keep) { pipe($input, $relay) or return (undef, 'unstarted') }
-    my $run = spare_taken($url, $sheets, $tool, $local_home) // page_started($url, $sheets, $tool, $local_home) // return (undef, 'unstarted');    # its process, started for this one run, here or a moment before (sub spare_for)
+    my $run = (!$app ? spare_taken($url, $sheets, $tool, $local_home) : undef) // page_started($url, $sheets, $tool, $local_home, $app) // return (undef, 'unstarted');    # its process, started for this one run, here or a moment before (sub spare_for)
     my ($page, $answer_in, $from_page, $seal) = @$run{qw(page in from seal)};
     pipe(my $held, my $hold) or do { kill 'KILL', $page; waitpid $page, 0; return (undef, 'unstarted') };
     my $feeder = fork;
@@ -2491,8 +2496,9 @@ sub contained {
         return (undef, 'unstarted');
     }
     my $started = { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, held => '', looked => 0, wide => $VIEW[0], scale => $VIEW_SCALE, until => now() + $PAGE_SECONDS, bytes => 0, waiting => 0, focus => 0, home => $local_home, url => $url, fetches => 0, heard => now() };
+    $started->{kept_app} = $app if $app;
     if ($soon && $keep) { $started->{fed} = $frame . $got if $soon eq 'beside'; return (undef, undef, $started) }
-    beside_begun($started, $sheets, $keep, $tool);    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
+    beside_begun($started, $sheets, $keep, $tool) unless $app;    # what the page names is begun, and its second run when its style sheets are here first (07-visit-beside.pl)
     return run_read($started, $keep, $sheets, $tool);
 }
 
@@ -2500,12 +2506,12 @@ sub contained {
 # its keeper hands over only after the system said it is contained (sub contained). Its variables
 # are those of the run, the address among them: nothing of the answer is in it yet.
 sub page_started {
-    my ($url, $sheets, $tool, $local_home) = @_;
+    my ($url, $sheets, $tool, $local_home, $app) = @_;
     pipe(my $answer_out, my $answer_in) && pipe(my $from_page, my $to_lzrprf) or return;
     my $seal = run_seal() // return;      # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
     my $page = fork // return;
     if (!$page) {
-        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
+        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$app && !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
         chdir '/';
         the_program($answer_out, $to_lzrprf);    # [C1]
     }
@@ -3974,7 +3980,7 @@ sub relaid {
         $SHOWN->{wide} = $VIEW[0]; $SHOWN->{scale} = $VIEW_SCALE;
         my $kept = live_of($TABS[$TAB]);
         if ($kept && $kept->{wide} == $VIEW[0] && ($kept->{scale} // 1) == $VIEW_SCALE && $kept->{shown}) { window("relaid $TAB", @{ $kept->{shown} }, '.'); $kept->{unsent} = 0; $DRAWN = 1; next }    # the page kept running was laid at this width: its last drawing, as its scripts left it, and nothing is laid out
-        $OUTRUN = 1; my @again = laid_out($SHOWN->{url}, $SHOWN->{got}, $SHOWN->{frame}, 1); $OUTRUN = 0;    # a newer size said while it runs ends it ('outrun'), and the newest is laid next
+        $OUTRUN = 1; my @again = laid_out($SHOWN->{url}, $SHOWN->{got}, $SHOWN->{frame}, 1, $TABS[$TAB]{kept_app}); $OUTRUN = 0;    # a newer size said while it runs ends it ('outrun'), and the newest is laid next
         if (!$again[0] || $SHOWN->{two} && @{ $again[4] }) { live_dropped($again[5]); next }    # not shown: the page as it is shown stays, and so does the run kept running with it
         my ($shown) = pictured($again[0], $again[2], $SHOWN->{host}, undef, undef, $SHOWN->{pictures});
         window("relaid $TAB", @$shown, '.');
@@ -3985,7 +3991,7 @@ sub relaid {
         live_kept($again[5], $TABS[$TAB], $again[0], $again[2], $SHOWN->{host}, $SHOWN->{pictures}, $shown, $again[6]) if $again[5];
     }
     $CURL_WANTED = 1;
-    if ($SHOWN) { $SPARE_WANTED = $SHOWN->{url} } else { spare_dropped() }    # a process for the page shown's next run, at the next quiet moment (sub spare_work); none waits for a page that is not shown
+    if ($SHOWN && !$TABS[$TAB]{kept_app}) { $SPARE_WANTED = $SHOWN->{url} } else { spare_dropped() }    # a process for the page shown's next run, at the next quiet moment (sub spare_work); none waits for a page that is not shown
     live_told();
 }
 
@@ -8170,14 +8176,16 @@ sub fetch {
     my $wire = $bytes + $WIRE_BYTES - $FETCH_BYTES;    # what encryption adds, on top of the answer
     my ($way, $roots) = ("$DIR/way.$$", $PEER ne '-' ? "$ROOT/authority.pem" : $ROOTS);
     my $none = 'the request could not be made';
-    my $up = $ask && $ask->{method} eq 'POST' ? $ask->{body} : $ask && defined $ask->{key} ? "Authorization: Bearer $ask->{key}\n" : undef;    # [C19] the body a page's POST carries, all that is carried besides the request; or the key that reads the answer to a support request, as a line curl adds to its request, so that no list of processes shows it (sub support_read)
-    my @asked = !$ask ? () : ($ask->{method} eq 'HEAD' ? ('--head') : (), defined $ask->{key} ? ('-H', '@-') : (), $ask->{method} eq 'POST' ? ('--data-binary', '@-', '-H', 'Content-Type:' . ($ask->{type} eq '-' ? '' : " $ask->{type}"), '-H', 'Expect:') : (), defined $ask->{origin} ? ('-H', "Origin: $ask->{origin}") : ());    # [C19]
-    my $cookie = $page ? sso_cookie($url) : $ask ? $ask->{cookie} : undef;    # [C7] the cookies of a provider you connected in this profile, to that provider's own hosts only (sub sso_cookie), carried on curl's input and never on its command line
+    my $sends = $ask && ($ask->{method} eq 'POST' || $ask->{kept_app} && $ask->{method} =~ /\A(?:PATCH|PUT|DELETE)\z/);
+    my $up = $sends ? $ask->{body} : $ask && defined $ask->{key} ? "Authorization: Bearer $ask->{key}\n" : undef;    # [C19] the body a page's POST carries, all that is carried besides the request; or the key that reads the answer to a support request, as a line curl adds to its request, so that no list of processes shows it (sub support_read)
+    my @asked = !$ask ? () : ($ask->{method} eq 'HEAD' ? ('--head') : (), defined $ask->{key} ? ('-H', '@-') : (), $sends ? ('--data-binary', '@-', '-H', 'Content-Type:' . ($ask->{type} eq '-' ? '' : " $ask->{type}"), '-H', 'Expect:') : (), defined $ask->{origin} ? ('-H', "Origin: $ask->{origin}") : ());    # [C19]
+    push @asked, '--request', $ask->{method} if $sends && $ask->{method} ne 'POST';
+    my $cookie = $page && !($ask && $ask->{kept_app}) ? sso_cookie($url) : $ask ? $ask->{cookie} : undef;    # [C7] the cookies of a provider you connected in this profile, to that provider's own hosts only (sub sso_cookie), carried on curl's input and never on its command line
     my $jarred = ($page || $ask && defined $ask->{top}) && !defined $cookie && !jar_skips($url);    # [C7] or else the jar's, for a page you visit or a page kept running outside the sandbox (sub jar_cookie)
     my $ahead = $ask && exists $ask->{jar};    # a request made ahead: the window asked the jar before this run began, and tells it of the answer when the page takes it (sub prefetch_pump)
     $cookie = $ahead ? (length $ask->{jar} ? $ask->{jar} : undef) : jar_cookie($url, $page, $ask) if $jarred;
     if (defined $cookie && !defined $up) { $up = "$cookie\n"; push @asked, '-H', '@-' }
-    elsif (defined $cookie && $ask && $ask->{method} eq 'POST' && $up !~ /\x00/) {    # a POST's body and its cookies, both on curl's input as its settings: a quoted text, with \\ \" \t \n \r \v written as curl reads them
+    elsif (defined $cookie && $sends && $up !~ /\x00/) {    # a POST's body and its cookies, both on curl's input as its settings: a quoted text, with \\ \" \t \n \r \v written as curl reads them
         my $quoted = sub { my ($text) = @_; $text =~ s/([\\"])/\\$1/g; $text =~ s/\t/\\t/g; $text =~ s/\n/\\n/g; $text =~ s/\r/\\r/g; $text =~ s/\x0b/\\v/g; return qq("$text") };
         $up = 'header = ' . $quoted->($cookie) . "\ndata-raw = " . $quoted->($up) . "\n";
         my ($at) = grep { $asked[$_] eq '--data-binary' } 0 .. $#asked;
@@ -8430,11 +8438,14 @@ my $JAR_LINE = 16384;                    # DECLARED: the longest line of one coo
 my $JAR_SEALED = 64 * 1024 * 1024;       # DECLARED: the longest jar file, in hex digits: above the application's largest sealed jar
 my $JAR_EVERY = 2;                       # DECLARED: seconds between two writes of the file while cookies keep coming; the last is written when the window ends
 my $JAR_SET_MOST = 64;                   # DECLARED: Set-Cookie lines of one answer handed to the jar
-my ($JAR, $JAR_STARTS, $JAR_SAVED) = (undef, 0, 0);
+our ($JAR, $JAR_STARTS, $JAR_SAVED) = (undef, 0, 0);
+our $JAR_FOLDER;
 sub jar_kept { !$INCOGNITO && !$TOR_WANTED && !$TOR && !$TOR_SESSION }    # [C16] [C17] only a window of a profile keeps a cookie past its end
-sub jar_file { "$DIR/cookies" }
+sub jar_directory { $JAR_FOLDER // $DIR }
+sub jar_file { jar_directory() . '/cookies' }
 sub jar_skips {                           # D18: a host of a provider you connected or are connecting keeps that provider's own store, and the jar is not asked
     my ($url) = @_;
+    return 0 if defined $JAR_FOLDER;
     return 0 unless sso_on();
     my ($host) = $url =~ m{\Ahttps://([^/:]+)} or return 1;
     my $key = sso_of($host) // return 0;
@@ -8476,13 +8487,13 @@ sub jar_started {                         # the window's jar: running already, o
 
 sub jar_locked {                          # one step on the profile's jar file, under a lock against another window of the profile
     my ($step) = @_;
-    open my $lock, '>>', "$DIR/cookies.lock" or return 'its lock could not be had';
+    sysopen(my $lock, jar_directory() . '/cookies.lock', O_WRONLY | O_CREAT | O_NOFOLLOW, 0600) or return 'its lock could not be had';
     flock $lock, LOCK_EX or return 'its lock could not be had';
     return $step->();
 }
 
 sub jar_key {                             # the profile's key for its jar file: 64 hex digits in cookies.key, made once of 32 random bytes; nothing when it is not a plain file of yours alone
-    my $file = "$DIR/cookies.key";
+    my $file = jar_directory() . '/cookies.key';
     if (sysopen(my $in, $file, O_RDONLY | O_NOFOLLOW)) {
         my @is = stat $in;
         return unless -f _ && $is[4] == $< && !($is[2] & 077) && $is[7] <= 65;
@@ -8528,7 +8539,7 @@ sub jar_save {                            # the jar into its file, merged first 
         my $new = jar_file() . ".new.$$";
         unlink $new;
         put($new, O_EXCL, $sealed) && rename($new, jar_file()) or (unlink($new), return 'it could not be written');
-        synced($DIR);
+        synced(jar_directory());
         $JAR->{seen} = jar_stamp();
         $JAR->{dirty} = 0;
         return;
@@ -8623,9 +8634,14 @@ sub jar_heard {                           # each Set-Cookie line of an answer to
 
 sub jar_kept_write {                      # a line =keep of a page kept running: the page's script set a cookie, judged by the jar against the page's address as lzrprf knows it
     my ($live, $raw) = @_;
+    if ($live->{kept_app} && !defined $JAR_FOLDER) {
+        my $app = $live->{kept_app};
+        return unless kept_app_valid($app, $live->{url});
+        return kept_app_jar($app, sub { jar_kept_write($live, $raw) });
+    }
     return if $live->{home} || jar_skips($live->{url});    # the local home has no site; a provider's family keeps its own store
     my ($rules) = permit_rules();
-    return if permit_site("https://$live->{host}", $rules, $live->{url}) eq 'sandbox';    # [C26] E1 writes nothing for the site
+    return if !defined $JAR_FOLDER && permit_site("https://$live->{host}", $rules, $live->{url}) eq 'sandbox';    # [C26] E1 writes nothing for the site
     my $said = jar_said('=script ', join(' ', time, $live->{url}, $raw) . "\n") // return;
     $JAR->{dirty} = 1 if $said eq "=kept\n";
     jar_save();
@@ -9889,7 +9905,9 @@ sub install_run {
             print {$INSTALL_LOG} "lzrprf behind this window could no longer write to the window (signal PIPE): the installer's lines go on into this file.\n" if $INSTALL_LOG;
             record('the window stopped reading while the installer ran (signal PIPE): its lines go on into install.txt');
         };
+        our $INSTALL_PULSE;                # optional progress callback while the installer owns this loop
         while ((my $left = $run->{until} - now()) > 0) {
+            $INSTALL_PULSE->() if $INSTALL_PULSE;
             my $ready = '';
             vec($ready, fileno $from, 1) = 1;
             select($ready, undef, undef, $left > 1 ? 1 : $left) > 0 or next;
@@ -10136,6 +10154,10 @@ sub hear {                                # the next thing the window says; noth
             return $line;
         }
         my ($ready, $writable, $wait) = ('', '', defined $until ? $until - now() : undef);
+        for my $live (grep { $_->{kept_app} && keys %{ $_->{kept_app}{sockets} } } @LIVE) {
+            ws_pump($live);
+            $wait = 0.2 if !defined $wait || $wait > 0.2;
+        }
         for my $live (@LIVE) { vec($writable, fileno $live->{relay}, 1) = 1 if length($live->{input_held} // '') }
         return '' if defined $wait && $wait <= 0;    # the time is over, and the window is still there
         vec($ready, fileno $FROM, 1) = 1 if $FROM;
@@ -10201,6 +10223,174 @@ sub window_changed {                      # the window holds the list $old of th
     }
     return window("patch $TAB $first " . (@$old - $first - $last), @$new[$first .. $#$new - $last], '.') if $saved > 512;
     window("relaid $TAB", @$new, '.');
+}
+# [C32] Kept apps have a broker-issued record. An address typed in an ordinary tab never gets one.
+# SYNC: managed-projects/lzrbrwsr/architecture/lzrcht-discord-web.md
+my @KEPT_APPS = ({
+    name => 'discord',
+    start => 'https://discord.com/app',
+    hosts => { map { $_ => 1 } qw(discord.com gateway.discord.gg cdn.discordapp.com media.discordapp.net discord.gg) },
+    socket_host => 'gateway.discord.gg',
+    seconds => 86_400, requests => 120, bytes => 8 * 1024 * 1024, sockets => 2,
+});
+
+sub kept_app_discord {
+    return if $INCOGNITO || $TOR_WANTED || $TOR_WINDOW || $TOR_SESSION;
+    my ($spec) = @KEPT_APPS;
+    my $folder = kept_app_folder($spec->{name}) or return;
+    my $at = now();
+    return { spec => $spec, folder => $folder, until => $at + $spec->{seconds}, minute => int($at / 60), requests => 0, bytes => 0, sockets => {} };
+}
+
+sub kept_app_valid {
+    my ($app, $url) = @_;
+    return if $INCOGNITO || $TOR_WANTED || $TOR_WINDOW || $TOR_SESSION;
+    return unless $app->{spec} == $KEPT_APPS[0] && now() < $app->{until};
+    my ($fit, $host) = address($url);
+    return $fit && $app->{spec}{hosts}{$host};
+}
+
+sub kept_app_budget {
+    my ($app, $requests, $bytes) = @_;
+    my $at = now();
+    return if $at >= $app->{until};
+    my $minute = int($at / 60);
+    if ($app->{minute} != $minute) { @$app{qw(minute requests bytes)} = ($minute, 0, 0) }
+    return if $app->{requests} + $requests > $app->{spec}{requests} || $app->{bytes} + $bytes > $app->{spec}{bytes};
+    $app->{requests} += $requests;
+    $app->{bytes} += $bytes;
+    return 1;
+}
+
+
+sub kept_app_folder {
+    my ($name) = @_;
+    return unless $name =~ /\A[a-z]{1,16}\z/;
+    my $path = $ROOT;
+    for my $part ('cht', 'web', $name) {
+        $path .= "/$part";
+        mkdir $path, 0700;
+        my @info = lstat $path;
+        return unless @info && -d _ && $info[4] == $< && !($info[2] & 077);
+    }
+    return $path;
+}
+
+# Switch only the jar's state and files. The app never borrows the profile jar,
+# its SSO provider store or the default directory.
+sub kept_app_jar {
+    my ($app, $work) = @_;
+    local $JAR_FOLDER = $app->{folder};
+    local ($JAR, $JAR_STARTS, $JAR_SAVED) = @{ $app->{jar} // [undef, 0, 0] };
+    my $result = $work->();
+    $app->{jar} = [$JAR, $JAR_STARTS, $JAR_SAVED];
+    return $result;
+}
+
+# The kept application has a separate network route. Every request still passes
+# the blocklist, content shield, checked address broker and TLS verification.
+sub kept_app_fetched {
+    my ($live, $line, $body) = @_;
+    my $app = $live->{kept_app};
+    my ($method, $size, $type, $dest, $to) = $line =~ m{\A=fetch (GET|HEAD|POST|PUT|PATCH|DELETE) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?([\x21-\x7e]{1,8192})\z};
+    return live_replied($live, 403, '', '') unless $method && $size == length($body)
+        && ($method !~ /\A(?:GET|HEAD)\z/ || !$size && $type eq '-')
+        && !$INCOGNITO && !$TOR_WANTED && !$TOR_WINDOW && !$TOR_SESSION;
+    my (undef, $status, undef, undef, $parts) = kept_app_response($app, $to, $method, $type, $body, $dest, 0, $FETCH_BYTES);
+    return live_replied($live, $parts ? @$parts : ($status, '', ''));
+}
+
+sub kept_app_response {
+    my ($app, $to, $method, $type, $body, $dest, $nav, $maximum) = @_;
+    my ($url, $host) = address($to);
+    return (undef, 403) unless $url && $app->{spec}{hosts}{$host};
+    return (undef, 403) if listed($url) ||
+        defined filter_said($url, $FILTER_DEST{$dest // 'data'} // $dest, 'discord.com') || shield_said($url) ne 'allow';
+    return (undef, 403) unless kept_app_budget($app, 1, 0);
+    my $remaining = $app->{spec}{bytes} - $app->{bytes};
+    return (undef, 403) unless $remaining > 0;
+    return (undef, 403) unless record("the kept app asked for $host ($method)");
+    my ($where) = find($host);
+    return (undef, 403) unless $where && !grep { $_->{own} } @$where;
+    return (undef, 403) unless record("the kept app connects to $host at the first public address that answers: " . join(', ', map { $_->{text} } @$where));
+    my $ask = { method => $method, type => $type, body => $body, origin => 'https://discord.com', top => $app->{spec}{start}, kept_app => 1 };
+    my ($got, $why, $peer, $certs) = @{ kept_app_jar($app, sub {
+        return [fetch($url, $where, $ask, $nav, [$remaining < $maximum ? $remaining : $maximum, $FETCH_SECONDS])];
+    }) };
+    return (undef, 0) if $why || !defined $got || !kept_app_budget($app, 0, length($got));
+    my $parts = live_parts($got, $method);
+    return (undef, 0) unless $parts && record("$host answered the kept app with $parts->[0]: " . length($got) . ' bytes');
+    return ($got, $parts->[0], $peer, $certs, $parts);
+}
+
+sub kept_app_open_tab {
+    my ($source) = @_;
+    return unless $TABS[$TAB] == $source && $source->{cht};
+    for my $i (0 .. $#TABS) {
+        next unless $TABS[$i]{kept_app};
+        tabbed('select', $i);
+        return;
+    }
+    return idle("A window holds $TABS_MOST tabs at most: close one to open Discord.") if @TABS >= $TABS_MOST;
+    my $app = kept_app_discord() or return idle('Discord could not open its private kept-app store.');
+    $source->{shown} = $SHOWN;
+    my $tab = fresh_tab();
+    $tab->{kept_app} = $app;
+    push @TABS, $tab;
+    $TAB = $#TABS;
+    undef $SHOWN;
+    tab_shown('Opening Discord in its kept-app tab.');
+    return go($app->{spec}{start}, 'you opened Discord from LZRCHT');
+}
+
+sub kept_app_visit {
+    my ($tab, $typed, $how) = @_;
+    my $app = $tab->{kept_app};
+    my ($url, $host) = address($typed);
+    return idle('This Discord tab opens Discord addresses only.') unless $url && kept_app_valid($app, $url) && $host =~ /\A(?:discord\.com|discord\.gg)\z/;
+    my ($got, $status);
+    for (0 .. 3) {
+        ($got, $status) = kept_app_response($app, $url, 'GET', '-', '', 'document', 1, $FETCH_BYTES);
+        return idle("Discord could not be opened (request status $status).") unless defined $got;
+        last unless $status >= 300 && $status < 400;
+        my (undef, $to) = redirected($got, $url);
+        ($url, $host) = defined $to ? address($to) : ();
+        return idle('The Discord redirect was refused.') unless $url && kept_app_valid($app, $url) && $host =~ /\A(?:discord\.com|discord\.gg)\z/;
+    }
+    return idle("Discord could not be opened (HTTP $status).") unless $status == 200;
+    my $prior = live_of($tab);
+    live_end($prior, 'its kept app went elsewhere', 1) if $prior;
+    my $frame = "=sheets\n";
+    my ($lines, undef, $paths, $title, $named, $live) = laid_out($url, $got, $frame, 1, $app);
+    return idle('Discord could not draw its page.') unless $lines && $live;
+    if (@$named) {
+        my @sheets = map {
+            my ($sheet, $status) = kept_app_response($app, "https://$host$_", 'GET', '-', '', 'stylesheet', 0, $SHEET_BYTES);
+            $status == 200 ? $sheet : '';
+        } @$named;
+        if (grep { length } @sheets) {
+            my $with = join(' ', '=sheets', map { length } @sheets) . "\n" . join('', @sheets);
+            my @next = laid_out($url, $got, $with, 1, $app);
+            if ($next[0] && $next[5]) {
+                live_dropped($live);
+                ($lines, $paths, $title, $live) = @next[0, 2, 3, 5];
+                $frame = $with;
+            } else { live_dropped($next[5]) }
+        }
+    }
+    @$tab{qw(url title says)} = ($url, $title || 'Discord', 'Discord in its kept-app tab.');
+    if (($how // '') !~ /\Ayou (?:went (?:back|forward) to|reloaded)\z/) {
+        splice @{ $tab->{visited} }, $tab->{at} + 1;
+        push @{ $tab->{visited} }, $url;
+        shift @{ $tab->{visited} } while @{ $tab->{visited} } > $VISITED;
+        $tab->{at} = $#{ $tab->{visited} };
+    }
+    $SHOWN = { url => $url, host => $host, got => $got, frame => $frame, list => $lines, pictures => {},
+        videos => [], sites => [], wide => $VIEW[0], scale => $VIEW_SCALE };
+    live_kept($live, $tab, $lines, $paths, $host, {}, $lines, []);
+    tab_shown();
+    live_told();
+    return;
 }
 # The live debug link [C31]. Off until you switch it on in the cogwheel's menu
 # ("Live debug link"), in a window that is neither incognito nor Tor; on, it
@@ -10622,6 +10812,7 @@ sub live_end {                            # "=end" for the page, then its keeper
     @LIVE = grep { $_ != $live } @LIVE;
     delete @$live{qw(unknown unknown_more)};    # what it counted of lines lzrprf does not know goes with it
     return if $live->{ended}++;
+    ws_end($live) if $live->{kept_app};
     my $gone = 0;
     syswrite($live->{relay}, "=end\n");    # never waited for: a page that reads nothing is ended below all the same
     close $live->{relay};
@@ -10673,6 +10864,7 @@ sub live_due {                            # a page kept running has a whole answ
 }
 
 sub live_turn {
+    ws_pump($_) for grep { $_->{kept_app} } @LIVE;
     my @due = grep { live_due($_) } @LIVE;
     $_->{starting} ? home_arrived($_) : live_answered($_) for @due;
     live_scroll_told($_) for grep { (live_scroll_left($_) // 1) <= 0 } @LIVE;    # [C18] a place of the page's own scroll that waited for the frame to be over
@@ -10731,6 +10923,7 @@ sub live_turn {
 # "=fetched 0 0 0". A request line of no form ends the page.
 sub live_asked {                          # [C19] the request at the front of what the page wrote: nothing when there is none, 0 while it is not all there, else [its line, its body, the bytes it takes], or [its line] when it is of no form
     my ($live) = @_;
+    return ws_asked($live->{held}) if $live->{held} =~ /\A=ws(?:open|send|close) /;
     my $permit = substr($live->{held}, 0, 8) eq '=permit ';    # [C26] a question whether a script may run: one line, no body
     if (substr($live->{held}, 0, 7) eq '=early ') {    # the page as it is before its scripts run: one line "=early BYTES", then that many bytes of a list, answered with nothing (sub live_early)
         my $end = index $live->{held}, "\n";
@@ -10790,9 +10983,11 @@ sub live_fetched {                        # [C19]
     return live_end($live, 'it wrote a line of no form') unless defined $took;
     substr($live->{held}, 0, $took, '');
     $live->{looked} = 0;
+    return ws_request($live, $line, $body) if $line =~ /\A=ws/;
     return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';
-    if (substr($line, 0, 6) eq '=soon ') { $line =~ m{^=soon (script|image|data) ([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form'); return prefetch_soon($live, $1, $2) }
+    if (substr($line, 0, 6) eq '=soon ') { return if $live->{kept_app}; $line =~ m{^=soon (script|image|data) ([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form'); return prefetch_soon($live, $1, $2) }
+    return kept_app_fetched($live, $line, $body) if $live->{kept_app};
     return live_replied($live, 0, '', '') if $live->{home};    # the local home has no network door, including absolute script requests    # [C26]
     my ($method, $size, $type, $dest, $as, $to) = $line =~ m{^=fetch (GET|HEAD|POST) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?(?:as ([a-z]{1,16}) )?([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form');
     return live_end($live, 'it wrote a line of no form') if $method ne 'POST' && ($size || $type ne '-');
@@ -10941,6 +11136,294 @@ sub live_sent {                           # [C19] a reply written to a page kept
     return;
 }
 
+# The renderer's bounded WebSocket protocol. Permission to open a transport requires
+# trusted kept-app provenance. Ordinary pages receive a failed socket rather than losing the page.
+# SYNC: managed-projects/lzrbrwsr/architecture/lzrcht-discord-web.md
+sub ws_asked {
+    my ($held) = @_;
+    my $end = index $held, "\n";
+    return length($held) <= 4120 ? 0 : [''] if $end < 0;
+    return [''] if $end > 4120;
+    my $line = substr($held, 0, $end);
+    my ($verb, $id, $rest) = $line =~ /\A=(wsopen|wssend|wsclose) ([1-9][0-9]{0,9}) (.*)\z/ or return [''];
+    return [''] if $id > 4294967295;
+    my $size = 0;
+    if ($verb eq 'wsopen') {
+        return [''] unless $rest =~ /\A[\x21-\x7e]{1,3584}(?: [!#$%&'*+\-.^_\x60|~0-9A-Za-z,]{1,511})?\z/;
+    } elsif ($verb eq 'wssend') {
+        ($size) = $rest =~ /\A(?:text|binary) (0|[1-9][0-9]{0,4})\z/ or return [''];
+        return [''] if $size > 65536;
+    } else {
+        ($size) = $rest =~ /\A(?:1000|[34][0-9]{3}) (0|[1-9][0-9]{0,2})\z/ or return [''];
+        return [''] if $size > 123;
+    }
+    return 0 if length($held) < $end + 1 + $size;
+    return [$line, substr($held, $end + 1, $size), $end + 1 + $size];
+}
+
+sub ws_request {
+    my ($live, $line, $body) = @_;
+    if (my ($id, $url, $offered) = $line =~ /\A=wsopen ([0-9]+) ([^ ]+)(?: (.+))?\z/) {
+        return if ws_open($live, $id, $url, $offered);
+        return live_sent($live, "=wsfailed $id\n");
+    }
+    my ($id) = $line =~ /\A=ws(?:send|close) ([0-9]+) /;
+    return ws_page_frame($live, $id, $line, $body);
+}
+
+# RFC 6455 section 5. The client never negotiates extensions. Incoming frames are
+# unmasked; outgoing frames always carry a fresh unpredictable mask.
+my $WS_DOWN = 1024 * 1024;
+my $WS_UP = 64 * 1024;
+sub ws_frame {
+    my ($opcode, $body, $mask) = @_;
+    return unless length($mask // '') == 4 && length($body) <= $WS_UP;
+    my $len = length $body;
+    my $header = $len < 126 ? pack('CC', 0x80 | $opcode, 0x80 | $len)
+        : $len <= 65535 ? pack('CCn', 0x80 | $opcode, 0xfe, $len)
+        : pack('CCNN', 0x80 | $opcode, 0xff, 0, $len);
+    my $key = substr($mask x int(($len + 3) / 4), 0, $len);
+    return $header . $mask . ($body ^ $key);
+}
+
+sub ws_read_frame {
+    my ($buffer) = @_;
+    return 0 if length($$buffer) < 2;
+    my ($flags, $len) = unpack 'CC', $$buffer;
+    my ($fin, $op, $at) = ($flags >> 7, $flags & 15, 2);
+    return unless !($flags & 0x70) && !($len & 0x80) && ($op <= 2 || $op >= 8 && $op <= 10);
+    return if $op >= 8 && (!$fin || $len > 125);
+    if ($len == 126) {
+        return 0 if length($$buffer) < 4;
+        ($len, $at) = (unpack('n', substr($$buffer, 2, 2)), 4);
+        return if $len < 126;
+    } elsif ($len == 127) {
+        return 0 if length($$buffer) < 10;
+        my ($high, $low) = unpack('NN', substr($$buffer, 2, 8));
+        return if $high || $low < 65536;
+        ($len, $at) = ($low, 10);
+    }
+    return if $len > $WS_DOWN;
+    return 0 if length($$buffer) < $at + $len;
+    my $body = substr($$buffer, $at, $len);
+    substr($$buffer, 0, $at + $len, '');
+    return [$fin, $op, $body];
+}
+
+sub ws_valid_text {
+    my ($body) = @_;
+    require Encode;
+    return eval { Encode::decode('UTF-8', $body, Encode::FB_CROAK()); 1 };
+}
+
+sub ws_endpoint {
+    my ($app, $url, $offered) = @_;
+    return unless $url =~ m{\Awss://([a-zA-Z0-9.-]+)(?::443)?([/?][\x21-\x7e]*)?\z};
+    my ($host, $path) = (lc($1), $2 // '/');
+    return unless $host eq $app->{spec}{socket_host} && $app->{spec}{hosts}{$host};
+    return if $path =~ /[#\\]/;
+    $path = "/$path" if $path =~ /^\?/;
+    my @protocols = defined $offered && $offered ne '-' ? split(/,/, $offered, -1) : ();
+    my %seen;
+    return if grep { !length || $seen{$_}++ } @protocols;
+    return ($host, $path, \@protocols);
+}
+
+sub ws_open {
+    my ($live, $id, $url, $offered) = @_;
+    my $app = $live->{kept_app} or return;
+    return if $INCOGNITO || $TOR_WANTED || $TOR_WINDOW || $TOR_SESSION || !$live->{until};
+    return if exists $app->{sockets}{$id} || keys(%{ $app->{sockets} }) >= $app->{spec}{sockets};
+    my ($host, $path, $protocols) = ws_endpoint($app, $url, $offered);
+    return unless $host && kept_app_budget($app, 1, 0);
+    my $address = "https://$host$path";
+    return if listed($address) || shield_said($address) ne 'allow';
+    return unless eval { require IO::Socket::SSL; 1 };
+    my $random = link_random(16) // return;
+    my $key = MIME::Base64::encode_base64(pack('H*', $random), '');
+    return unless record("the kept app asked to open a secure WebSocket to $host");
+    my ($where) = find($host);
+    return unless $where && !grep { $_->{own} } @$where;
+    return unless record("the kept app connects to $host at the first public address that answers: " . join(', ', map { $_->{text} } @$where));
+    my $until = now() + $FETCH_SECONDS;
+    my ($raw) = reach($where, $until);
+    return unless $raw;
+    my $socket = IO::Socket::SSL->start_SSL($raw,
+        SSL_startHandshake => 0, SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_PEER(),
+        SSL_ca_file => $ROOTS, SSL_hostname => $host, SSL_verifycn_name => $host,
+        SSL_verifycn_scheme => 'http', SSL_version => 'SSLv23:!SSLv2:!SSLv3:!TLSv1:!TLSv1_1');
+    if (!$socket) { close $raw; return }
+    unblocked($socket);
+    my $offer = @$protocols ? 'Sec-WebSocket-Protocol: ' . join(', ', @$protocols) . "\r\n" : '';
+    my $cookie = kept_app_jar($app, sub { jar_cookie($address, 0, { top => $app->{spec}{start}, method => 'GET' }) });
+    my $request = "GET $path HTTP/1.1\r\nHost: $host\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" .
+        "Origin: https://discord.com\r\nSec-WebSocket-Key: $key\r\nSec-WebSocket-Version: 13\r\n$offer" . (defined $cookie ? "$cookie\r\n" : '') . "\r\n";
+    $app->{sockets}{$id} = { socket => $socket, until => $until, phase => 'tls', in => '', out => $request,
+        accept => MIME::Base64::encode_base64(Digest::SHA::sha1($key . '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'), ''),
+        offered => { map { $_ => 1 } @$protocols }, host => $host };
+    return 1;
+}
+
+sub ws_upgrade {
+    my ($ws) = @_;
+    my $end = index($ws->{in}, "\r\n\r\n");
+    return length($ws->{in}) <= 16384 ? 0 : undef if $end < 0;
+    return if $end > 16384;
+    my @lines = split /\r\n/, substr($ws->{in}, 0, $end + 4, '');
+    return unless (shift(@lines) // '') =~ /\AHTTP\/1\.1 101(?: [\x20-\x7e]*)?\z/;
+    my %headers;
+    for my $line (@lines) {
+        my ($name, $value) = $line =~ /\A([A-Za-z0-9-]+):[ \t]*([\x20-\x7e]*?)[ \t]*\z/ or return;
+        $name = lc $name;
+        return if exists $headers{$name} && $name =~ /\A(?:upgrade|connection|sec-websocket-)/;
+        $headers{$name} = $value;
+    }
+    return unless lc($headers{upgrade} // '') eq 'websocket'
+        && grep { $_ eq 'upgrade' } split /\s*,\s*/, lc($headers{connection} // '');
+    return if ($headers{'sec-websocket-accept'} // '') ne $ws->{accept} || exists $headers{'sec-websocket-extensions'};
+    my $picked = $headers{'sec-websocket-protocol'};
+    return if defined $picked && !$ws->{offered}{$picked};
+    $ws->{selected} = $picked // '-';
+    return 1;
+}
+
+sub ws_reply {
+    my ($live, $bytes) = @_;
+    return if $live->{ended};
+    $live->{input_held} //= '';
+    return live_end($live, 'it does not read its WebSocket replies') if length($live->{input_held}) + length($bytes) > 2 * $WS_DOWN;
+    $live->{input_held} .= $bytes;
+    live_flushed($live);
+    return;
+}
+
+sub ws_close_socket {
+    my ($live, $id, $code, $reason) = @_;
+    my $ws = delete $live->{kept_app}{sockets}{$id} or return;
+    close $ws->{socket};
+    if ($ws->{phase} eq 'open' || $ws->{phase} eq 'closing') {
+        $code //= 1006;
+        $reason //= '';
+        return ws_reply($live, "=wsclose $id $code " . length($reason) . "\n$reason");
+    }
+    return ws_reply($live, "=wsfailed $id\n");
+}
+
+sub ws_queue_frame {
+    my ($ws, $op, $body) = @_;
+    return if length($ws->{out}) + length($body) + 14 > $WS_DOWN;
+    my $random = link_random(4) // return;
+    my $frame = ws_frame($op, $body, pack('H*', $random)) // return;
+    $ws->{out} .= $frame;
+    return 1;
+}
+
+sub ws_page_frame {
+    my ($live, $id, $line, $body) = @_;
+    my $ws = $live->{kept_app} && $live->{kept_app}{sockets}{$id} or return;
+    if ($line =~ /\A=wsclose [0-9]+ ([0-9]+) /) {
+        my $code = $1;
+        return ws_close_socket($live, $id) unless $ws->{phase} eq 'open' && ws_valid_text($body) && ws_queue_frame($ws, 8, pack('n', $code) . $body);
+        $ws->{phase} = 'closing';
+        $ws->{until} = now() + 5;
+        return;
+    }
+    return unless $ws->{phase} eq 'open';
+    my $text = $line =~ / text /;
+    return ws_close_socket($live, $id) if $text && !ws_valid_text($body) || !ws_queue_frame($ws, $text ? 1 : 2, $body);
+    return;
+}
+
+sub ws_frames_heard {
+    my ($live, $id, $ws) = @_;
+    for (1 .. 32) {
+        my $frame = ws_read_frame(\$ws->{in});
+        return ws_close_socket($live, $id) unless defined $frame;
+        return unless $frame;
+        my ($fin, $op, $body) = @$frame;
+        if ($op == 8) {
+            return ws_close_socket($live, $id) if length($body) == 1;
+            my ($code, $reason) = length($body) ? (unpack('n', $body), substr($body, 2)) : (1005, '');
+            return ws_close_socket($live, $id) unless ($code == 1005 && !length($body) ||
+                ($code >= 1000 && $code <= 1014 && $code != 1004 && $code != 1005 && $code != 1006 || $code >= 3000 && $code <= 4999)
+                    && ws_valid_text($reason));
+            return ws_close_socket($live, $id, $code, $reason) if $ws->{phase} eq 'closing' && !length($ws->{out});
+            return ws_close_socket($live, $id) if $ws->{phase} eq 'open' && !ws_queue_frame($ws, 8, $body);
+            @$ws{qw(phase close_code close_reason until)} = ('closing', $code, $reason, now() + 5);
+            return;
+        }
+        if ($op == 9) { return ws_close_socket($live, $id) unless ws_queue_frame($ws, 10, $body); next }
+        next if $op == 10 || $ws->{phase} eq 'closing';
+        if ($op) {
+            return ws_close_socket($live, $id) if defined $ws->{message};
+            @$ws{qw(message message_kind)} = ('', $op);
+        }
+        return ws_close_socket($live, $id) unless defined $ws->{message} && length($ws->{message}) + length($body) <= $WS_DOWN;
+        $ws->{message} .= $body;
+        next unless $fin;
+        my $message = delete $ws->{message};
+        my $kind = $ws->{message_kind} == 1 ? 'text' : 'binary';
+        return ws_close_socket($live, $id) if $kind eq 'text' && !ws_valid_text($message);
+        ws_reply($live, "=wsmsg $id $kind " . length($message) . "\n$message");
+        return if $live->{ended};
+    }
+    return;
+}
+
+sub ws_pump {
+    my ($live) = @_;
+    my $app = $live->{kept_app} or return;
+    for my $id (keys %{ $app->{sockets} }) {
+        return if $live->{ended};
+        ws_step($live, $id, $app->{sockets}{$id});
+    }
+    return;
+}
+
+sub ws_step {
+    my ($live, $id, $ws) = @_;
+    my $socket = $ws->{socket};
+    return ws_close_socket($live, $id) if $ws->{until} <= now();
+    if ($ws->{phase} eq 'tls') {
+        if (!$socket->connect_SSL()) {
+            return if $socket->want_read || $socket->want_write;
+            return ws_close_socket($live, $id);
+        }
+        $ws->{phase} = 'upgrade';
+    }
+    if (length $ws->{out}) {
+        my $wrote = $socket->syswrite($ws->{out});
+        return ws_close_socket($live, $id) unless $wrote || !defined $wrote && ($socket->want_read || $socket->want_write || $!{EAGAIN} || $!{EINTR});
+        substr($ws->{out}, 0, $wrote, '') if $wrote;
+    }
+    return ws_close_socket($live, $id, $ws->{close_code}, $ws->{close_reason}) if defined $ws->{close_code} && !length $ws->{out};
+    my $got = $socket->sysread(my $part, 65536);
+    if ($got) {
+        return ws_close_socket($live, $id) if !kept_app_budget($live->{kept_app}, 0, $got) || length($ws->{in}) + $got > $WS_DOWN + 65546;
+        $ws->{in} .= $part;
+    } elsif (defined $got || !($socket->want_read || $socket->want_write || $!{EAGAIN} || $!{EINTR})) {
+        return ws_close_socket($live, $id);
+    }
+    if ($ws->{phase} eq 'upgrade') {
+        my $fit = ws_upgrade($ws);
+        return ws_close_socket($live, $id) unless defined $fit;
+        return unless $fit;
+        return ws_close_socket($live, $id) unless record("the kept app opened a verified secure WebSocket to $ws->{host}");
+        @$ws{qw(phase until)} = ('open', $live->{kept_app}{until});
+        ws_reply($live, "=wsopened $id $ws->{selected}\n");
+        return if $live->{ended};
+    }
+    return ws_frames_heard($live, $id, $ws);
+}
+
+sub ws_end {
+    my ($live) = @_;
+    my $app = $live->{kept_app} or return;
+    close $_->{socket} for values %{ $app->{sockets} };
+    $app->{sockets} = {};
+    kept_app_jar($app, sub { jar_end(); return });
+    return;
+}
 # Website decisions and their opt-in essentials.
 # SYNC: managed-projects/lzrbrwsr/architecture/lzrdfndr.md
 my @WEB_CHOICES = ('Always allow', 'Allow once', 'Always Deny', 'Deny once', 'Forget');
@@ -11560,13 +12043,13 @@ sub permit_queued {                       # [C26] a script no rule allows, kept 
 # the kind it was given to and this visit only. What does not fit is asked by the page (sub
 # live_permitted) and answered by the same rules.
 sub permit_page {                         # [C26] the frame for a page run of $url; with "page deny" the answer, $$got, loses its scripts first (sub permit_stripped)
-    my ($url, $got) = @_;
+    my ($url, $got, $app) = @_;
     my ($host) = $url =~ m{^https://([^/?#:]+)};
     $host = lc($host // '');
     my $site = "https://$host";
     permit_password($url, $$got);         # a page with a password field is one for signing in: no sandbox and no curated rule
     my ($rules) = permit_rules();
-    my $allowed = permit_site($site, $rules, $url);
+    my $allowed = $app && kept_app_valid($app, $url) ? 'person' : permit_site($site, $rules, $url);
     my %line;
     my $one = sub { my ($word, $id) = @_; $line{$id} = $word if $word eq 'deny' || !$line{$id} };
     my $put = sub { my ($word, $class, $origin, $sha) = @_; $one->($word, "$_ $origin $sha") for permit_kinds($class, $origin) };
@@ -14848,8 +15331,12 @@ sub cht_drew {                            # [C32] what the drawing role wrote: w
         elsif (delete $c->{copying}) { cht_copied($tab, $line) or return 'handed a copy that is not text' }
         elsif ($line =~ /^=page ([1-9][0-9]{0,5})$/ && $1 <= $CHT_PAGE && @{ $c->{asked} }) { $c->{page} = { left => 0 + $1, lines => [], bytes => 0 } }
         elsif ($line eq '=copy 1' && ($c->{asked}[0] // '') eq 'p' && !$c->{copied}++) { $c->{copying} = 1 }
+        elsif ($line eq '=app discord' && ($c->{asked}[0] // '') eq 'p' && !$c->{app_opened}++) { $c->{app_pending} = 1 }
         elsif ($line =~ /^=link (lzrcht|telegram|discord) 0$/ && ($c->{asked}[0] // '') eq 'p') { cht_linked($c, $1, 0) }
-        elsif ($line eq '=drawn' && @{ $c->{asked} }) { shift @{ $c->{asked} }; $c->{copied} = 0 }
+        elsif ($line eq '=drawn' && @{ $c->{asked} }) {
+            shift @{ $c->{asked} }; $c->{copied} = 0; $c->{app_opened} = 0;
+            kept_app_open_tab($tab) if delete $c->{app_pending};
+        }
         else { return 'wrote a line of no form' }
     }
     return;

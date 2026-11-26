@@ -81,6 +81,10 @@ sub hear {                                # the next thing the window says; noth
             return $line;
         }
         my ($ready, $writable, $wait) = ('', '', defined $until ? $until - now() : undef);
+        for my $live (grep { $_->{kept_app} && keys %{ $_->{kept_app}{sockets} } } @LIVE) {
+            ws_pump($live);
+            $wait = 0.2 if !defined $wait || $wait > 0.2;
+        }
         for my $live (@LIVE) { vec($writable, fileno $live->{relay}, 1) = 1 if length($live->{input_held} // '') }
         return '' if defined $wait && $wait <= 0;    # the time is over, and the window is still there
         vec($ready, fileno $FROM, 1) = 1 if $FROM;

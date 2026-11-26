@@ -213,8 +213,12 @@ sub cht_drew {                            # [C32] what the drawing role wrote: w
         elsif (delete $c->{copying}) { cht_copied($tab, $line) or return 'handed a copy that is not text' }
         elsif ($line =~ /^=page ([1-9][0-9]{0,5})$/ && $1 <= $CHT_PAGE && @{ $c->{asked} }) { $c->{page} = { left => 0 + $1, lines => [], bytes => 0 } }
         elsif ($line eq '=copy 1' && ($c->{asked}[0] // '') eq 'p' && !$c->{copied}++) { $c->{copying} = 1 }
+        elsif ($line eq '=app discord' && ($c->{asked}[0] // '') eq 'p' && !$c->{app_opened}++) { $c->{app_pending} = 1 }
         elsif ($line =~ /^=link (lzrcht|telegram|discord) 0$/ && ($c->{asked}[0] // '') eq 'p') { cht_linked($c, $1, 0) }
-        elsif ($line eq '=drawn' && @{ $c->{asked} }) { shift @{ $c->{asked} }; $c->{copied} = 0 }
+        elsif ($line eq '=drawn' && @{ $c->{asked} }) {
+            shift @{ $c->{asked} }; $c->{copied} = 0; $c->{app_opened} = 0;
+            kept_app_open_tab($tab) if delete $c->{app_pending};
+        }
         else { return 'wrote a line of no form' }
     }
     return;

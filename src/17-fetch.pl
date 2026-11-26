@@ -110,14 +110,16 @@ sub fetch {
     my $wire = $bytes + $WIRE_BYTES - $FETCH_BYTES;    # what encryption adds, on top of the answer
     my ($way, $roots) = ("$DIR/way.$$", $PEER ne '-' ? "$ROOT/authority.pem" : $ROOTS);
     my $none = 'the request could not be made';
-    my $up = $ask && $ask->{method} eq 'POST' ? $ask->{body} : $ask && defined $ask->{key} ? "Authorization: Bearer $ask->{key}\n" : undef;    # [C19] the body a page's POST carries, all that is carried besides the request; or the key that reads the answer to a support request, as a line curl adds to its request, so that no list of processes shows it (sub support_read)
-    my @asked = !$ask ? () : ($ask->{method} eq 'HEAD' ? ('--head') : (), defined $ask->{key} ? ('-H', '@-') : (), $ask->{method} eq 'POST' ? ('--data-binary', '@-', '-H', 'Content-Type:' . ($ask->{type} eq '-' ? '' : " $ask->{type}"), '-H', 'Expect:') : (), defined $ask->{origin} ? ('-H', "Origin: $ask->{origin}") : ());    # [C19]
-    my $cookie = $page ? sso_cookie($url) : $ask ? $ask->{cookie} : undef;    # [C7] the cookies of a provider you connected in this profile, to that provider's own hosts only (sub sso_cookie), carried on curl's input and never on its command line
+    my $sends = $ask && ($ask->{method} eq 'POST' || $ask->{kept_app} && $ask->{method} =~ /\A(?:PATCH|PUT|DELETE)\z/);
+    my $up = $sends ? $ask->{body} : $ask && defined $ask->{key} ? "Authorization: Bearer $ask->{key}\n" : undef;    # [C19] the body a page's POST carries, all that is carried besides the request; or the key that reads the answer to a support request, as a line curl adds to its request, so that no list of processes shows it (sub support_read)
+    my @asked = !$ask ? () : ($ask->{method} eq 'HEAD' ? ('--head') : (), defined $ask->{key} ? ('-H', '@-') : (), $sends ? ('--data-binary', '@-', '-H', 'Content-Type:' . ($ask->{type} eq '-' ? '' : " $ask->{type}"), '-H', 'Expect:') : (), defined $ask->{origin} ? ('-H', "Origin: $ask->{origin}") : ());    # [C19]
+    push @asked, '--request', $ask->{method} if $sends && $ask->{method} ne 'POST';
+    my $cookie = $page && !($ask && $ask->{kept_app}) ? sso_cookie($url) : $ask ? $ask->{cookie} : undef;    # [C7] the cookies of a provider you connected in this profile, to that provider's own hosts only (sub sso_cookie), carried on curl's input and never on its command line
     my $jarred = ($page || $ask && defined $ask->{top}) && !defined $cookie && !jar_skips($url);    # [C7] or else the jar's, for a page you visit or a page kept running outside the sandbox (sub jar_cookie)
     my $ahead = $ask && exists $ask->{jar};    # a request made ahead: the window asked the jar before this run began, and tells it of the answer when the page takes it (sub prefetch_pump)
     $cookie = $ahead ? (length $ask->{jar} ? $ask->{jar} : undef) : jar_cookie($url, $page, $ask) if $jarred;
     if (defined $cookie && !defined $up) { $up = "$cookie\n"; push @asked, '-H', '@-' }
-    elsif (defined $cookie && $ask && $ask->{method} eq 'POST' && $up !~ /\x00/) {    # a POST's body and its cookies, both on curl's input as its settings: a quoted text, with \\ \" \t \n \r \v written as curl reads them
+    elsif (defined $cookie && $sends && $up !~ /\x00/) {    # a POST's body and its cookies, both on curl's input as its settings: a quoted text, with \\ \" \t \n \r \v written as curl reads them
         my $quoted = sub { my ($text) = @_; $text =~ s/([\\"])/\\$1/g; $text =~ s/\t/\\t/g; $text =~ s/\n/\\n/g; $text =~ s/\r/\\r/g; $text =~ s/\x0b/\\v/g; return qq("$text") };
         $up = 'header = ' . $quoted->($cookie) . "\ndata-raw = " . $quoted->($up) . "\n";
         my ($at) = grep { $asked[$_] eq '--data-binary' } 0 .. $#asked;

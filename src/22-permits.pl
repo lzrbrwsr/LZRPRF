@@ -438,13 +438,13 @@ sub permit_queued {                       # [C26] a script no rule allows, kept 
 # the kind it was given to and this visit only. What does not fit is asked by the page (sub
 # live_permitted) and answered by the same rules.
 sub permit_page {                         # [C26] the frame for a page run of $url; with "page deny" the answer, $$got, loses its scripts first (sub permit_stripped)
-    my ($url, $got) = @_;
+    my ($url, $got, $app) = @_;
     my ($host) = $url =~ m{^https://([^/?#:]+)};
     $host = lc($host // '');
     my $site = "https://$host";
     permit_password($url, $$got);         # a page with a password field is one for signing in: no sandbox and no curated rule
     my ($rules) = permit_rules();
-    my $allowed = permit_site($site, $rules, $url);
+    my $allowed = $app && kept_app_valid($app, $url) ? 'person' : permit_site($site, $rules, $url);
     my %line;
     my $one = sub { my ($word, $id) = @_; $line{$id} = $word if $word eq 'deny' || !$line{$id} };
     my $put = sub { my ($word, $class, $origin, $sha) = @_; $one->($word, "$_ $origin $sha") for permit_kinds($class, $origin) };
