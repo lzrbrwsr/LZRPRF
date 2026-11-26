@@ -378,14 +378,14 @@ function heard(line) {
     }
     var at = line.indexOf(' '), word = at < 0 ? line : line.slice(0, at), rest = at < 0 ? '' : line.slice(at + 1);
     var aside = selected != perlTab;    // the window shows a tab lzrprf has not been told of yet: what lzrprf says of its own tab's bar, lock and arrows is said again once it is told
-    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
+    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); if (word == 'page') inspectClose(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
     if (word == 'picture') pictureBegun(rest); else if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
     else if (word == 'patch' || word == 'runs') { var p = (word == 'patch' ? /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/ : /^(\d{1,2}) (\d{1,3})$/).exec(rest); if (p) { listFor = +p[1]; listPatch = word == 'patch' ? [+p[2], +p[3]] : [+p[2]]; list = []; again = true; } }    // runs: several stretches in one list (runsOf, 28-window-pointer.pl)
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
-    else if (word == 'tabs') tabsTold(rest);
+    else if (word == 'tabs') { tabsTold(rest); if (!inspectFits(inspectUI)) inspectClose(); }
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
     else if (word == 'install') installTold(rest);
-    else if (word == 'checked') checkedTold(rest);
+    else if (word == 'checked') checkedTold(rest); else if (word == 'release') releaseNumber = rest;    // for About (28-window-menu.pl)
     else if (word == 'licence') licenceTold(rest);
     else if (word == 'profiles') profilesTold(rest);
     else if (word == 'sso') ssoTold(rest);
@@ -419,16 +419,18 @@ function heard(line) {
     else if (word == 'mark') markTold(rest);
     else if (word == 'pictures') { picturesRow = true; picturesBlocked = rest == 'block'; if (cogOpen) cogPlaced(); }
     else if (word == 'marksbar') { marksOn = rest == 'on'; marksView.hidden = !marksOn; if (barMenuItem) barMenuItem.title = $(barToggleWords(marksOn, true)); place(); }
-    else if (word == 'redirect') redirectTold(rest);
     else if (word == 'flagged' || word == 'flagreport') flagTold(word, rest);    // [C28] LZRDFNDR's red page, and the report of a wrong block before it is sent
     else if (word == 'permit') permitTold(rest);    // [C26] lzrprf's question about the scripts of the page shown
     else if (word == 'permitscript') permitScriptTold(rest);    // [C26] one script of that question, with its source
     else if (word == 'scripts') scriptsTold(rest);    // [C26] the list of LZRDFNDR scripts
+    else if (word == 'webquestion') webQuestionTold(rest);
+    else if (word == 'sends') sendsTold(rest);
+    else if (word == 'essential') essentialTold(rest);
     else if (word == 'sites') sitesTold(rest);    // [C26] LZRDFNDR's On Websites
     else if (word == 'redirects') redirectsTold(rest);    // [C4] LZRDFNDR's Redirects
     else if (word == 'filters') filtersTold(rest);    // [C27] the list page of Filters
     else if (word == 'layers') layersTold(rest);    // [C18] the layers of the page kept running
-    else if (word == 'live') liveTold(rest);
+    else if (word == 'live') { liveTold(rest); if (!liveOn || trmnlKeys) inspectClose(); } else if (word == 'inspect') inspectTold(rest);
     else if (word == 'video') videoTold(rest);
     else if (word == 'scroll') pageScrollTo(rest); else if (word == 'cursor') pointerShaped(rest);    // the pointer's shape over the page (28-window-pointer.pl)
     else if (word == 'quit') app.terminate($());
@@ -1101,6 +1103,7 @@ function shareNow() { return sheet && sheet.high > 0 && scroll.documentView.isEq
 // shown with its kept drawing (tabClosed). Only an open question or modal takes the press instead.
 function tabSaid(line, closed, kept) {
     if (modalOpen || asking) return;
+    if (closed !== undefined && tabs.length < 2 && /^tab close /.test(line)) { win.performClose($()); return; }    // T6 (Henry, 2026-11-26): closing the last tab closes the window, as the red dot does, and no empty tab is opened in its place
     var chose = /^tab select (\d+)$/.exec(line), to = chose ? +chose[1] : undefined;
     if (chose && kept === undefined) kept = tabChosen(to); else if (closed !== undefined && takes() && tabClosed(closed)) { kept = true; closed = undefined; }
     if (kept && line.slice(0, 4) == 'tab ') line += ' kept';
@@ -1753,7 +1756,10 @@ function supportAbout() {
 function windowPicture() {    // the window's own drawing of itself, at one pixel a point, made smaller until its PNG is one lzrprf sends; null when none is
     var r = root.bounds, big = root.bitmapImageRepForCachingDisplayInRect(r);
     if (!big || big.isNil()) return null;
-    root.cacheDisplayInRectToBitmapImageRep(r, big);
+    var localPane = inspectUI && inspectUI.pane, locallyHidden = localPane && localPane.hidden;
+    if (localPane) localPane.hidden = true;
+    try { root.cacheDisplayInRectToBitmapImageRep(r, big); }
+    finally { if (localPane) localPane.hidden = locallyHidden; }
     for (var scale = 1; scale >= 0.25; scale /= 2) {
         var w = Math.max(1, Math.round(r.size.width * scale)), h = Math.max(1, Math.round(r.size.height * scale));
         var rep = $.NSBitmapImageRep.alloc.initWithBitmapDataPlanesPixelsWidePixelsHighBitsPerSampleSamplesPerPixelHasAlphaIsPlanarColorSpaceNameBytesPerRowBitsPerPixel(null, w, h, 8, 4, true, false, $('NSDeviceRGBColorSpace'), 0, 0);
@@ -2014,7 +2020,7 @@ var shot = null, shotView = null, shotParts = null, SHOT_FLY = 0.11, SHOT_FLASH 
 function homeActionShot(action) {
     if (!homePress || Date.now() - homePress.at > 1000 || !flightAllowed()) return;
     var target = action == 'search' ? bar : tabsView, k = layersKit(), now = $.NSProcessInfo.processInfo.systemUptime;    // Core Animation's clock
-    var to = action == 'search' ? $.NSMakePoint(Math.min(bar.frame.size.width / 2, 160), bar.frame.size.height / 2)
+    var to = action == 'search' ? $.NSMakePoint(PILL.origin.x + PILL.size.width / 2 - bar.frame.origin.x, bar.frame.size.height / 2)    // T4 (Henry, 2026-11-26): the horizontal middle of the search box, the pill the bar is drawn in (both in the bar's row)
         : $.NSMakePoint(TABS_X + (tabs.length + 0.5) * Math.max(1, Math.min(260, Math.floor((tabsView.frame.size.width - TABS_X - 48) / (tabs.length + 1)))), tabsView.frame.size.height / 2);
     if (!shotView) { shotView = $.LzrprfLayers.alloc.initWithFrame(root.bounds); shotView.layer = k.layer.layer; shotView.wantsLayer = true; root.addSubview(shotView); shotParts = [k.shape.layer, k.shape.layer]; shotParts.forEach(function (one) { shotView.layer.addSublayer(one); }); }
     shotView.frame = root.bounds; shotView.hidden = false;
@@ -2346,7 +2352,7 @@ function paintIcon(view, glyph, hot, on, lit) {
 // replaces it, so nothing is ticked against an old look; measured, the wait for lzrprf's answer was the lag.
 var gameHelper = false, gameStaged = false, TOOL_READING = 'Reading this computer', tool = null, toolIn = null, toolIcon = null, toolScroll = null, toolView = null, toolCopy = null, toolWaiting = false, toolBack = 0, toolItems = null, TOOL_WIDE = 800, TOOL_HIGH = 660;    // DECLARED(as wide as its three buttons side by side, and as tall as most laptop windows leave)
 function toolPressed(tab) {    // TAB: the tab it opens on, On Your Computer unless named ("other": the minigame's Setup LZRDFNDR)
-    if (modalOpen) { if (modalKind == 'tool') closeModal(); return; }
+    if (modalOpen) { if (modalKind == 'tool') { if (webReturn) webReviewEnded(false); else closeModal(); } return; } if (permitReopened()) return;    // a minimized question about scripts comes back first (28-window1-tabs.pl)
     techHidden(); secureHidden(); suggestHidden();
     toolWaiting = true; toolBack = 0; toolIcon.needsDisplay = true;
     say('tool open');    // first: lzrprf reads while the panel is made
@@ -2381,7 +2387,7 @@ function toolTold(rest) {
 // copy button of the question about scripts, is the only thing that writes to the clipboard;
 // clipboardWrite is that one write, for both (selftest puts its own in its place).
 var TOOL_TITLE = 'LZRDFNDR \u2014 Spyware and Scripts', toolTab = 'computer', toolTabs = [], sitesIn = null, sitesList = null;    // the panel's three tabs: On Your Computer, the application's list; On Websites, the scripts of each site and your decision on each; Redirects, every redirect put to you and your decision on each
-var TOOL_TABS = ['computer', 'websites', 'redirects', 'other'], redirectsIn = null, redirectsList = null;
+var TOOL_TABS = ['computer', 'websites', 'other'], redirectsIn = null, redirectsList = null;
 var TOOL_COPY_WORDS = 'Copy found apps information to clipboard', TOOL_COPY_LEAD = 'These apps were found using LZRDFNDR by LZRBRWSR. We recommend analyzing and understanding what they are so you can make an informed choice to disable or keep them:';
 var clipboardWrite = function (text) { var board = $.NSPasteboard.generalPasteboard; board.clearContents; return !!board.setStringForType($(text), $('public.utf8-plain-text')); };
 function toolPicked() { return tool ? tool.rows.filter(function (row) { return row.on; }) : []; }
@@ -2395,6 +2401,7 @@ function toolTicked(mode) { return tool ? tool.rows.filter(function (row) { retu
 function toolNumbers(mode) { return toolTicked(mode).map(function (row) { return row.i; }).join(','); }
 function toolChoices() {
     if (tool && toolTab == 'other') return [['Close', closeModal], [gameStaged ? 'Switch on' : 'Switch off', gameApplied]];    // the sentry's box ticked or not stages the choice, and this button applies it
+    if (toolTab == 'websites') return [[webReturn ? 'Back' : 'Close', webReturn ? function () { webReviewEnded(false); } : closeModal], ['Save', essentialSave]];
     if (!tool || toolTab != 'computer') return [['Close', closeModal]];
     if (tool.confirm) return [['Back', toolBacked], ['Switch off ' + toolTicked('act').length, toolConfirmed]];
     var out = [['Close', closeModal]];
@@ -2407,7 +2414,7 @@ function toolEnabled() {    // which buttons take a press now: the one that chan
     var acts = toolTicked('act').length, undos = toolTicked('undo').length;
     panelButtons.forEach(function (one, k) { var act = modalActions[k]; one.enabled = act == closeModal || !!tool && (!tool.busy || toolTab == 'other') && (act == gameApplied ? gameStaged != gameHelper : act == toolActed || act == toolConfirmed ? acts > 0 : act == toolUndone ? undos > 0 : true); });
     toolTabs.forEach(function (one, k) {    // the three tabs: not on the question; the one shown in the beam's colour
-        one.hidden = !tool || !!tool.confirm || !modalOpen || modalKind != 'tool';
+        one.hidden = !tool || !!tool.confirm || !!webReturn || !modalOpen || modalKind != 'tool';
         one.bezelColor = TOOL_TABS[k] == toolTab ? $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.05, 0.42, 0.52, 1) : $.NSColor.clearColor;
         one.state = TOOL_TABS[k] == toolTab ? 1 : 0;
     });
@@ -2430,8 +2437,7 @@ function toolSized() {
 function toolTabbed(which) {    // a tab pressed: On Websites asks lzrprf for its scripts each time it is shown
     if (!tool || tool.busy && !tool.reading || tool.confirm || !modalOpen || modalKind != 'tool' || toolTab == which) return;
     toolTab = which;
-    if (which == 'websites') { sitesList = null; say('scripts sites'); }
-    if (which == 'redirects') { redirectsList = null; say('redirects list'); }
+    if (which == 'websites') webRead();
     gameStaged = gameHelper; toolChanged(); toolView.scrollPoint($.NSMakePoint(0, 0));
 }
 // [C26] On Websites, as lzrprf tells it: "sites begin", "sites site SITE", "sites script N<tab>SITE<tab>NAME<tab>inline|external<tab>
@@ -2453,11 +2459,8 @@ function redirectsTold(rest) {
     else if (!redirectsIn) return;
     else if (word == 'site') redirectsIn.push({ site: more });
     else if (word == 'one' && f.length == 7 && /^\d{1,4}$/.test(f[0])) redirectsIn.push({ n: +f[0], site: f[1], status: f[2], name: f[3], to: f[4], decision: f[5], fit: f[6] == '1' });
-    else if (word == 'end') { redirectsList = redirectsIn; redirectsIn = null; if (modalOpen && modalKind == 'tool' && toolTab == 'redirects') toolChanged(); }
+    else if (word == 'end') { redirectsList = redirectsIn; redirectsIn = null; if (modalOpen && modalKind == 'tool' && toolTab == 'websites') toolChanged(); }
 }
-var REDIRECT_PILLS = [['Proceed', 'proceed'], ['Cancel', 'cancel'], ['Forget', 'forget']];
-var SITE_PILLS = [['Always', 'always'], ['Deny', 'deny'], ['Forget', 'forget']];
-function sitePills(one, w) { var pills = one.pills || SITE_PILLS; return pills.map(function (pill, k) { return { word: pill[0], to: pill[1], x: w - 14 - (pills.length - k) * 74 + 6, y: one.y + 10, w: 68, h: 24 }; }); }
 function gameApplied() { if (gameStaged == gameHelper) return; gameHelper = gameStaged; say('game helper ' + (gameStaged ? 'on' : 'off')); toolChanged(); }    // H-0071: the sentry as staged, shown at once and kept by lzrprf, whose "game helper 0|1" wins
 function toolBacked() { tool.confirm = false; toolChanged(); }
 function toolActed() { if (!toolTicked('act').length) return; tool.confirm = true; toolChanged(); toolView.scrollPoint($.NSMakePoint(0, 0)); }
@@ -2477,29 +2480,8 @@ function toolLaid() {    // what the list draws, from its top: each piece with w
         items.push({ row: { on: gameStaged, mode: gameHelper ? 'undo' : 'act', tag: gameHelper ? 'on' : 'off', title: 'LZRDFNDR minigame sentry', detail: said, fact: '' }, game: true, y: y, h: high, detail: detail, fact: 0 });    // H-0071: a box as a row of On Your Computer; its tag says what is switched now
         toolItems = { items: items, high: y + high + 10, wide: w }; return toolItems;
     }
-    if (toolTab == 'redirects' && !tool.confirm) {    // [C4] every redirect put to you in this window, under the site that redirected, with its decision and the pills that change it
-        note('Every redirect lzrprf put to you in this window, and your decision on each. Proceed or Cancel here answers that same redirect for you from now on, in this window; Forget asks again. Nothing of it is written.', sans(13), WHITE, 12);
-        if (!redirectsList) note('Reading the redirects', sans(12.5, true), GREEN, 12);
-        else if (!redirectsList.length) note('No redirect has been put to you in this window yet.', sans(12.5), GREY, 12);
-        else redirectsList.forEach(function (one) {
-            if (one.n === undefined) return note(one.site.replace(/^https:\/\//, ''), sans(14, true), WHITE, 8);
-            var words = one.status + (one.to ? ' to ' + one.to : ', naming no address to go to') + (one.fit ? '' : ', which lzrprf cannot follow'), detail = tall(words, sans(11.5), inner - 230), h = 11 + 19 + detail + 11;
-            items.push({ web: one, words: words, y: y, h: h, detail: detail, pills: REDIRECT_PILLS, says: 'redirects decide' });
-            y += h + 8;
-        });
-        toolItems = { items: items, high: y + 2, wide: w };
-        return toolItems;
-    }
     if (toolTab == 'websites' && !tool.confirm) {
-        note('The scripts of each website that were put to you, and your decision on each: allowed or denied always is kept in LZRDFNDR scripts, once holds for one visit.', sans(13), WHITE, 12);
-        if (!sitesList) note('Reading the scripts of the websites', sans(12.5, true), GREEN, 12);
-        else if (!sitesList.length) note('No website has asked to run a script that needed your decision yet.', sans(12.5), GREY, 12);
-        else sitesList.forEach(function (one) {
-            if (one.n === undefined) return note(one.site.replace(/^https:\/\//, ''), sans(14, true), WHITE, 8);
-            var words = [one.where].concat(one.bytes ? [one.bytes + ' bytes'] : [], one.who ? [one.who] : [], one.cls == 'strings' ? ['wants to turn text into code (eval)'] : []).join(', '), detail = tall(words, sans(11.5), inner - 230), h = 11 + 19 + detail + 11;
-            items.push({ web: one, words: words, y: y, h: h, detail: detail });
-            y += h + 8;
-        });
+        y = webLaid(items, w, tall);
         toolItems = { items: items, high: y + 2, wide: w };
         return toolItems;
     }
@@ -2525,7 +2507,8 @@ function paintTool() {
     var laid = toolLaid(), w = laid.wide, seen = toolView.visibleRect;
     laid.items.forEach(function (one) {
         if (one.y + one.h < seen.origin.y - 4 || one.y > seen.origin.y + seen.size.height + 4) return;    // only what shows is drawn
-        if (one.web) return paintSite(one, w);
+        if (one.essentialHead) return webPaintHead(one, w);
+        if (one.web) return webPaintRow(one, w);
         if (one.proc || one.procs) return paintProc(one, w);
         if (!one.row) return styled(one.text, inked(one.font, one.colour)).drawInRect($.NSMakeRect(4, one.y, w - 8, one.h + 2));
         var row = one.row, can = row.mode != 'none', card = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1.5, one.y + 0.5, w - 3, one.h - 1), 10, 10);
@@ -2549,33 +2532,10 @@ function paintTool() {
         if (one.fact) styled(row.fact, inked(mono(10.5), DIM)).drawInRect($.NSMakeRect(42, one.y + 30 + one.detail + 6, w - 54, one.fact));
     });
 }
-function paintSite(one, w) {    // [C26] one script of On Websites: its name, what it is, your decision, and the three pills that change it
-    var web = one.web, card = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1.5, one.y + 0.5, w - 3, one.h - 1), 10, 10), none = /^(no decision|pending|off)$/.test(web.decision);
-    FILL.setFill; card.fill;
-    stroked(card, LINE, 1);
-    $(web.name).drawInRectWithAttributes($.NSMakeRect(16, one.y + 10, w - 16 - 240, 19), inked(sans(13.5, true), WHITE, true));
-    styled(one.words, inked(sans(11.5), GREY)).drawInRect($.NSMakeRect(16, one.y + 30, w - 16 - 240, one.detail + 2));
-    var said = styled(web.decision.toUpperCase(), inked(sans(9.5, true), none ? GREY : /^denied|^cancel/.test(web.decision) ? YELLOW : GREEN));
-    said.drawAtPoint($.NSMakePoint(w - 14 - said.size.width, one.y + 40));
-    sitePills(one, w).forEach(function (pill) {
-        var box = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(pill.x, pill.y, pill.w, pill.h), 8, 8);
-        stroked(box, ICON, 1);
-        var label = styled(pill.word, inked(sans(11.5), WHITE));
-        label.drawAtPoint($.NSMakePoint(pill.x + (pill.w - label.size.width) / 2, pill.y + 4));
-    });
-}
 function toolClicked(event) {
     if (!tool || tool.confirm || tool.busy && toolTab != 'other') return;
     var at = pointIn(toolView, event), items = toolLaid().items; if (toolTab == 'other') { items.forEach(function (one) { if (one.game && at.y >= one.y && at.y < one.y + one.h) { gameStaged = !gameStaged; toolChanged(); } }); return; }    // the sentry's box: staged, applied by Switch on or Switch off (gameApplied)
-    if (toolTab != 'computer') {    // a pill of a script or a redirect: the decision changed by lzrprf, which tells the list again
-        var w = toolLaid().wide;
-        for (var j = 0; j < items.length; j++) {
-            if (!items[j].web) continue;
-            var hit = sitePills(items[j], w).filter(function (pill) { return at.x >= pill.x && at.x <= pill.x + pill.w && at.y >= pill.y && at.y <= pill.y + pill.h; })[0];
-            if (hit) { say((items[j].says || 'scripts decide') + ' ' + items[j].web.n + ' ' + hit.to); return; }
-        }
-        return;
-    }
+    if (toolTab == 'websites') { webClick(at, items, toolLaid().wide); return; }
     if (procClicked(at, items)) return;
     for (var k = 0; k < items.length; k++) {
         var one = items[k];
@@ -3061,7 +3021,8 @@ function torBeamDrawn(view) {
 
 function modal(title, about, choices, kind) {
     welcoming = false;
-    installState = '';    // set again by installTold when this modal is the installer's
+    installState = '';
+    webWarningHidden();    // set again by installTold when this modal is the installer's
     cogHidden();
     modalOpen = true;
     modalKind = kind;
@@ -3128,7 +3089,7 @@ function buttons(choices) {
         one.bezelStyle = 1;
         one.font = sans(13, i == choices.length - 1);
         if (choices.length == 1 || (modalKind == 'flag' && i == 0)) one.keyEquivalent = $('\r');    // Return presses it, and it is drawn as the button Return presses; [C28] on LZRDFNDR's page the first, Close the Tab or Cancel
-        if (modalEscape < 0 && (modalKind == 'tall' || modalKind == 'flag' ? i == 0 : MODAL_ESCAPES.indexOf(choice[0]) >= 0)) modalEscape = i;
+        if (modalEscape < 0 && (isWebQuestion() ? choice[0] == 'Deny once' : modalKind == 'tall' || modalKind == 'flag' ? i == 0 : MODAL_ESCAPES.indexOf(choice[0]) >= 0)) modalEscape = i;
         if (modalKind == 'flag') { one.font = sans(13, i == 0); if (i == 0) one.bezelColor = $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.55, 0.05, 0.05, 1); }    // [C28] the first is the primary one there
         else if (i == choices.length - 1 && choices.length > 1) one.bezelColor = $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.05, 0.42, 0.52, 1);    // the step forward, in the beam's colour; the step back stays plain
         one.target = hand;
@@ -3147,6 +3108,7 @@ function closeModal() {
     var back = flyBack();    // before anything in the panel changes, so the picture that flies is the panel as it was
     if (techOpen) { techOpen = false; under.hidden = true; }
     modalOpen = false;
+    webWarningHidden();
     veil.hidden = !back;
     bar.enabled = free;
     logs.enabled = free || listing == 'log';
@@ -3270,6 +3232,7 @@ function placeModal() {
         panelButtons[i].frame = $.NSMakeRect(x, M + 18, bw, 32);
         x -= 10;
     }
+    webQuestionPlaced(M, w, h);
     procsPlaced(M, w);
 }
 
@@ -3320,15 +3283,9 @@ function permitCodeText(scripts) {    // the code block: each script under a lin
 }
 function permitTold(rest) {
     asked++;
-    var parts = rest.split('\t'), number = permitAsked = asked;
-    permitShown = permitScripts;
+    var parts = rest.split('\t'); parts.essential = essentialScriptPrompt; essentialScriptPrompt = false;
+    permitShow(parts, permitAsked = asked, permitShown = permitScripts);    // drawn by permitShow (28-window1-tabs.pl), which also minimizes it
     permitScripts = [];
-    modal('LZRDFNDR scripts', parts[1] || '', parts.slice(2).map(function (title, i) { return [title, function () { closeModal(); say('button ' + number + ' ' + (i + 1)); }]; }), permitShown.length ? 'permit' : 'tall');
-    if (!permitShown.length) return;
-    panelText.string = $(permitCodeText(permitShown));
-    panelText.font = mono(11.5);
-    panelText.textColor = WHITE;
-    panelText.scrollRangeToVisible($.NSMakeRange(0, 0));
 }
 function permitCopied() { if (modalOpen && modalKind == 'permit' && permitShown.length) permitCopy.title = $(clipboardWrite(permitCodeText(permitShown)) ? 'Copied' : 'Not copied'); }
 
@@ -3418,17 +3375,6 @@ function flagTold(word, rest) {
     if (word == 'flagged') modal('LZRDFNDR \u2014 CONTENT FLAGGED', 'This content has been blocked by LZRDFNDR because it was identified as potentially harmful or prohibited.\n\nDetected category: ' + parts[0], [['Close the Tab', answer(1)], ['Report False Positive Anonymously', answer(2)]], 'flag');
     else modal('Report False Positive Anonymously', 'This is the whole report. Nothing is sent until you press Send.\n\nCategory: ' + parts[0] + '\nList: ' + parts[1] + '\nConfidence: ' + parts[2] + '\nPage: ' + parts[3] + '\n\nIt goes to ' + parts[4] + '. It holds no address of yours, no history and nothing of the page, and the page is not opened again.', [['Cancel', answer(1)], ['Send', answer(2)]], 'flag');
     if (panelButtons[0]) win.makeFirstResponder(panelButtons[0]);
-}
-
-function redirectTold(rest) {
-    asked++;
-    var parts = rest.split('\t'), number = asked;
-    modal('Redirect', '', parts.slice(4).map(function (title, i) { return [title, function () { closeModal(); say('button ' + number + ' ' + (i + 1)); }]; }), 'tall');
-    var said = $.NSMutableAttributedString.alloc.init;
-    [['You tried to navigate to:\n', GREY], [parts[1] + '\n\n', WHITE], ['The page redirects to (' + parts[0] + '):\n', GREY], [(parts[2] || '(no address)') + (parts[3] ? '\n\n' : ''), WHITE], [parts[3] || '', YELLOW]].forEach(function (one) {
-        said.appendAttributedString(styled(one[0], inked(mono(12.5), one[1])));
-    });
-    panelSub.attributedStringValue = said;    // the reason an address cannot be opened, in yellow under it: lzrprf's own words (its sub unfit)
 }
 
 // The installer's run, as lzrprf tells it: "install begin", "install sum HEX", "install line C TEXT"
@@ -3537,6 +3483,7 @@ function face(flags, size, hex) {
         how.setObjectForKey(one, $.NSFontAttributeName);
         how.setObjectForKey(colour(hex), $.NSForegroundColorAttributeName);    // a link too: the page chose its colour, and a white link on a blue button stays white
         if (flags & 8) how.setObjectForKey($.NSNumber.numberWithInt(1), $.NSUnderlineStyleAttributeName);
+        if (flags & 16) how.setObjectForKey($.NSNumber.numberWithInt(1), $.NSStrikethroughStyleAttributeName);    // line-through (laid.rs looks 16)
         typefaces[key] = [how, one.ascender];
     }
     return typefaces[key];
@@ -3927,12 +3874,8 @@ function viewDrawn(view, paintIt) {
 }
 
 ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: clickThrough({
-    // The page's own menu: Copy, and nothing that looks anything up or opens anything.
-    'menuForEvent:': { types: ['id', ['id']], implementation: function (event) {
-        var menu = $.NSMenu.alloc.initWithTitle($(''));
-        menu.addItemWithTitleActionKeyEquivalent($('Copy'), 'copy:', $(''));
-        return menu;
-    } }
+    // The browser's own Copy and local Inspect actions.
+    'menuForEvent:': { types: ['id', ['id']], implementation: function (event) { return inspectMenu(true); } }
 }) });
 
 ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
@@ -4123,7 +4066,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowDidEndLiveResize:': { types: ['void', ['id']], implementation: function (note) { sizing(false); viewNow(); } },
     'windowDidChangeBackingProperties:': { types: ['void', ['id']], implementation: function (note) { glassPlaced(); view(); } },    // a move to a screen of another scale: the page is drawn again at its pixels
     'windowDidEnterFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
-    'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
+    'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },    // full screen keeps the system's own options, which hide the menu bar and show it at the top: options of its own (auto-hide toolbar on a window with no toolbar) hung a window that opened in full screen (release 131, 2026-11-26)
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },
     'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
@@ -4145,6 +4088,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'tool:': { types: ['void', ['id']], implementation: function (sender) { toolPressed(); } },
     'toolCopy:': { types: ['void', ['id']], implementation: function (sender) { toolCopied(); } },
     'toolAll:': { types: ['void', ['id']], implementation: function (sender) { procsPressed(); } }, 'procNote:': { types: ['void', ['id']], implementation: function (sender) { procNoted(); } },
+    'essentialReview:': { types: ['void', ['id']], implementation: function () { webReviewOpened(); } },
     'toolTab:': { types: ['void', ['id']], implementation: function (sender) { toolTabbed(TOOL_TABS[sender.tag] || 'computer'); } },
     'permitCopy:': { types: ['void', ['id']], implementation: function (sender) { permitCopied(); } },
     'torTick:': { types: ['void', ['id']], implementation: function (timer) { try { torTicked(); } catch (fault) { torTimer.invalidate; torTimer = null; } } },
@@ -4265,13 +4209,13 @@ var CMD = 1 << 20, SHIFT = 1 << 17, OPTION = 1 << 19, CONTROL = 1 << 18;
 function menus() {
     var main = $.NSMenu.alloc.initWithTitle($(''));
     var tabKeys = [1, 2, 3, 4, 5, 6, 7, 8].map(function (n) { return ['Tab ' + n, 'tabNumber:', String(n), true, CMD, n - 1]; }).concat([['Last Tab', 'tabNumber:', '9', true, CMD, -1]]);
-    [[NAME, [['New Incognito Window', 'incognito:', 'N', true], ['Settings...', 'settings:', ',', true], ['Quit ' + NAME, 'terminate:', 'q', false]]],
+    [[NAME, [['Settings...', 'settings:', ',', true], ['Quit ' + NAME, 'terminate:', 'q', false]]],
      ['Edit', [['Undo', 'undo:', 'z', false], ['Redo', 'redo:', 'Z', false], ['Cut', 'cut:', 'x', false], ['Copy', 'copy:', 'c', false], ['Paste', 'paste:', 'v', false], ['Select All', 'selectAll:', 'a', false],
         ['Find...', 'finding:', 'f', true], ['Find Next', 'findNext:', 'g', true], ['Find Previous', 'findPrevious:', 'g', true, CMD | SHIFT]]],
      ['View', [['Zoom In', 'zoomIn:', '+', true], ['Zoom In', 'zoomIn:', '=', true, CMD, 0, true], ['Zoom Out', 'zoomOut:', '-', true], ['Actual Size', 'zoomReset:', '0', true]]],
      ['Go', [['Address', 'bar:', 'l', true], ['Back', 'back:', '[', true], ['Forward', 'forward:', ']', true], ['Reload', 'reload:', 'r', true], ['Clear Browsing History...', 'clearing:', String.fromCharCode(8), true, CMD | SHIFT], ['Clear Cookies of This Site...', 'cookieSite:', '', true], ['Log', 'log:', '', true]]],
      ['Bookmarks', [['Bookmark This Tab...', 'markThis:', 'd', true], ['Show Bookmarks Bar', 'marksBar:', 'b', true, CMD | SHIFT], ['Bookmark Manager', 'bookmarks:', 'b', true, CMD | OPTION], ['Import Bookmarks...', 'importing:', '', true]]],
-     ['Tab', [['New Tab', 'newTab:', 't', true], ['Close Tab', 'closeTab:', 'w', true], ['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
+     ['Tab', [['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
         ['Select Next Tab', 'nextTab:', String.fromCharCode(0xF703), true, CMD | OPTION], ['Select Previous Tab', 'previousTab:', String.fromCharCode(0xF702), true, CMD | OPTION],
         ['Next Tab', 'nextTab:', '\t', true, CONTROL], ['Previous Tab', 'previousTab:', '\t', true, CONTROL | SHIFT]].concat(tabKeys)]].forEach(function (one) {
         var item = $.NSMenuItem.alloc.init, menu = $.NSMenu.alloc.initWithTitle($(one[0]));
@@ -4287,7 +4231,7 @@ function menus() {
         item.submenu = menu;
         main.addItem(item);
     });
-    app.mainMenu = main;
+    menusMore(main); app.mainMenu = main;    // File and Help, and the name in the bar (28-window-menu.pl)
 }
 
 function tabMoved(by) { if (!modalOpen && !asking && tabs.length > 1) tabSaid('tab select ' + ((selected + by + tabs.length) % tabs.length)); }

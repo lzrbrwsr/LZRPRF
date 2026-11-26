@@ -265,7 +265,7 @@ my @LIVE_TOLD = ('off', 0);               # what the window was last told of the
 my $LIVE_STOP_SECONDS = 0.25;             # DECLARED(a quarter of a second, many frames of the screen: the window says where it stopped on the frame after it read lzrprf's scroll): how long after the window said a page's own scroll back its next place may say where its view stopped short of it (sub live_input)
 my $LIVE_FRAME_SECONDS = 1 / 60;          # DECLARED(one frame of a screen that draws 60 times a second; the window shows no more places than that): the least time between two places of a page's own scroll that lzrprf tells the window; one sooner waits, and only the newest (sub live_scroll_told)
 my $LIVE_UNKNOWN_NAMES = 16;              # DECLARED(far more than one later application adds at once): the most names of answer lines it does not know that lzrprf writes in the log for one page kept running (sub live_unknown)
-my %LIVE_KNOWN = map { $_ => 1 } qw(focus go statement scroll layers sound samples play hush again patch ready fetch fetched end page live permit permitted permits keep jar);    # the names of the lines of an answer and of the frame around it: one of these out of its form or its place ends the page
+my %LIVE_KNOWN = map { $_ => 1 } qw(pressed focus go statement scroll layers sound samples play hush again patch ready fetch fetched end page live permit permitted permits keep jar inspect);    # the names of the lines of an answer and of the frame around it: one of these out of its form or its place ends the page
 my %CURSORS = map { $_ => 1 } qw(default pointer text vertical-text crosshair move grab grabbing not-allowed no-drop copy alias context-menu col-resize row-resize ew-resize ns-resize e-resize w-resize n-resize s-resize);    # the pointer's shapes a page kept running may ask for ("=cursor"), those the window has a cursor for: the application's own list of them
 my %PERMIT_CAPS = (                       # [C26] the capabilities a script may ask, by name, and who may grant each: "low", the sandbox (E1), a curated rule (E2) or you (E3); "person", only you, by your own rule; "c5", nobody by any script permission: it has its own question each time (C5). A name not here is granted by your rule alone
     dom => 'low', layout => 'low', timers => 'low', 'storage-own' => 'low', 'fetch-same' => 'low',
@@ -1144,7 +1144,7 @@ sub run {
     my $behind = fork // die "lzrprf: cannot fork: $!\n";
     become($from, $to, $TRY ? \*STDOUT : undef, '/usr/bin/perl', $SELF, 'behind', $TRY, defined $PROFILE && !$INCOGNITO ? $ROOT : $DIR, $PEER, $ANSWER, $window, $INCOGNITO ? $ROOT : '-', $PROFILE // '-', $program, @arguments) unless $behind;    # descriptor 0 is what the window says, descriptor 1 what it is told; a profile by its id alone, never by its name, and behind finds its folder from the state folder
     close $_ for $to, $from;
-    my $more = window_pointer_text() . window_trmnl_text() . window_link_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
+    my $more = window_pointer_text() . window_trmnl_text() . window_link_text() . window_menu_text() . window_inspect_text() . window_website_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)
@@ -1226,6 +1226,23 @@ sub incognito_opened {                    # "New Incognito Window": a second lzr
     return idle('A new incognito window was asked for: "lzrprf try" starts none.') if $TRY;
     return idle('No incognito window was started: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'incognito', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);    # it reads the settings of this window's profile, named by its id alone
     return idle('An incognito window is opening. It writes nothing: when it closes, it leaves nothing behind.');
+}
+
+sub window_opened {                       # File > New Window: a second lzrprf, of its own, started as "New Incognito Window" starts one, not incognito
+    return idle('A new window was asked for: "lzrprf try" starts none.') if $TRY;
+    return idle("No window was opened: this window has opened $PULLED_MOST windows from its tabs, profiles and File menu, the most one window may. Open it from another window.") if $PULLED >= $PULLED_MOST;
+    return idle('No window was opened: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'run', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);    # this window's profile, by its id alone
+    $PULLED++;
+    return idle('A new window is opening.');
+}
+
+sub help_opened {                         # Help > Privacy Policy or Terms and Conditions: the page of the site the installer comes from, in a new tab, so the text is the web's own
+    my ($which) = @_;
+    my (undef, undef, undef, $installer) = beside();
+    my ($site) = ($installer // '') =~ m{^(https://[A-Za-z0-9.-]{1,253})/};
+    return idle('This application names no site, so it has no privacy policy or terms to open.') unless $site;
+    tabbed('new');
+    go("$site/$which.html", $which eq 'privacy' ? 'you opened the privacy policy from the Help menu' : 'you opened the terms and conditions from the Help menu');
 }
 
 sub apart {                               # a second lzrprf, of its own, that goes through every start check itself; true when it was started. A line given is its standard input, then closed
@@ -1768,6 +1785,7 @@ sub behind {
     elsif (length $pulled) { go($pulled, 'you pulled a tab out into this window') }    # [C4] checked as a typed address is, and [C5] written before its name is looked up: the address of a tab pulled out of another window, handed on a pipe
     elsif (my $home = home()) { go($home, 'you opened your home page') }    # [C4] an address that came from the bar, kept when you made it the home page
     newer() unless $INCOGNITO || $local_home;           # [C16] it would write its answer and an installer's lines. Only now, once the window is idle and its first page is drawn: a look for a newer release never stands before the first drawing
+    window('release ' . ((beside())[0] // '-'));    # the release number, shown in Help > About
     window('checked ' . ($INCOGNITO ? 'none' : checked_kept()));    # when lzrprf last looked for a newer release, shown under Check for updates
     licence_told();                       # whether a licence code is kept, shown under Enter licence code
     support_told();                       # where a support request would go, and whether one is kept to read its answer
@@ -1788,11 +1806,23 @@ sub behind {
         elsif ($event eq 'live') { live_turn(); trmnl_opened() if $TRMNL_OPEN; permits_later(); my $home = live_of($TABS[$TAB]); if ($home_update_due && $home && $home->{home_ready}) { $home_update_due = 0; newer() } $IDLE_WORK //= \&identity_asked if $local_home && $home && $home->{home_ready} }    # a page kept running with its tab answered, or is to end (sub live_answered); [C26] what it asked meanwhile is put to you after
         elsif ($event =~ /^scripts (list|reset|revoke|set)(?: (0|[1-9][0-9]{0,3}))?(?: (always|deny))?$/ && ($1 eq 'revoke' ? defined $2 && !defined $3 : $1 eq 'set' ? defined $2 && defined $3 : !defined $2 && !defined $3)) { scripts_set($1, $2, $3); said_noted() }    # [C26] [C4] LZRDFNDR scripts, from the cogwheel's menu
         elsif ($event =~ /^scripts (e1|curated)(?: (0|[1-9][0-9]{0,3}))? (on|off)$/ && ($1 eq 'curated') == defined $2) { scripts_set($1, $2, $3); said_noted() }    # [C26] the switch of the sandbox (E1), or of one curated rule (E2)
-        elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-4])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
+        elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-5])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
         elsif ($event eq 'scripts sites') { sites_told() }    # [C26] LZRDFNDR's On Websites: the scripts of each site and your decision on each
-        elsif ($event =~ /^scripts decide (0|[1-9][0-9]{0,3}) (always|deny|forget)$/) { sites_decide($1, $2); said_noted() }    # [C26] [C4] a decision changed there
+        elsif ($event =~ /^scripts decide (0|[1-9][0-9]{0,3}) (always|deny|allow-once|deny-once|forget)$/) { sites_decide($1, $2); said_noted() }    # [C26] [C4] a decision changed there
+        elsif ($event eq 'sends list') { sends_told() }
+        elsif ($event =~ /\Asends decide (0|[1-9][0-9]{0,3}) (always|deny|allow-once|deny-once|forget)\z/) { sends_decide($1, $2) }
+        elsif ($event eq 'essential list') { essential_web_told() }
+        elsif ($event =~ /\Aessential save ([01])((?: [0-9]=[a-z-]+){0,8})\z/) {
+            my ($on, $changes) = ($1, $2);
+            my $ok = essential_web_save($on, grep length, split / /, $changes);
+            my ($again, $resolved) = $ok ? permit_essentials_saved() : ();
+            window('essential saved ' . ($ok ? $resolved ? 'resolved' : 'ok' : 'failed'));
+            essential_web_told();
+            if ($again) { $PERMIT_RELOAD = $again; go($again, 'you reloaded') }
+            elsif ($resolved) { permits_later() }
+        }
         elsif ($event eq 'redirects list') { redirects_told() }    # [C4] LZRDFNDR's Redirects: every redirect put to you and your decision on each
-        elsif ($event =~ /^redirects decide (0|[1-9][0-9]{0,3}) (proceed|cancel|forget)$/) { redirects_decide($1, $2); said_noted() }    # [C4] a decision changed there
+        elsif ($event =~ /^redirects decide (0|[1-9][0-9]{0,3}) (proceed|cancel|allow-once|deny-once|forget)$/) { redirects_decide($1, $2); said_noted() }    # [C4] a decision changed there
         elsif ($event =~ /^filters (list|switch|allow|revoke)(?: (0|[1-9][0-9]{0,3}))?(?: (on|off))?$/ && ($1 eq 'list' ? !defined $2 && !defined $3 : $1 eq 'switch' ? defined $2 && defined $3 : defined $2 && !defined $3)) { filters_set($1, $2, $3); said_noted() }    # [C27] [C4] Filters, from the cogwheel's menu: the lists, a list switched, a blocked request's host let through on its site, or that revoked
         elsif ($event =~ /^video (0|[1-9][0-9]?)$/ && $1 < $VIDEOS) { videoed($1) }    # [C22] you clicked the place of a video: the one moment a video is fetched
         elsif ($event =~ /^video at (0|[1-9][0-9]?) ((?:playing|paused|ended|off|gone) [0-9]{1,6}\.[0-9]{3} [0-9]{1,2}(?:\.[0-9]{1,3})? [0-9]{13})$/ && $1 < $VIDEOS) { video_sound_at($1, $2) }    # [C22] the picture's clock of a video whose sound you turned on: its sound plays in the sound process, in step
@@ -1800,6 +1830,7 @@ sub behind {
         elsif ($event =~ /^page ((?:click|move|down|up|scroll (?:0|[1-9][0-9]?)) (?:0|[1-9][0-9]{0,5}) (?:0|[1-9][0-9]{0,5})|out|key (?:[\x21-\x7e]|Space|Escape|Enter|Tab|Backspace|Delete|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|PageUp|PageDown)(?: shift)?|text [^\x00-\x1f\x7f]{1,$LIVE_TEXT})$/) { live_input($1) }    # a click in the page, the pointer moved over it, its button down or up, the pointer out of it, a key while it has the keyboard, text typed into its field, where the window shows it from: handed to the page kept running, and to nothing else
         elsif ($event =~ /^page ctrl ([a-z@\[\]\\^_])$/) { trmnl_input("ctrl $1") }    # [C29] a key held with Control, in a terminal's tab alone
         elsif ($event =~ /^page ((?:drag|context) (?:0|[1-9][0-9]{0,5}) (?:0|[1-9][0-9]{0,5})|(?:menu|tkey) [a-z]{1,8}(?:-[a-z]{1,8})?|wheel -?[1-9][0-9]{0,2}|copy|pastelong|paste [\x21-\x7e]+)$/) { trmnl_input($1) }    # [C29] in a terminal's tab alone: a drag that selects or moves a divider, a right press, an item of its menus, a key of its own (24-trmnl-panes.pl), the wheel, your copy, and your paste as the window read it from the clipboard
+        elsif ($event =~ /^inspect (0|[1-9][0-9]?) ([1-9][0-9]{0,8}) ([1-9][0-9]{0,8}) (open|-|(?:[0-9a-f]{2}){1,500})$/) { inspect_input($1, $2, $3, $4) }    # [C18] the user opened or typed into the Inspect pane of this tab
         elsif (viewing($event)) { relaid() }    # the window's page has a new size: the page shown is laid out again at its width, from what was kept, and nothing is fetched
         elsif ($event =~ /^tab move (0|[1-9][0-9]?) (0|[1-9][0-9]?)$/) { tab_moved($1, $2) }    # a tab dragged along the strip to another place among the tabs: the page shown stays as it is
         elsif ($event =~ /^tab (new|select|close)(?: (0|[1-9][0-9]?))?( kept)?$/) { tabbed($1, $2, $3); relaid() }    # a tab chosen in the strip: the window shows the drawing it kept of it ("kept"), or lzrprf sends the one it kept, and only a page kept at another width is laid out again; nothing is fetched, unless a new tab opens the home page
@@ -1830,6 +1861,9 @@ sub behind {
         elsif ($event eq 'update-check') { $INCOGNITO ? idle('An incognito window looks for no newer release; a window that is not incognito does, in its cogwheel menu.') : newer(1) }
         elsif ($event =~ /^frame (full|-?[0-9]{1,5} -?[0-9]{1,5} [1-9][0-9]{1,4} [1-9][0-9]{1,4})$/) { frame_said($1) }    # the window was moved, resized or made full screen: kept for the next window
         elsif ($event eq 'incognito') { incognito_opened(); said_noted() }
+        elsif ($event eq 'window new') { window_opened(); said_noted() }    # File > New Window (sub window_opened)
+        elsif ($event eq 'window tor') { tor_window_opened(); said_noted() }    # File > New Tor Window: as the onion icon
+        elsif ($event =~ /^help (privacy|terms)$/) { help_opened($1); relaid() }    # Help > Privacy Policy and Terms and Conditions: the site's own page in a new tab
         elsif ($INCOGNITO && $event =~ /^profiles? /) { profiles_refused('An incognito window has no profile, and opens, makes or changes none.') }
         elsif ($event eq 'sso list') { sso_told() }    # "Connect seamless SSO accounts" was opened: each provider as connected now
         elsif ($event =~ /^sso connect ([a-z]{1,16})$/) { sso_connect($1); relaid() }    # Connect: the provider's own sign-in page in a new tab
@@ -2165,21 +2199,27 @@ sub visit {
             $NEXT = [$fit, 'lzrprf follows that redirect to', $mark, 1];
             return idle("$host redirected to $there ($status): the same site, so lzrprf follows it.");
         }
+        my $essential = essential_web_redirect($url, $fit);
+        my $rule = essential_web_answer($essential, 0);
         my $family = sso_of($host);
-        if (defined $fit && defined $family && sso_on() && sso_state($family) ne 'none' && (sso_of($there) // '') eq $family && ($auto // 0) < $SSO_HOPS) {    # within the family of a provider you connected or are connecting: its own sign-in redirects, followed without a question and written down first, at most $SSO_HOPS a visit (sub sso_cookie)
+        if ($rule eq 'forget' && defined $fit && defined $family && sso_on() && sso_state($family) ne 'none' && (sso_of($there) // '') eq $family && ($auto // 0) < $SSO_HOPS) {    # within the family of a provider you connected or are connecting: its own sign-in redirects, followed without a question and written down first, at most $SSO_HOPS a visit (sub sso_cookie)
             record("$host redirected to $there ($status); followed, the same sign-in family", $kept) or return idle($UNWRITTEN);
             push @WAY, "$url answered $status, to $fit (followed by lzrprf: the same sign-in family)";
             $NEXT = [$fit, 'lzrprf follows that sign-in redirect to', $mark, ($auto // 0) + 1];
             return idle("$host redirected to $there ($status), the same sign-in family, so lzrprf follows it.");
         }
         my $why = !defined $to ? 'The answer names no address to go to.' : defined $fit ? '' : unfit($to);
-        my $decided = redirect_noted($url, $to, $status, defined $fit);    # [C4] a decision you kept for this redirect in LZRDFNDR's Redirects answers it: 2 to proceed, 1 to cancel, 0 to ask
-        my $press = $decided || asked("redirect $status\t$url\t" . ($to // '') . "\t$why", 'Cancel', defined $fit ? ('Proceed', defined $mark ? 'Proceed and update bookmark' : ()) : ());
-        redirect_answered($url, $to, $press >= 2 && defined $fit) unless $decided;
-        noted("your kept decision answered the redirect of $url: " . ($decided == 2 ? 'proceed' : 'cancel')) if $decided;
-        if ($press >= 2 && defined $fit) {
+        my $decided = redirect_noted($url, $to, $status, defined $fit);    # [C4] 2 to follow, 1 to stop, 0 to ask
+        my $by_rule = $decided ? 0 : $rule eq 'deny' || $rule eq 'deny-once' ? 1 : defined $fit && ($rule eq 'always' || $rule eq 'allow-once') ? 2 : 0;
+        essential_web_answer($essential, 1) if $by_rule;
+        my $words = "$url redirects to " . ($to // '(no address)') . " ($status)." . (length $why ? " $why" : '');
+        my $press = $decided || $by_rule || web_question('redirect', $words, $essential, defined $fit, defined $fit && defined $mark);
+        my $go = defined $fit && ($press == 2 || $press == 3 || $press == 6);
+        redirect_answered($url, $to, $press, $go) unless $decided || $by_rule;
+        noted("your kept decision answered the redirect of $url: " . ($go ? 'proceed' : 'cancel')) if $decided || $by_rule;
+        if ($go) {
             push @WAY, "$url answered $status, to $fit (you chose to follow it)";
-            my $moved = $press == 3 ? (mark_moved($mark, $fit) ? ' The bookmark now holds that address.' : ' The bookmark could not be changed.') : '';
+            my $moved = $press == 6 ? (mark_moved($mark, $fit) ? ' The bookmark now holds that address.' : ' The bookmark could not be changed.') : '';
             $NEXT = [$fit, 'you chose to follow a redirect to', undef];
             return idle("$url redirects to $fit ($status). lzrprf goes there as a new request.$moved");
         }
@@ -2822,13 +2862,19 @@ sub redirect_noted {                      # [C4] a redirect about to be put to y
     my $key = "$url\t" . ($to // '');
     my $one = $REDIRECTS{$key};
     return $one->{decision} eq 'proceed always' && $fit ? 2 : 1 if $one && $one->{decision} =~ /always\z/;
+    if ($one && delete $one->{once}) { return $one->{decision} eq 'proceeded' && $fit ? 2 : 1 }
     if (!$one && keys %REDIRECTS >= $REDIRECTS_MOST) { my ($oldest) = sort { $REDIRECTS{$a}{n} <=> $REDIRECTS{$b}{n} } keys %REDIRECTS; delete $REDIRECTS{$oldest} }
     my ($host) = $url =~ m{\Ahttps://([^/?#:]+)};
     $REDIRECTS{$key} = { site => 'https://' . lc($host // ''), status => $status, from => $url, to => $to // '', fit => $fit ? 1 : 0, decision => 'pending', n => ++$REDIRECTS_SEEN };
     return 0;
 }
 
-sub redirect_answered { my ($url, $to, $went) = @_; my $one = $REDIRECTS{"$url\t" . ($to // '')} or return; $one->{decision} = $went ? 'proceeded' : 'cancelled' }    # [C4] what you answered, as the Redirects tab says it
+sub redirect_answered {
+    my ($url, $to, $press, $went) = @_;
+    my $one = $REDIRECTS{"$url\t" . ($to // '')} or return;
+    if ($press == 5) { $one->{decision} = 'pending'; return }
+    $one->{decision} = $press == 3 && $went ? 'proceed always' : $press == 4 ? 'cancel always' : $went ? 'proceeded' : 'cancelled';
+}
 
 sub redirects_listed {                    # [C4] the redirects of LZRDFNDR's Redirects, each site's together, in the order of their site and address: their keys, and the lines that tell them
     my @keys = sort { $REDIRECTS{$a}{site} cmp $REDIRECTS{$b}{site} || $a cmp $b } keys %REDIRECTS;
@@ -2842,18 +2888,23 @@ sub redirects_listed {                    # [C4] the redirects of LZRDFNDR's Red
     return \@keys, \@lines;
 }
 
-sub redirects_told { my (undef, $lines) = redirects_listed(); window('redirects begin', map({ unlisted($_) } @$lines), 'redirects end') }    # [C4] [C23] "redirects begin", "redirects site SITE", "redirects one N<tab>SITE<tab>STATUS<tab>FROM<tab>TO<tab>DECISION<tab>FIT" for each, "redirects end"
+my @REDIRECT_WEB_KEYS;
+sub redirects_told { my ($keys, $lines) = redirects_listed(); @REDIRECT_WEB_KEYS = @$keys; window('redirects begin', map({ unlisted($_) } @$lines), 'redirects end') }    # [C4] [C23] "redirects begin", "redirects site SITE", "redirects one N<tab>SITE<tab>STATUS<tab>FROM<tab>TO<tab>DECISION<tab>FIT" for each, "redirects end"
 
 sub redirects_decide {                    # [C4] a decision changed in LZRDFNDR's Redirects, for the redirect numbered $n as redirects_told last numbered it: "proceed" or "cancel" keeps it as always, "forget" takes it away
     my ($n, $to) = @_;
-    my ($keys) = redirects_listed();
-    my $key = $keys->[$n];
+    my $key = $REDIRECT_WEB_KEYS[$n];
     my $words = 'Nothing was changed: that redirect is no longer in the list.';
-    if (defined $key) {
+    if (defined $key && exists $REDIRECTS{$key}) {
         my $one = $REDIRECTS{$key};
         if ($to eq 'forget') { delete $REDIRECTS{$key}; $words = "No decision is kept for the redirect of $one->{from}: it is asked about again." }
-        elsif ($to eq 'proceed' && !$one->{fit}) { $words = "The redirect of $one->{from} cannot be followed, so it is not kept as proceed." }
-        else { $one->{decision} = "$to always"; $words = "The redirect of $one->{from} is now answered $to, in this window, without asking." }
+        elsif (($to eq 'proceed' || $to eq 'allow-once') && !$one->{fit}) { $words = "The redirect of $one->{from} cannot be followed, so its decision stays unchanged." }
+        else {
+            delete $one->{once};
+            $one->{once} = 1 if $to =~ /-once\z/;
+            $one->{decision} = $to eq 'allow-once' ? 'proceeded' : $to eq 'deny-once' ? 'cancelled' : "$to always";
+            $words = "The redirect of $one->{from} is now answered $to in this window.";
+        }
         noted('LZRDFNDR Redirects: ' . unlisted($words));
     }
     redirects_told();
@@ -7244,8 +7295,8 @@ sub tor_phase {                           # [C17] the next step of the Tor windo
     return 1;
 }
 
-sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window: a Tor window apart from it, and this one as it was
-    window('tor off');
+sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window, or File > New Tor Window in any window: a Tor window apart from it, and this one as it was
+    window('tor off') unless $TOR_WINDOW;    # the onion of a Tor window stays as its own Tor says
     return idle('LZRTNNL is not installed, so no Tor window opens. Add it in Add or remove LZR modules, in the cogwheel menu.') unless part_on('lzrtnnl');
     return idle('A Tor window was asked for: "lzrprf try" starts none. Tor never carries this window.') if $TRY;
     return idle('No Tor window was started: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'tor', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);
@@ -7281,7 +7332,7 @@ sub tor_session_asked {                   # [C17] Stop Tor in a Tor window, aske
 }
 
 sub tor_session_tables {                  # [C17] how many entries the Tor window's tables in memory hold
-    return @LIVE + @CLOSED + @SESSION + @WAY + @PICTURED + @PERMIT_SEEN + @FILTER_SEEN + @PERMIT_HELD + @HELD + @LATER + keys(%PERMIT_PASSWORD) + keys(%PERMIT_PATHS) + keys(%PERMIT_DENIED) + keys(%PERMIT_NEXT) + keys(%PERMIT_ONCE) + keys(%PERMIT_INFO) + keys(%PERMIT_WEB) + listed_said() + @MARKS + length($TITLED)
+    return sends_count() + essential_web_count() + keys(%REDIRECTS) + @LIVE + @CLOSED + @SESSION + @WAY + @PICTURED + @PERMIT_SEEN + @FILTER_SEEN + @PERMIT_HELD + @HELD + @LATER + keys(%PERMIT_PASSWORD) + keys(%PERMIT_PATHS) + keys(%PERMIT_DENIED) + keys(%PERMIT_NEXT) + keys(%PERMIT_ONCE) + keys(%PERMIT_INFO) + keys(%PERMIT_WEB) + listed_said() + @MARKS + length($TITLED)
         + (grep { length($_->{url} // '') || @{ $_->{visited} // [] } } @TABS) + (defined $SHOWN) + (defined $FLAGGED) + (defined $PERMIT_ASK) + (defined $NEXT);
 }
 
@@ -7311,6 +7362,7 @@ sub tor_session_end {                     # [C17] the end of a Tor window, step 
     @$_ = () for \@LIVE, \@CLOSED, \@SESSION, \@WAY, \@PICTURED, \@PERMIT_SEEN, \@FILTER_SEEN, \@PERMIT_HELD, \@HELD, \@LATER;
     undef $_ for $PERMIT_UNREAD, $PERMIT_STRIPPED; %$_ = () for \%PERMIT_PASSWORD, \%PERMIT_PATHS, \%PERMIT_DENIED, \%PERMIT_NEXT, \%PERMIT_ONCE, \%PERMIT_INFO, \%PERMIT_WEB;
     @MARKS = ();
+    %REDIRECTS = (); sends_clear(); essential_web_clear();
     listed_said(1);
     ($TAB, $TITLED, @TABS) = (0, '', fresh_tab());
     ($SHOWN, $FLAGGED, $PERMIT_ASK, $NEXT) = ();
@@ -9679,7 +9731,8 @@ sub welcome {
     window("welcome line g What $APP keeps you from", (map { "welcome line b $_" } @PROTECTS), "welcome line y What $APP cannot keep you from: yours to watch", map { "welcome line b " . s/\$APP/$APP/gr } @CANNOT);
     window('welcome end');
     my @held;
-    while (defined(my $line = hear())) {
+    while (defined(my $line = hear(scalar link_due(undef)))) {    # [C31] with the live debug link on, its commands are still looked at while the welcome waits: a staging browser left on it took none for hours (2026-11-26)
+        if ($line eq '') { eval { link_watch() }; next }
         if ($line ne 'welcomed') { push @held, $line; next }
         unlink "${\ shared()}/welcomed";
         my $out;
@@ -10225,7 +10278,7 @@ sub link_off {                            # [C31] off: its file and its spool re
     my ($why) = @_;
     my $dir = link_folder();
     my $id = $LINK{id} // '';
-    unlink "$dir/on", "$dir/spool", glob("$dir/spool.*"), glob("$dir/shot.*"), "$dir/local", "$dir/local.log", glob("$dir/command.*");
+    unlink "$dir/on", "$dir/spool", glob("$dir/spool.*"), glob("$dir/shot.*"), "$dir/local.log", glob("$dir/command.*");    # not the file local: it is yours, and while it stays an idle window looks every 5 s (sub link_due), so a link switched on again is heard without a click
     undef $LINK{local};
     @LINK{qw(id key until)} = ();
     undef $LINK{read};
@@ -10395,12 +10448,12 @@ sub link_reaped {                         # [C31] the sender's answer: the comma
 sub link_checked {                        # [C31] a command and its signature: (verb, argument, nonce) when every check holds, else (nothing, why)
     my ($block) = @_;
     my ($command, $signature) = $block =~ /\A([^\n]+)\n(-----BEGIN SSH SIGNATURE-----\n.*)\z/s or return (undef, 'it is not a command and a signature');
-    my ($id, $nonce, $expires, $verb, $arg) = $command =~ /\Alzrbrwsr-debug-link 1 ([0-9a-f]{12}) ([0-9a-f]{16,32}) ([0-9]{10}) (open|reload|measure|snapshot|verbosity|shot)(?: ([\x21-\x7e]{1,2000}))?\z/ or return (undef, 'it is not in the one form a command has');
+    my ($id, $nonce, $expires, $verb, $arg) = $command =~ /\Alzrbrwsr-debug-link 1 ([0-9a-f]{12}) ([0-9a-f]{16,32}) ([0-9]{10}) (open|reload|measure|snapshot|verbosity|shot|forget|press|right|move|scroll)(?: ([\x21-\x7e]{1,2000}))?\z/ or return (undef, 'it is not in the one form a command has');
     return (undef, 'it names another link') unless $id eq ($LINK{id} // '');
     my $now = time;
     return (undef, 'it expired') if $expires <= $now;
     return (undef, "its expiry is more than $LINK_COMMAND_SECONDS seconds away") if $expires > $now + $LINK_COMMAND_SECONDS;
-    my %arg_ok = (open => qr{\Ahttps://[\x21-\x7e]+\z}, measure => qr{\Ahttps://[\x21-\x7e]+\z}, reload => qr{\A\z}, snapshot => qr{\A\z}, verbosity => qr{\A[012]\z}, shot => qr{\A(?:page|window)(?:,private)?\z});
+    my %arg_ok = (open => qr{\Ahttps://[\x21-\x7e]+\z}, measure => qr{\Ahttps://[\x21-\x7e]+\z}, reload => qr{\A\z}, snapshot => qr{\A\z}, verbosity => qr{\A[012]\z}, shot => qr{\A(?:page|window)(?:,private)?\z}, forget => qr{\Ahttps://[\x21-\x7e]+\z}, press => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, right => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, move => qr{\A[0-9]{1,5},[0-9]{1,5}\z}, scroll => qr{\A[0-9]{1,5},[0-9]{1,5},-?[0-9]{1,5},-?[0-9]{1,5}\z});
     return (undef, "its argument is not one $verb takes") unless ($arg // '') =~ $arg_ok{$verb};
     my $seen = link_folder() . '/nonces';
     my @kept;
@@ -10424,7 +10477,7 @@ sub link_command {                        # [C31] one command: checked, written 
     $LINK{last_command} = time;
     $LINK{next} = 0;
     my $shown = $verb . (length $arg ? ' ' . link_url($arg) : '');
-    $shown = "$verb $arg" if $verb eq 'verbosity' || $verb eq 'shot';
+    $shown = "$verb $arg" if $verb eq 'verbosity' || $verb eq 'shot' || $verb =~ /\A(?:press|right|move|scroll)\z/;
     noted("the live debug link ran a signed command: $shown");
     link_line('INFO', 'command', "a signed command was run: $shown", verb => $verb, nonce => $nonce, verdict => 'run');
     window("link said $shown");
@@ -10457,6 +10510,35 @@ sub link_command {                        # [C31] one command: checked, written 
         link_line('INFO', 'snapshot_tab', 'a tab', tab => $n++, url => link_url($_->{url})) for @TABS;
         link_line('INFO', 'snapshot_load', 'a recent load', url => $_->[0], first_drawing_ms => $_->[1], loading_line_end_ms => $_->[2]) for @{ $LINK{loads} || [] };
         return;
+    }
+    if ($verb eq 'forget') {                # the cookies of one site, as Clear Cookies of This Site does (sub jar_forget), so a staging test meets a site as a first visit
+        my ($url, $host) = address($arg);
+        return link_line('WARN', 'command', 'the address is not one lzrprf fetches', verb => $verb, nonce => $nonce) unless $url;
+        my $gone = jar_forget($url);
+        noted("the live debug link cleared the cookies of $host: $gone");
+        return link_line('INFO', 'forget', "the cookies of $host were cleared: $gone", nonce => $nonce, cleared => $gone);
+    }
+    if ($verb eq 'press') {                 # a press and release at X,Y of the page shown (its view's points, as the window sends them), handed straight to the page kept running: it tells a press the page drops from one the window never sent
+        my ($x, $y) = split /,/, $arg;
+        live_input("down $x $y"); live_input("up $x $y");
+        noted("the live debug link pressed the page shown at $x,$y");
+        return link_line('INFO', 'press', "a press and release were handed to the page at $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
+    }
+    if ($verb eq 'right' || $verb eq 'move') {    # [1237] the secondary button at X,Y (the page's contextmenu), or the pointer moved there (hover, mousemove), handed straight to the page kept running
+        my ($x, $y) = split /,/, $arg;
+        live_input("move $x $y"); live_input("context $x $y") if $verb eq 'right';
+        noted("the live debug link handed the page shown a $verb at $x,$y");
+        return link_line('INFO', $verb, $verb eq 'right' ? "a right press was handed to the page at $x,$y" : "the pointer was moved over the page to $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
+    }
+    if ($verb eq 'scroll') {                # [1237] the wheel at X,Y by DX,DY points: the pointer moved there, then the page shown from its place moved by that much (no less than its top or left)
+        my ($x, $y, $dx, $dy) = split /,/, $arg;
+        my $live = live_of($TABS[$TAB]);
+        my ($sx, $sy) = split / /, ($live && $live->{scrolled} // '0 0');
+        my ($nx, $ny) = (($sx // 0) + $dx, ($sy // 0) + $dy);
+        $nx = 0 if $nx < 0; $ny = 0 if $ny < 0;
+        live_input("move $x $y"); live_input("scroll $TAB $nx $ny");
+        noted("the live debug link scrolled the page shown by $dx,$dy to $nx,$ny");
+        return link_line('INFO', 'scroll', "the page was shown from $nx,$ny (moved by $dx,$dy at $x,$y)", nonce => $nonce, x => $x, y => $y, to => "$nx,$ny", live => ($live ? 1 : 0));
     }
     if ($verb eq 'shot') {
         return link_line('WARN', 'command', "a picture was asked again within $LINK_SHOT_SECONDS seconds; none was taken", nonce => $nonce) if time - ($LINK{shot_at} // 0) < $LINK_SHOT_SECONDS;
@@ -10707,7 +10789,7 @@ sub live_fetched {                        # [C19]
     my $boxed = !$url || defined $filter || $allowed ne 'sandbox' ? '' : $method eq 'POST' ? 'post' : $host ne $live->{host} && $dest !~ /^(?:script|module)$/ ? 'fetch-other' : '';    # [C26] E1: what of the sandbox's table this request is, when the table refuses it
     $boxed = '' if $boxed && sandbox_says($boxed) ne 'refused';
     my $away = $url && !$boxed && !defined $filter && $method eq 'POST' && $host ne $live->{host};    # [C5] a POST to another host than the page's: never covered by a script permission
-    my $sent = $away && $live->{until} ? ask("The page $live->{host} wants to send something to $host, another host. No script permission covers that. Send it this once?", "Don't send", 'Send') : 0;    # asked before the log is held, so a question left open keeps nothing waiting; a page that is still read, before it is shown, is not asked for
+    my $sent = $away && $live->{until} ? send_question($site, $url) : 0;    # [C5] before the log is held; a page still being read cannot send to another host
     my ($status, $head, $answer, $why) = (0, '', '');
     my ($kept) = keeping();               # read once, as in visit
     open my $request, '>>', "$DIR/busy" or return live_replied($live, 0, '', '');
@@ -10729,11 +10811,21 @@ sub live_fetched {                        # [C19]
         record("$asked_for; refused: " . ($live->{until} ? 'you did not let it send to another host' : 'a page that is still read is not let send to another host'), $kept);
         return live_replied($live, 0, '', '');
     }
-    record("you let the page $live->{url} send to $host, this once", $kept) or return live_replied($live, 0, '', '') if $away;
+    record("you let the page $live->{url} send to $host by a LZRDFNDR decision", $kept) or return live_replied($live, 0, '', '') if $away;
     if ($code && !$allowed) {             # [C26] not fetched at all: the site's scripts do not run
         record("$asked_for; refused: the scripts of $live->{host} are not allowed", $kept);
         $PERMIT_ASK->{refused}++ if $PERMIT_ASK && $PERMIT_ASK->{site} eq $site && !($PERMIT_DENIED{$site} && $PERMIT_DENIED{$site}{''});
         return live_replied($live, 403, '', '');
+    }
+    if ($code) {
+        my (undef, $path) = website_path($url);
+        my $essential = essential_web_script($site, 'code', "https://$host", $path // '');
+        my $decision = essential_web_answer($essential, 0);
+        if ($decision eq 'deny' || $decision eq 'deny-once') {
+            essential_web_answer($essential, 1);
+            record("$asked_for; refused by the Essential Allow and deny list", $kept);
+            return live_replied($live, 403, '', '');
+        }
     }
     record($asked_for, $kept) or return live_replied($live, 0, '', '');    # [C5] before the name is even looked up
     $why = "the page asked for more than $LIVE_FETCH_MOST addresses" if ++$live->{fetches} > $LIVE_FETCH_MOST;
@@ -10831,6 +10923,185 @@ sub live_sent {                           # [C19] a reply written to a page kept
     return;
 }
 
+# Website decisions and their opt-in essentials.
+# SYNC: managed-projects/lzrbrwsr/architecture/lzrdfndr.md
+my @WEB_CHOICES = ('Always allow', 'Allow once', 'Always Deny', 'Deny once', 'Forget');
+my @WEB_ANSWER_BY_ID = qw(deny-once allow-once always deny forget);    # The numbered answer keeps its action when the order on screen changes.
+my @ESSENTIAL_WEB = (
+    ['redirect', 'gmail.com', '/', 'mail.google.com', '/mail/u/0/', 'always'],
+    ['redirect', 'mail.google.com', '/mail/u/0/', 'accounts.google.com', '/ServiceLogin', 'always'],
+    ['redirect', 'accounts.google.com', '/ServiceLogin', 'accounts.google.com', '/v3/signin/identifier', 'always'],
+    ['script', 'yle.fi', 'player-v2.yle.fi', '/embed.js', qr{\A/embed\.js\z}, 'always'],
+    ['script', 'yle.fi', 'player-v2.yle.fi', '/33.<hash>.js', qr{\A/33\.[0-9a-f]{20}\.js\z}, 'always'],
+    ['script', 'yle.fi', 'player-v2.yle.fi', '/761.<hash>.js', qr{\A/761\.[0-9a-f]{20}\.js\z}, 'always'],
+    ['script', 'yle.fi', 'tag-manager.yle.fi', '/ylefi-production.js', qr{\A/ylefi-production\.js\z}, 'deny'],
+    ['script', 'www.google.com', 'www.gstatic.com', '/og/_/js/', qr{\A/og/_/js/}, 'deny'],
+);
+my $HELD_ESSENTIAL_WEB;
+my %ESSENTIAL_WEB_ONCE;
+sub essential_web_count { scalar(keys %ESSENTIAL_WEB_ONCE) + !!$HELD_ESSENTIAL_WEB }
+sub essential_web_clear { %ESSENTIAL_WEB_ONCE = (); undef $HELD_ESSENTIAL_WEB }
+
+sub website_path {
+    my ($url) = @_;
+    return unless defined $url;
+    my ($host, $path) = $url =~ m{\Ahttps://([^/?#:]+)(/[^?#]*)?(?:[?#].*)?\z} or return;
+    return (lc $host, $path // '/');
+}
+
+sub essential_web_redirect {
+    my ($from, $to) = @_;
+    my ($home, $start) = website_path($from);
+    my ($away, $finish) = website_path($to);
+    return unless defined $home && defined $away;
+    for my $index (0 .. $#ESSENTIAL_WEB) {
+        my ($kind, $site, $path, $other, $target) = @{ $ESSENTIAL_WEB[$index] };
+        return $index if $kind eq 'redirect' && $home eq $site && $start eq $path && $away eq $other && $finish eq $target;
+    }
+    return;
+}
+
+sub essential_web_script {
+    my ($site, $class, $origin, $path) = @_;
+    return unless $class eq 'code' && length $path;
+    my ($home) = website_path($site);
+    my ($host) = website_path($origin);
+    return unless defined $home && defined $host;
+    $home =~ s/\Awww\.yle\.fi\z/yle.fi/;
+    for my $index (0 .. $#ESSENTIAL_WEB) {
+        my ($kind, $owner, $source, undef, $pattern) = @{ $ESSENTIAL_WEB[$index] };
+        return $index if $kind eq 'script' && $home eq $owner && $host eq $source && $path =~ $pattern;
+    }
+    return;
+}
+
+sub essential_web_settings {
+    return $HELD_ESSENTIAL_WEB if $INCOGNITO && $HELD_ESSENTIAL_WEB;
+    my $file = kept_in() . '/essential-web';
+    my $off = { on => 0, choices => {}, unread => 1 };
+    sysopen(my $in, $file, O_RDONLY | O_NOFOLLOW | O_NONBLOCK) or return -l $file || -e _ ? $off : { on => 0, choices => {} };
+    my @is = stat $in;
+    my $text = '';
+    return $off unless @is && -f _ && $is[3] == 1 && $is[4] == $< &&
+        $is[7] <= 512 && defined sysread($in, $text, 513) && $text =~ /\A([01])\n((?:[0-7] (?:always|deny|forget)\n)*)\z/;
+    my ($on, $lines, %choices) = ($1, $2);
+    for (split /\n/, $lines) {
+        my ($id, $choice) = split / /;
+        return $off if exists $choices{$id};
+        $choices{$id} = $choice;
+    }
+    return { on => $on, choices => \%choices };
+}
+
+sub essential_web_choice {
+    my ($settings, $id) = @_;
+    return 'forget' unless defined $id && defined $ESSENTIAL_WEB[$id];
+    return $ESSENTIAL_WEB_ONCE{$id} // $settings->{choices}{$id} // $ESSENTIAL_WEB[$id][-1];
+}
+
+sub essential_web_told {
+    my $settings = essential_web_settings();
+    my @rows;
+    for my $id (0 .. $#ESSENTIAL_WEB) {
+        my ($kind, $site, $a, $b, $c) = @{ $ESSENTIAL_WEB[$id] };
+        my ($from, $to) = $kind eq 'script' ? ("$a$b", '') : ("$site$a", "$b$c");
+        push @rows, 'essential row ' . join("\t", $id, $kind, $site, $from, $to, essential_web_choice($settings, $id));
+    }
+    window("essential begin " . $settings->{on}, @rows, 'essential end');
+}
+
+sub essential_web_save {
+    my ($on, @change) = @_;
+    my $lock = $INCOGNITO ? 1 : keep_lock();
+    return unless $lock;
+    my $settings = essential_web_settings();
+    return if $settings->{unread};
+    my %keep = %{ $settings->{choices} };
+    my %once = %ESSENTIAL_WEB_ONCE;
+    my %seen;
+    for my $change (@change) {
+        my ($id, $choice) = $change =~ /\A([0-9])=(always|deny|allow-once|deny-once|forget)\z/ or return;
+        return if !defined $ESSENTIAL_WEB[$id] || $seen{$id}++;
+        delete $once{$id};
+        if ($choice eq 'allow-once' || $choice eq 'deny-once') {
+            $once{$id} = $choice;
+            $keep{$id} = 'forget';
+        } else {
+            $keep{$id} = $choice;
+        }
+    }
+    if ($INCOGNITO) {
+        $HELD_ESSENTIAL_WEB = { on => $on, choices => \%keep };
+    } else {
+        my $file = "$DIR/essential-web";
+        unlink "$file.new";
+        unless (put("$file.new", O_EXCL, $on, map { "$_ $keep{$_}" } sort keys %keep) && rename("$file.new", $file)) {
+            unlink "$file.new";
+            return;
+        }
+        synced();
+    }
+    %ESSENTIAL_WEB_ONCE = %once;
+    return 1;
+}
+
+sub essential_web_site {
+    my ($site) = @_;
+    return 0 unless $site eq 'https://yle.fi' || $site eq 'https://www.yle.fi' || $site eq 'https://www.google.com';
+    return essential_web_settings()->{on};
+}
+
+sub essential_web_answer {
+    my ($id, $take) = @_;
+    return 'forget' unless defined $id;
+    my $settings = essential_web_settings();
+    return 'forget' unless $settings->{on};
+    my $choice = essential_web_choice($settings, $id);
+    delete $ESSENTIAL_WEB_ONCE{$id} if $take;
+    return $choice;
+}
+
+# A redirect or send that holds one request. The same numbered answer path is used by the window.
+sub web_question {
+    my ($kind, $words, $id, $can_allow, $bookmark) = @_;
+    my $saved = sub {
+        my $choice = essential_web_answer($id, 0);
+        if ($choice eq 'deny' || $choice eq 'deny-once') { essential_web_answer($id, 1); return 1 }
+        if ($can_allow && ($choice eq 'always' || $choice eq 'allow-once')) { essential_web_answer($id, 1); return 2 }
+        return;
+    };
+    return asked(join("\t", "webquestion $kind", unlisted($words), defined $id ? $id : '-', $can_allow ? 1 : 0),
+        $saved, @WEB_CHOICES, ($bookmark ? 'Proceed and update bookmark' : ()));
+}
+
+# Selftest appends this to the actual matcher source in its own contained copy.
+sub essential_test_text {
+    return <<'END';
+my @redirects = (
+    ['https://gmail.com/', 'https://mail.google.com/mail/u/0/'],
+    ['https://mail.google.com/mail/u/0/', 'https://accounts.google.com/ServiceLogin?new=1'],
+    ['https://accounts.google.com/ServiceLogin?osid=1', 'https://accounts.google.com/v3/signin/identifier?dsh=rotated'],
+    ['https://gmail.com/inbox', 'https://mail.google.com/mail/u/0/'],
+    ['https://gmail.com/', 'https://mail.google.com.evil.test/mail/u/0/'],
+);
+my $hash = 'a' x 20;
+my @scripts = (
+    ['yle.fi', 'code', 'player-v2.yle.fi', '/embed.js'],
+    ['www.yle.fi', 'code', 'player-v2.yle.fi', "/33.$hash.js"],
+    ['yle.fi', 'code', 'player-v2.yle.fi', "/761.$hash.js"],
+    ['yle.fi', 'code', 'tag-manager.yle.fi', '/ylefi-production.js'],
+    ['www.google.com', 'code', 'www.gstatic.com', '/og/_/js/k=og.asy.x'],
+    ['yle.fi', 'code', 'player-v2.yle.fi', "/762.$hash.js"],
+    ['evil.test', 'code', 'player-v2.yle.fi', '/embed.js'],
+    ['yle.fi', 'strings', 'player-v2.yle.fi', '/embed.js'],
+);
+print join(',', map { essential_web_redirect(@$_) // '-' } @redirects), "\n";
+print join(',', map {
+    my ($site, $class, $host, $path) = @$_;
+    essential_web_script("https://$site", $class, "https://$host", $path) // '-'
+} @scripts), "\n";
+END
+}
 # LZRDFNDR scripts (until release 77 named Script permissions) [C26]. LZRBRWSR runs no script you have not allowed
 # (managed-projects/lzrbrwsr/architecture/script-permissions.md, docs/script-permissions.md, RULES.md). Two layers
 # decide and either one alone refuses: lzrprf, which holds the only policy and
@@ -10932,7 +11203,7 @@ sub permit_site {                         # [C26] whether a site may run scripts
     return 'person' if $PERMIT_ONCE{$site} || grep { $_->[0] eq 'always' && $_->[1] eq $site } @$rules;
     return '' if permit_signin($url) || ($PERMIT_DENIED{$site} && $PERMIT_DENIED{$site}{''});
     my $layers = permit_layers();
-    return 'sandbox' if $layers->{e1} || grep { $_->{site} eq $site } curated_on($layers);
+    return 'sandbox' if $layers->{e1} || essential_web_site($site) || grep { $_->{site} eq $site } curated_on($layers);
     return '';
 }
 
@@ -11015,8 +11286,10 @@ sub permit_decision {                     # [C26] your decision on one script of
     return ('no decision', -1);
 }
 
+my @WEBSITE_SCRIPT_KEYS;
 sub sites_told {                          # [C26] LZRDFNDR's On Websites: "sites begin", then for each site in order "sites site SITE", and under it "sites script N<tab>SITE<tab>NAME<tab>inline|external<tab>BYTES<tab>WHO<tab>CLASS<tab>DECISION" for each script put to you in this window and each rule of yours; then "sites end"
     my ($keys, $all, $lines) = sites_listed();
+    @WEBSITE_SCRIPT_KEYS = @$keys;
     window('sites begin', @$lines, 'sites end');
 }
 
@@ -11035,32 +11308,6 @@ sub sites_listed {                        # [C26] the scripts of On Websites, ea
         push @lines, 'sites script ' . join("\t", $n++, $site, $name, $where, $bytes, $who, $class, (permit_decision($site, $class, $origin, $sha, $rules))[0]);
     }
     return \@keys, \%all, \@lines;
-}
-
-sub sites_decide {                        # [C26] [C4] a decision changed in LZRDFNDR's On Websites, for the script numbered $n as sites_told last numbered it: "always" or "deny" keeps a rule of yours for it, "forget" takes away every decision of yours for it; then the list is told again
-    my ($n, $to) = @_;
-    my ($keys, $all) = sites_listed();    # numbered as sites_told numbered them
-    my $key = $keys->[$n];
-    my $words = 'Nothing was changed: that script is no longer in the list.';
-    if (defined $key) {
-        my ($site, $kind, $origin, $sha, $caps) = @{ $all->{$key} };
-        my $class = permit_class($kind);
-        my $date = strftime('%Y-%m-%d', gmtime);
-        delete $PERMIT_DENIED{$site}{"$class $origin $sha"} if $PERMIT_DENIED{$site};
-        for my $once (grep { $_ } $PERMIT_ONCE{$site}, $PERMIT_NEXT{$site}) { delete $once->{keys}{$_} for grep { my ($k, $o, $s) = split / /; permit_class($k) eq $class && $o eq $origin && $s eq $sha } keys %{ $once->{keys} } }
-        my $done = permit_stored(sub {
-            my ($rules, $memory) = @_;
-            my $had = @$rules;
-            @$rules = grep { !($_->[1] eq $site && $_->[2] eq $class && $_->[3] eq $origin && $_->[4] eq $sha && !($memory && $_->[7] eq 'file')) } @$rules;
-            push @$rules, [$to, $site, $class, $origin, $sha, $caps // '-', $date] if $to ne 'forget';
-            return $to ne 'forget' || $had != @$rules;
-        });
-        my ($name) = permit_named($site, $kind, $origin, $sha);
-        $words = $to eq 'forget' ? "No decision of yours is kept for $name: it is asked about again." : $done ? "$name is now " . ($to eq 'always' ? 'allowed' : 'denied') . ' always.' : 'Nothing was changed: the scripts file could not be written.';
-        noted("LZRDFNDR On Websites: $words");
-    }
-    sites_told();
-    return idle($words);
 }
 
 # The two switches of the layers, in the plain file scriptlayers of yours, one
@@ -11248,13 +11495,26 @@ sub permit_refused {                      # [C26] bytes you denied for the class
     return scalar grep { $_->[0] eq 'deny' && $_->[1] eq $site && $_->[2] eq $class && $_->[3] eq $origin && $_->[4] eq $sha } @$rules;
 }
 
+sub permit_essential_id {
+    my ($site, $kind, $origin, $sha, $caps, $url) = @_;
+    return if $kind !~ /\A(?:external|module|import)\z/ || permit_signin($url);
+    my $id = essential_web_script($site, permit_class($kind), $origin, $PERMIT_PATHS{"$site $origin $sha"} // '');
+    return unless defined $id;
+    return $id if $ESSENTIAL_WEB[$id][-1] eq 'deny' || permit_covers(join(',', keys %PERMIT_E1), $caps);
+    return;
+}
+
 sub permit_decided {                      # [C26] the policy, in its order, for a script on the page at $url: "always", "once" or "deny"; in a list, also the layer that decided: "e1", "e2", "e3", or "none" for a deny no rule of yours names
-    my ($site, $kind, $origin, $sha, $caps, $rules, $url) = @_;
+    my ($site, $kind, $origin, $sha, $caps, $rules, $url, $take) = @_;
     my $said = sub { return wantarray ? @_ : $_[0] };
     return $said->('deny', 'e3') if permit_refused($site, $kind, $origin, $sha, $rules);    # your Deny wins over E1 and E2
     my $layer = permit_site($site, $rules, $url);
     return $said->('deny', 'none') unless $layer;
     my $class = permit_class($kind);
+    my $essential = permit_essential_id($site, $kind, $origin, $sha, $caps, $url);
+    my $decision = essential_web_answer($essential, $take);
+    return $said->('deny', 'essential') if $decision eq 'deny' || $decision eq 'deny-once';
+    return $said->($decision eq 'always' ? 'always' : 'once', 'essential') if ($decision eq 'always' || $decision eq 'allow-once') && permit_covers(join(',', keys %PERMIT_E1), $caps);
     return $said->('once', 'e1') if ($layer eq 'person' || permit_layers()->{e1}) && $kind =~ /\A(?:inline|external|module|handler|import)\z/ && ($origin eq 'inline' || $origin eq $site) && permit_covers(join(',', keys %PERMIT_E1), $caps);    # E1: never data: or blob:, which are neither; a module the site imports from itself is its own code too
     return $said->('once', 'e2') if permit_curated($site, $kind, $origin, $sha, $caps, $url);    # E2, a curated rule
     return $said->('always', 'e3') if grep { $_->[0] eq 'always' && $_->[1] eq $site && $_->[2] eq $class && $_->[3] eq $origin && $_->[4] eq $sha && permit_covers($_->[5], $caps) } @$rules;    # E3, your rules, of the class asked
@@ -11437,12 +11697,12 @@ sub live_permitted {                      # [C26] "=permit KIND ORIGIN SHA256 CA
     $origin = lc $origin;
     my $site = "https://$live->{host}";
     my ($rules) = permit_rules();
-    my ($said, $layer) = permit_decided($site, $kind, $origin, $sha, $caps, $rules, $live->{url});
-    permit_queued($site, $kind, $origin, $sha, $caps) if $said eq 'deny' && !permit_refused($site, $kind, $origin, $sha, $rules);
+    my ($said, $layer) = permit_decided($site, $kind, $origin, $sha, $caps, $rules, $live->{url}, 1);
+    permit_queued($site, $kind, $origin, $sha, $caps) if $said eq 'deny' && $layer ne 'essential' && !permit_refused($site, $kind, $origin, $sha, $rules);
     my $what = "$kind script " . ($origin eq 'inline' ? 'in the page' : "from $origin") . ' ' . substr($sha, 0, 12);
     permit_seen($layer, $site, $what, 'ran') if $layer =~ /\Ae[12]\z/;    # [C26] what E1 and E2 decided, for Script permissions
     permit_seen('e1', $site, $what, 'asked') if $said eq 'deny' && $layer eq 'none' && permit_site($site, $rules, $live->{url}) eq 'sandbox';
-    noted("the page $live->{url} asked to run a script ($kind, " . ($origin eq 'inline' ? 'in the page' : "from $origin") . ", capabilities $caps): " . ($said eq 'deny' ? 'not run' : "run ($said, " . { e1 => 'E1, the sandbox', e2 => 'E2, a curated rule', e3 => 'E3, your rule' }->{$layer} . ')'));
+    noted("the page $live->{url} asked to run a script ($kind, " . ($origin eq 'inline' ? 'in the page' : "from $origin") . ", capabilities $caps): " . ($said eq 'deny' ? 'not run' : "run ($said, " . { e1 => 'E1, the sandbox', e2 => 'E2, a curated rule', e3 => 'E3, your rule', essential => 'the Essential Allow and deny list' }->{$layer} . ')'));
     return live_sent($live, "=permitted $said\n");
 }
 
@@ -11483,8 +11743,10 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
     my $i = 0;
     window(map { my ($name, $where, $bytes, $who) = permit_named($site, @$_[0 .. 2]); my $info = $PERMIT_INFO{"$site $_->[1] $_->[2]"}; my $source = $info ? $info->{source} : '';
         'permitscript ' . join("\t", $i++, $name, $where, $bytes, $who, length $source, MIME::Base64::encode_base64($source, '')) } @items);    # [C26] each script with its source, shown in the question as text that never runs
+    my $essential = grep { defined permit_essential_id($site, @$_, $ask->{url}) } @items;
+    window('essential script') if $essential;
     my $state = { site => $site, url => $ask->{url}, items => \@items, allowed => $allowed, host => $host };
-    my @buttons = ('Deny Once', 'Deny Always', 'Allow Once', 'Always Allow');
+    my @buttons = ('Deny Once', 'Deny Always', 'Allow Once', 'Always Allow', 'Forget');
     return permit_answered($state, asked("permit $site\t$words", @buttons)) unless $FROM;    # "lzrprf try": the test's answer at once
     $state->{n} = asked_later("permit $site\t$words", @buttons); $PERMIT_PENDING = $state;    # Henry 2026-11-25: the page goes on while the question stands; its answer comes as any other line (sub permit_button)
     return 0;
@@ -11500,6 +11762,7 @@ sub permit_button {                       # [C26] the answer to the question abo
 
 sub permit_answered {                     # [C26] what Deny Once, Deny Always, Allow Once and Always Allow do; true when the page is to be loaded again
     my ($state, $press) = @_;
+    return 0 if $press == 5;
     my ($site, $allowed, $host, @items) = (@$state{qw(site allowed host)}, @{ $state->{items} });
     my $ask = { url => $state->{url} };
     if ($press == 1 || $press == 2) {
@@ -11611,6 +11874,117 @@ sub scripts_told {                        # [C26] the list page: "scripts begin"
         (map { 'scripts curated ' . join("\t", $n++, $layers->{all} || $layers->{off}{ $_->{key} } ? 'off' : 'on', @$_{qw(site class origin)}, "$_->{kind} $_->{id}", @$_{qw(caps reviewer reviewed)}) } @{ $curated->{rules} }),
         (map { 'scripts part ' . join("\t", @$_) } @{ $curated->{parts} }), (length $curated->{why} ? "scripts curatedwhy $curated->{why}" : ()),
         (map { 'scripts seen ' . join("\t", @$_) } @PERMIT_SEEN), 'scripts end' . ($unread ? ' unread' : ''));
+}
+
+# Cross-host sends are keyed by the originating site and the exact destination.
+# SYNC: managed-projects/lzrbrwsr/architecture/lzrdfndr.md
+my (%SEND_NOTED, @SEND_WEB_KEYS);
+my $SEND_SEEN = 0;
+my $SEND_MOST = 256;    # DECLARED(the latest 256 cross-host sends in one window)
+
+sub send_keys {
+    return sort { $SEND_NOTED{$a}->{site} cmp $SEND_NOTED{$b}->{site} || $a cmp $b } keys %SEND_NOTED;
+}
+
+sub sends_told {
+    my $n = 0;
+    @SEND_WEB_KEYS = send_keys();
+    window('sends begin', (map {
+        my $one = $SEND_NOTED{$_};
+        'sends one ' . join("\t", $n++, @$one{qw(site to decision)})
+    } @SEND_WEB_KEYS), 'sends end');
+}
+
+sub sends_decide {
+    my ($n, $decision) = @_;
+    my $key = $SEND_WEB_KEYS[$n];
+    my $one = defined $key ? $SEND_NOTED{$key} : undef;
+    if ($one) {
+        if ($decision eq 'forget') { delete $SEND_NOTED{$key} }
+        else {
+            $one->{decision} = $decision;
+            $one->{once} = $decision =~ /-once\z/ ? 1 : 0;
+        }
+    }
+    sends_told();
+}
+
+sub send_question {
+    my ($site, $to) = @_;
+    my $key = "$site\t$to";
+    if (my $one = $SEND_NOTED{$key}) {
+        my $decision = $one->{decision};
+        return 2 if $decision eq 'always';
+        return 1 if $decision eq 'deny';
+        return $decision eq 'allow-once' ? 2 : 1 if delete $one->{once};
+    } elsif (keys %SEND_NOTED >= $SEND_MOST) {
+        my ($old) = sort { $SEND_NOTED{$a}->{n} <=> $SEND_NOTED{$b}->{n} } keys %SEND_NOTED;
+        delete $SEND_NOTED{$old};
+    }
+    my $words = "The page $site wants to send something to $to, on another host. No script permission covers that.";
+    my $answer = web_question('send', $words, undef, 1, 0);
+    $SEND_NOTED{$key} = { site => $site, to => $to, n => ++$SEND_SEEN, decision => $WEB_ANSWER_BY_ID[$answer - 1] };
+    return $answer == 2 || $answer == 3 ? 2 : 1;
+}
+
+sub sends_count { scalar keys %SEND_NOTED }
+sub sends_clear { %SEND_NOTED = (); @SEND_WEB_KEYS = (); $SEND_SEEN = 0 }
+# LZRDFNDR website edits and the pending script question.
+# SYNC: managed-projects/lzrbrwsr/architecture/lzrdfndr.md
+sub sites_decide {                        # [C26] [C4] a decision changed in LZRDFNDR's On Websites, for the script numbered $n as sites_told last numbered it: "always" or "deny" keeps a rule of yours for it, "forget" takes away every decision of yours for it; then the list is told again
+    my ($n, $to) = @_;
+    my (undef, $all) = sites_listed();
+    my $key = $WEBSITE_SCRIPT_KEYS[$n];
+    my $words = 'Nothing was changed: that script is no longer in the list.';
+    if (defined $key && exists $all->{$key}) {
+        my ($site, $kind, $origin, $sha, $caps) = @{ $all->{$key} };
+        my $class = permit_class($kind);
+        my $date = strftime('%Y-%m-%d', gmtime);
+        delete $PERMIT_DENIED{$site}{"$class $origin $sha"} if $PERMIT_DENIED{$site};
+        for my $once (grep { $_ } $PERMIT_ONCE{$site}, $PERMIT_NEXT{$site}) { delete $once->{keys}{$_} for grep { my ($k, $o, $s) = split / /; permit_class($k) eq $class && $o eq $origin && $s eq $sha } keys %{ $once->{keys} } }
+        my $once = $to =~ /-once\z/;
+        my $done = permit_stored(sub {
+            my ($rules, $memory) = @_;
+            my $had = @$rules;
+            @$rules = grep { !($_->[1] eq $site && $_->[2] eq $class && $_->[3] eq $origin && $_->[4] eq $sha && !($memory && $_->[7] eq 'file')) } @$rules;
+            push @$rules, [$to, $site, $class, $origin, $sha, $caps // '-', $date] if $to ne 'forget' && !$once;
+            return $once || $to ne 'forget' || $had != @$rules;
+        });
+        if ($done && $once) {
+            if ($to eq 'deny-once') { $PERMIT_DENIED{$site}{"$class $origin $sha"} = 1 }
+            else {
+                $PERMIT_NEXT{$site} //= { keys => {}, hosts => {} };
+                $PERMIT_NEXT{$site}{keys}{join(' ', $kind, $origin, $sha, $caps // '-')} = 1;
+            }
+        }
+        my ($name) = permit_named($site, $kind, $origin, $sha);
+        $words = $to eq 'forget' ? "No decision of yours is kept for $name: it is asked about again." : $done && $once ? "$name now applies to one visit." : $done ? "$name is now " . ($to eq 'always' ? 'allowed' : 'denied') . ' always.' : 'Nothing was changed: the scripts file could not be written.';
+        noted("LZRDFNDR On Websites: $words");
+    }
+    sites_told();
+    return idle($words);
+}
+
+sub permit_essentials_saved {
+    my $pending = $PERMIT_PENDING or return;
+    return unless ($TABS[$TAB]{url} // '') eq $pending->{url};
+    my ($allow, $changed, @remaining);
+    for my $item (@{ $pending->{items} }) {
+        my ($kind, $origin, $sha, $caps) = @$item;
+        my $id = permit_essential_id($pending->{site}, @$item, $pending->{url});
+        my $choice = essential_web_answer($id, 0);
+        if ($choice eq 'forget') { push @remaining, $item; next }
+        $changed = 1;
+        if (($choice eq 'always' || $choice eq 'allow-once') && permit_covers(join(',', keys %PERMIT_E1), $caps)) {
+            $allow = 1;
+        } else {
+            $PERMIT_DENIED{$pending->{site}}{permit_class($kind) . " $origin $sha"} = 1 if $choice eq 'deny-once';
+        }
+    }
+    return unless $changed;
+    undef $PERMIT_PENDING;
+    unless ($allow) { permit_queued($pending->{site}, @$_) for @remaining }
+    return ($allow ? $pending->{url} : '', 1);
 }
 
 # The filter lists [C27] (docs/filters.md). uBlock Origin's
@@ -11963,6 +12337,36 @@ sub filters_dir {                         # [C27] "lzrprf filters DIR PAGE TYPE 
     return;
 }
 
+# The page's native Inspect pane: what only the window may ask from the live page [C18].
+# SYNC: managed-projects/lzrbrwsr/ARCHITECTURE.md §7.4 ; src/28-window-inspect.pl
+# TRIAD(tests: managed-projects/lzrbrwsr/src/page/scripted_inspect.rs, docs: managed-projects/lzrbrwsr/ARCHITECTURE.md)
+
+sub inspect_input {
+    my ($tab, $panel, $request, $source) = @_;
+    return if $tab != $TAB || $TABS[$TAB]{trmnl};
+    my $live = live_of($TABS[$TAB]) or return;
+    if ($source eq 'open') {
+        $live->{inspect_panel} = $panel;
+        $source = '-';
+    } else {
+        return unless ($live->{inspect_panel} // '') eq $panel && !defined $live->{inspect_reply};
+    }
+    $live->{inspect_reply} = $request;
+    live_wrote($live, "inspect $request $source");
+}
+
+sub inspect_answer {
+    my ($live, $request, $result, $log) = @_;
+    return unless defined $live->{inspect_reply} && $live->{inspect_reply} eq $request;
+    delete $live->{inspect_reply};
+    return unless $live->{tab} == $TABS[$TAB] && defined $live->{inspect_panel};
+    for my $encoded ($result, $log) {
+        next if $encoded eq '-';
+        my $text = pack 'H*', $encoded;
+        $encoded = '-' unless utf8::decode($text) && $text !~ /(?:(?![\n\t])[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\p{NChar}])/;
+    }
+    window("inspect $TAB $live->{inspect_panel} $request $result $log");
+}
 # A line of the window for the page kept running with the selected tab, in a
 # form sub behind checked: "click X Y" in CSS pixels of the laid page, where
 # the window found the pointer after its own scrolling, at most 200000 each
@@ -12003,9 +12407,10 @@ sub filters_dir {                         # [C27] "lzrprf filters DIR PAGE TYPE 
 # ever is; a tab with no page kept running takes none.
 sub live_input {                          # [C18]
     my ($what) = @_;
+    link_line('INFO', 'input', "the window handed lzrprf $what", what => $what, tab => $TAB, live => (live_of($TABS[$TAB]) ? 1 : 0), waiting => (live_of($TABS[$TAB]) && live_of($TABS[$TAB])->{waiting} ? 1 : 0)) if $what =~ /\A(?:click|down|up|context) /;    # [1237] the sniffer (keys and text never, they can be a password): each press that reached lzrprf, while the live debug link is on (staging-control tail shows it); a press the window dropped never appears here
     return trmnl_input($what) if $TABS[$TAB]{trmnl};    # [C29] a terminal's tab: its keys go to its shell, in their fixed forms
     my $live = live_of($TABS[$TAB]) or return;
-    return if $what =~ /^(?:click|move|down|up|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
+    return if $what =~ /^(?:click|move|down|up|context|scroll [0-9]+) ([0-9]+) ([0-9]+)$/ && ($1 > 200_000 || $2 > 200_000);
     if ($what =~ /^move /) {
         if ($live->{waiting}) { $live->{move_held} = $what; return }    # the newest place of the pointer waits for the page's answer (sub live_answered), as a scroll does
         return live_wrote($live, $what);
@@ -12185,6 +12590,8 @@ sub live_answered {                       # [C18]
                 my $wrong = live_sound($live, $line, \@sounds);
                 return live_end($live, "it wrote a sound lzrprf does not take: $wrong") if $wrong;
             }
+            elsif ($line =~ /^=pressed (a|a-nohref|button|input|none) (click|noclick) (acts|canceled|-)$/) { link_line('INFO', 'pressed', "the page met the press: $1, $2, $3", met => $1, click => $2, outcome => $3) }    # [1238] what a released press met, for the live debug link's log alone, before =again in any place
+            elsif ($line =~ /^=inspect ([1-9][0-9]{0,8}) (-|(?:[0-9a-f]{2}){1,1000}) (-|(?:[0-9a-f]{2}){1,2400})$/) { inspect_answer($live, $1, $2, $3) }    # [C18] bounded, numbered reply to the current native pane
             elsif ($line =~ /^=cursor ([a-z-]{1,16})$/ && $CURSORS{$1}) { $cursor = $1 }    # the cursor over the page, before =again, in any place among the lines above
             elsif ($line =~ /^=keep ([^\x00-\x20\x7f]{1,16000})$/) { jar_kept_write($live, $1) }    # [C7] a cookie the page's script set, before =again in any place: judged by the jar against the page's own address (sub jar_kept_write)
             elsif ($line =~ /^=([a-z0-9-]{1,32})(?: [\x20-\x7e]{0,8192})?$/ && !$LIVE_KNOWN{$1}) { live_unknown($live, $1) }    # a line of a later application: passed over
@@ -12250,6 +12657,7 @@ sub live_answered {                       # [C18]
             if ($go =~ m{^https://lzrbrwsr\.invalid/_home/(search|marks|tabs|new|trmnl)$} && now() - ($live->{pressed} // 0) <= 1) { $1 eq 'trmnl' ? ($TRMNL_OPEN = 1) : window("homeaction $1") }    # [C29] the terminal icon: lzrprf opens it itself, within a second of your press
             undef $go;    # a local home never follows an address, even if its program asks
         }
+        link_line('INFO', 'go', 'the page asked to go to another address', home => ($live->{home} ? 1 : 0)) if defined $go;    # [1238] the address itself is not logged
         return go($go, 'you followed the page to') if defined $go;    # [C4] a visit like a typed address; it ends this page first (sub visit)
     }
     live_scroll_told($live) if !$live->{ended} && $DRAWN && $live->{tab} == $TABS[$TAB];    # of the answers of this turn with no drawing, the newest scroll only, and only onto a drawing the window shows
@@ -12639,8 +13047,14 @@ function soundVideoAt(key, one, more) {    // the picture's clock: the sound fol
         soundSay('video ' + key + ' drift ' + Math.round(drift * 1000));
         if (Math.abs(drift) < SOUND_VIDEO_SLACK) return;
     }
-    p.stop; p.prepareToPlay; p.rate = rate; p.currentTime = now() + SOUND_VIDEO_LEAD * rate;    // stopped and prepared again: a paused player starts at once and keeps the lead as drift (93 ms measured), a prepared one starts on the device clock (0 to 3 ms)
-    var started = !!p.playAtTime(p.deviceCurrentTime + SOUND_VIDEO_LEAD);
+    p.stop; p.prepareToPlay; p.rate = rate;    // stopped and prepared again: a paused player starts at once and keeps the lead as drift (93 ms measured), a prepared one starts on the device clock (0 to 3 ms)
+    var lead = SOUND_VIDEO_LEAD, set = Date.now(), late = 0;
+    for (var tries = 0; tries < 2; tries++) {    // the seek itself takes time (41 to 44 ms on a busy Mac, 2026-11-26): it is taken from the lead, and a seek longer than the lead is made again with a lead twice as long as it took
+        set = Date.now(); p.currentTime = now() + lead * rate; late = (Date.now() - set) / 1000;
+        if (late < lead * 0.8 || tries == 1) break;    // the lead played below is the one this seek was made with (lzr3's review)
+        lead = Math.min(0.5, Math.max(lead, late * 2));
+    }
+    var started = !!p.playAtTime(p.deviceCurrentTime + Math.max(0.002, lead - (Date.now() - set) / 1000));
     busy = Date.now();
     if (!one.said) { one.said = true; soundSay('video ' + key + (one.ready && started ? ' yes' : ' no') + ' ready=' + !!one.ready + ' started=' + started + ' length=' + Math.round(p.duration * 1000)); }
 }
@@ -13501,7 +13915,7 @@ function trmnlMethods(methods) {    // the methods of LzrprfLaid, with the termi
     var pressed = methods['mouseDown:'].implementation, typed = methods['keyDown:'].implementation;
     methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; pressed(event); } };    // a press starts a selection afresh
     methods['mouseDragged:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragged(event); } };
-    methods['rightMouseDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlContext(event)) canvas.nextResponder.rightMouseDown(event); } };    // on any other page a right press goes where it always went
+    methods['rightMouseDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlContext(event) && !inspectContext(event)) canvas.nextResponder.rightMouseDown(event); } };
     methods['keyDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlShortcut(event)) typed(event); } };
     methods['performKeyEquivalent:'] = { types: ['bool', ['id']], implementation: function (event) { return trmnlShortcut(event); } };    // a key with Command reaches a view before the window's menus: only the terminal's own keys are taken here
     methods['copy:'] = { types: ['void', ['id']], implementation: function (sender) { trmnlCopy(); } };
@@ -14116,19 +14530,29 @@ sub ask { my ($words, @buttons) = @_; return asked('ask ' . $words =~ s/\s+/ /gr
 
 sub asked_later { my ($line, @buttons) = @_; $ASKED++; window(join "\t", $line, @buttons); return $ASKED }    # a question whose answer the main loop hears as any line (sub permit_button): it holds nothing
 
-sub asked {                               # a question in a line of its own kind: "ask" in the strip, "redirect" in a modal; up to four buttons
+sub asked {                               # a question in a line of its own kind: "ask" in the strip, "webquestion" in the LZRDFNDR modal
     my ($line, @buttons) = @_;
+    my $saved = ref($buttons[0]) eq 'CODE' ? shift @buttons : undef;
     $ASKED++;
     window(join "\t", $line, @buttons);
     if (!$FROM) {                         # "lzrprf try" only: the test's answer
-        my $press = $ANSWER eq 'allow' ? 2 : $ANSWER =~ s/^([1-4])// ? $1 : 1;    # a digit for each question in turn; a third button is answered by 3, a fourth by 4
+        my $press = $ANSWER eq 'allow' ? 2 : $ANSWER =~ s/^([1-6])// ? $1 : 1;    # a digit for each question in turn; one through six
         window("answered $press");
         return $press;
     }
     my $until = now() + $ANSWER_SECONDS;
     while ((my $left = $until - now()) > 0) {
         my $event = hear($left) // leave();
-        return $1 if $event =~ /^button $ASKED ([1-4])$/ && $1 <= @buttons;
+        return $1 if $event =~ /^button $ASKED ([1-6])$/ && $1 <= @buttons;
+        if ($saved && $event eq 'essential list') { essential_web_told(); next }
+        if ($saved && $event =~ /\Aessential save ([01])((?: [0-9]=[a-z-]+){0,8})\z/) {
+            my ($on, $changes) = ($1, $2);
+            my $ok = essential_web_save($on, grep length, split / /, $changes);
+            my $press = $ok ? $saved->() : undef;
+            window('essential saved ' . ($ok ? defined $press ? 'resolved' : 'ok' : 'failed'));
+            return $press if defined $press;
+            next;
+        }
         if ($event =~ /^button /) { push @LATER, $event; next }    # the answer to the question about scripts, which stood before this one: heard after it (sub permit_button)
         viewing($event); if ($event =~ /^page scroll [0-9]{1,2} [0-9]{1,6} [0-9]{1,6}$/) { my $back = live_scroll_back(); @LATER = ((grep { !/^page scroll / || $_ eq $back && $_ ne $event } @LATER), $event) } elsif ($event =~ /^tor (?:on|off)$/) { push @LATER, $event }    # a new size of the window's page said meanwhile is still its size; the page is laid out at it after the question (sub relaid); Tor turned on or off is heard after it too, and where the window shows the page from, the newest place only: one said each frame of a long question is not kept by the hundred, but the page's own scroll said back is kept too, so the window's places are heard again after it (sub live_input)
     }
@@ -14650,6 +15074,249 @@ sub lookup {                              # every address a name leads to, as nu
     print map { (getnameinfo($_->{addr}, NI_NUMERICHOST | NI_NUMERICSERV))[1] . "\n" } $failed ? () : @all;
 }
 
+# The window's native Inspect pane. It uses the live page relay and never evaluates JavaScript here.
+# SYNC: managed-projects/lzrbrwsr/ARCHITECTURE.md §7.4 ; src/24-inspect.pl
+# TRIAD(tests: managed-projects/lzrbrwsr/src/page/scripted_inspect.rs, docs: managed-projects/lzrbrwsr/ARCHITECTURE.md)
+sub window_inspect_text {
+    return <<'END';
+var inspectUI = null, inspectHand = null, inspectSerial = 0;
+var INSPECT_WARNING = 'Do not paste code you do not understand. It can act as you on this site. Type allow pasting and press Return to enable paste in this pane.';
+var INSPECT_SOURCE_BYTES = 500;    // DECLARED(the bound of the checked page relay, src/24-inspect.pl)
+function inspectAvailable() { return liveOn && !trmnlKeys && pageShown && free && !modalOpen; }
+function inspectFits(one) { return one && liveOn && !trmnlKeys && selected == one.tab && tabs[selected] && tabs[selected].gen == one.gen && current == one.address; }
+function inspectNext() { inspectSerial = inspectSerial % 999999999 + 1; return inspectSerial; }    // DECLARED(the numbered frame allows nine digits)
+function inspectHex(text) {
+    return encodeURIComponent(text).replace(/%([0-9a-f]{2})|./gi, function (part, byte) { return byte ? byte.toLowerCase() : part.charCodeAt(0).toString(16); });
+}
+function inspectText(hex) { return hex == '-' ? '' : decodeURIComponent(hex.replace(/../g, '%$&')); }
+function inspectPaint(one) {
+    var text = [one.note, one.logs, one.result].filter(Boolean).join('\n');
+    if (String(one.output.string.js || '') == text) return;
+    one.output.string = $(text);
+    one.output.scrollRangeToVisible($.NSMakeRange(text.length, 0));
+}
+function inspectMessage(one, text) { one.note = text; inspectPaint(one); }
+function inspectAsk(one, source) {
+    one.pending = inspectNext();
+    one.sent = Date.now();
+    say('inspect ' + one.tab + ' ' + one.panel + ' ' + one.pending + ' ' + source);
+}
+function inspectTold(rest) {
+    var one = inspectUI, reply = /^([0-9]+) ([0-9]+) ([0-9]+) (-|[0-9a-f]+) (-|[0-9a-f]+)$/.exec(rest);
+    if (!inspectFits(one) || !reply || +reply[1] != one.tab || +reply[2] != one.panel || +reply[3] != one.pending) return;
+    one.pending = 0;
+    try {
+        if (one.command !== null) one.result = '> ' + one.command + '\n' + inspectText(reply[4]);
+        one.logs = inspectText(reply[5]);
+    } catch (error) { inspectMessage(one, 'The page returned unreadable console text.'); }
+    one.command = null;
+    one.ready = true;
+    inspectPaint(one);
+}
+function inspectTick() {
+    var one = inspectUI;
+    if (!inspectFits(one)) { inspectClose(); return; }
+    if (modalOpen || !free) return;
+    if (one.pending) {
+        if (Date.now() - one.sent > 3000) inspectMessage(one, 'Waiting for the page to answer.');
+        return;
+    }
+    if (one.ready) inspectAsk(one, '-');
+}
+function inspectRun() {
+    var one = inspectUI;
+    if (!inspectFits(one) || !inspectAvailable()) return;
+    var source = String(one.input.string.js || '');
+    if (!source.trim()) return;
+    if (source == 'allow pasting' && !one.paste) {
+        one.paste = true;
+        one.input.string = $('');
+        inspectMessage(one, 'Paste is enabled until this pane closes.');
+        return;
+    }
+    if (!one.ready || one.pending) { inspectMessage(one, 'Wait for the current console request to finish.'); return; }
+    var encoded;
+    try { encoded = inspectHex(source); } catch (error) { inspectMessage(one, 'The command has text the console cannot read.'); return; }
+    if (encoded.length > 2 * INSPECT_SOURCE_BYTES || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(source)) {
+        inspectMessage(one, 'Use up to ' + INSPECT_SOURCE_BYTES + ' UTF-8 bytes of JavaScript.');
+        return;
+    }
+    one.command = source;
+    one.input.string = $('');
+    one.note = '';
+    inspectPaint(one);
+    inspectAsk(one, encoded);
+}
+function inspectPasteboard(board) {
+    var one = inspectUI;
+    if (!inspectFits(one) || !inspectAvailable()) return false;
+    if (!one.paste) { inspectMessage(one, INSPECT_WARNING); return false; }
+    var text = board.stringForType($('public.utf8-plain-text')).js;
+    if (typeof text != 'string') return false;
+    var old = String(one.input.string.js || ''), at = one.input.selectedRange;
+    var fresh = old.slice(0, at.location) + text + old.slice(at.location + at.length);
+    try {
+        if (inspectHex(fresh).length > 2 * INSPECT_SOURCE_BYTES) { inspectMessage(one, 'The pasted command is too long.'); return false; }
+    } catch (error) { inspectMessage(one, 'The pasted text is unreadable.'); return false; }
+    one.input.string = $(fresh);
+    one.input.selectedRange = $.NSMakeRange(at.location + text.length, 0);
+    return true;
+}
+function inspectPaste() {
+    if (!inspectUI || !inspectUI.paste) {
+        if (inspectUI) inspectMessage(inspectUI, INSPECT_WARNING);
+        return;
+    }
+    inspectPasteboard($.NSPasteboard.generalPasteboard);
+}
+ObjC.registerSubclass({ name: 'LzrprfInspectActions', superclass: 'NSObject', methods: {
+    'openInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectOpen(); } },
+    'runInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectRun(); } },
+    'closeInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectClose(); } },
+    'tickInspect:': { types: ['void', ['id']], implementation: function (timer) { inspectTick(); } },
+    'textView:doCommandBySelector:': { types: ['bool', ['id', 'SEL']], implementation: function (view, command) {
+        var name = ObjC.selectorAsString(command);
+        if (name == 'insertNewline:' && !(app.currentEvent.modifierFlags & SHIFT)) { inspectRun(); return true; }
+        if (name == 'cancelOperation:') { inspectClose(); return true; }
+        return false;
+    } }
+} });
+ObjC.registerSubclass({ name: 'LzrprfInspectInput', superclass: 'NSTextView', methods: {
+    'paste:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },
+    'pasteAsPlainText:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },
+    'pasteAsRichText:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },
+    'readSelectionFromPasteboard:': { types: ['bool', ['id']], implementation: function (board) { return inspectPasteboard(board); } },
+    'readSelectionFromPasteboard:type:': { types: ['bool', ['id', 'id']], implementation: function (board, type) { return inspectPasteboard(board); } },
+    'performDragOperation:': { types: ['bool', ['id']], implementation: function (drag) { return false; } }
+} });
+function inspectActions() {
+    if (!inspectHand) inspectHand = $.LzrprfInspectActions.alloc.init;
+    return inspectHand;
+}
+function inspectMenu(copy) {
+    var menu = $.NSMenu.alloc.initWithTitle($(''));
+    if (copy) menu.addItemWithTitleActionKeyEquivalent($('Copy'), 'copy:', $(''));
+    if (inspectAvailable()) {
+        var item = menu.addItemWithTitleActionKeyEquivalent($('Inspect'), 'openInspect:', $(''));
+        item.target = inspectActions();
+    }
+    return menu;
+}
+function inspectContext(event) {
+    if (!inspectAvailable()) return false;
+    $.NSMenu.popUpContextMenuWithEventForView(inspectMenu(false), event, canvas);
+    return true;
+}
+function inspectTextView(frame, editable) {
+    var scroll = $.NSScrollView.alloc.initWithFrame(frame);
+    scroll.autoresizingMask = 2;
+    scroll.hasVerticalScroller = true;
+    scroll.borderType = 1;
+    var view = editable ? unchecked($.LzrprfInspectInput.alloc.initWithFrame(frame)) : unchecked($.NSTextView.alloc.initWithFrame(frame));
+    view.autoresizingMask = 2;
+    view.editable = editable;
+    view.richText = false;
+    view.backgroundColor = DARK;
+    view.textColor = WHITE;
+    view.insertionPointColor = WHITE;
+    view.font = mono(13, false);
+    view.textContainerInset = $.NSMakeSize(7, 5);
+    view.unregisterDraggedTypes;
+    scroll.documentView = view;
+    return { view: view, scroll: scroll };
+}
+function inspectButton(title, action, frame) {
+    var item = $.NSButton.alloc.initWithFrame(frame);
+    item.title = $(title);
+    item.target = inspectHand;
+    item.action = action;
+    item.bezelStyle = 1;
+    item.autoresizingMask = 1;
+    return item;
+}
+function inspectOpen() {
+    if (!inspectAvailable()) return;
+    if (inspectFits(inspectUI)) { win.makeFirstResponder(inspectUI.input); return; }
+    inspectClose();
+    inspectActions();
+    var wide = Math.max(280, root.bounds.size.width - 44), high = 260;
+    var pane = $.NSBox.alloc.initWithFrame($.NSMakeRect(22, 42, wide, high));
+    pane.autoresizingMask = 2 | 32;
+    pane.boxType = 4;
+    pane.titlePosition = 0;
+    pane.fillColor = DARK;
+    pane.borderColor = EDGE;
+    pane.borderWidth = 1;
+    pane.cornerRadius = 10;
+    var inside = pane.contentView;
+    var title = $.NSTextField.labelWithString($('Inspect JavaScript'));
+    title.frame = $.NSMakeRect(12, high - 31, 205, 20);
+    title.font = sans(14);
+    title.textColor = WHITE;
+    var output = inspectTextView($.NSMakeRect(12, 66, wide - 24, high - 105), false);
+    var input = inspectTextView($.NSMakeRect(12, 12, wide - 100, 44), true);
+    input.view.delegate = inspectHand;
+    inside.addSubview(title);
+    inside.addSubview(output.scroll);
+    inside.addSubview(input.scroll);
+    inside.addSubview(inspectButton('Run', 'runInspect:', $.NSMakeRect(wide - 82, 15, 70, 27)));
+    inside.addSubview(inspectButton('Close', 'closeInspect:', $.NSMakeRect(wide - 82, high - 34, 70, 27)));
+    root.addSubviewPositionedRelativeTo(pane, -1, veil);
+    var one = inspectUI = { pane: pane, input: input.view, output: output.view, tab: selected, gen: tabs[selected].gen, address: current,
+        panel: inspectNext(), pending: 0, command: null, logs: '', result: '', note: '', ready: false, paste: false };
+    one.timer = $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(1, inspectHand, 'tickInspect:', $(), true);
+    win.makeFirstResponder(one.input);
+    inspectAsk(one, 'open');
+}
+function inspectClose() {
+    if (!inspectUI) return;
+    var one = inspectUI;
+    inspectUI = null;
+    if (one.timer) one.timer.invalidate;
+    one.pane.removeFromSuperview;
+}
+END
+}
+
+# Read by selftest from the shipped source and appended only to its hidden window.
+sub inspect_window_test_text {
+    return <<'END';
+// A hidden window in selftest. No clipboard is read and no real page script is executed here.
+function inspectWindowTried() {
+    var state = [liveOn, trmnlKeys, pageShown, free], saveSay = say, lines = [], answer = '';
+    try {
+        liveOn = pageShown = free = true;
+        trmnlKeys = false;
+        say = function (line) { lines.push(line); };
+        var menu = page.menuForEvent(null), laid = inspectMenu(false);
+        var labels = menu.numberOfItems == 2 && menu.itemAtIndex(1).title.js == 'Inspect' && laid.itemAtIndex(0).title.js == 'Inspect';
+        var item = menu.itemAtIndex(1);
+        item.target.openInspect(item);
+        var one = inspectUI, open = lines.length == 1 && /^inspect .+ open$/.test(lines[0]);
+        one.input.paste(null);
+        var blocked = !one.paste && one.note == INSPECT_WARNING && lines.length == 1;
+        inspectTold(one.tab + ' ' + one.panel + ' ' + one.pending + ' - -');
+        one.input.string = $('allow pasting');
+        inspectRun();
+        var enabled = one.paste && one.input.string.js == '' && lines.length == 1;
+        one.input.string = $('6 * 7');
+        inspectRun();
+        var sent = lines.length == 2 && lines[1].slice(-10) == '36202a2037';
+        inspectTold(one.tab + ' ' + one.panel + ' ' + one.pending + ' 3432 6c6f673a206f6b');
+        var output = one.output.string.js.indexOf('42') >= 0 && one.output.string.js.indexOf('log: ok') >= 0;
+        liveOn = false;
+        inspectTick();
+        answer = [labels, open, blocked, enabled, sent, output, inspectUI === null].join(' ');
+    } catch (e) { answer = 'fault ' + String(e).replace(/\s+/g, ' ').slice(0, 170); }
+    finally {
+        inspectClose();
+        liveOn = state[0]; trmnlKeys = state[1]; pageShown = state[2]; free = state[3];
+        say = saveSay;
+    }
+    return answer;
+}
+END
+}
 # The live debug link in the window [C31]: the part of the window's text the
 # link uses, joined after the rest of it by sub run (04-start.pl).
 #   - a row in the cogwheel's menu, "Live debug link", on and off by the same
@@ -14715,6 +15382,80 @@ function linkShot(nonce, which) {    // the window's own drawing of itself, or o
     }
     if (!png) png = windowPicture();
     if (png) say('link shot ' + nonce + ' ' + png.base64EncodedStringWithOptions(0).js);
+}
+END
+}
+
+# The menu bar of the window (Henry, 2026-11-26): the part of the window's text
+# that names the application in the Mac's menu bar and adds its File and Help
+# menus, joined after the rest of it by sub run (04-start.pl).
+#   - the name: macOS names the application in the menu bar after the
+#     process's entry in Launch Services, which for the system's osascript is
+#     "osascript", so the bar never said LZRBRWSR. The entry is renamed to the
+#     application's name, "LZRBRWSR", or "LZRBRWSR - Staging" for
+#     LZRBRWSR-Staging.app (measured 2026-11-26 with osascript: "osascript"
+#     before, the name after);
+#   - File: New Tab, New Window, New Incognito Window, New Tor Window, Close
+#     Tab, Close Window. New Window and New Tor Window are second lzrprfs of
+#     their own ("window new", sub window_opened; "window tor", sub
+#     tor_window_opened, as the onion icon);
+#   - Help: About (a modal with the release number lzrprf says at start,
+#     "release N"), Privacy Policy and Terms and Conditions, each the site's own
+#     page in a new tab ("help privacy", "help terms"; sub help_opened), so the
+#     text has one source, the one the web shows;
+#   - full screen hides the menu bar and shows it when the pointer reaches the
+#     top of the screen: the system's own presentation options, none of ours.
+sub window_menu_text {
+    return <<'END';
+var releaseNumber = '';    // "release N", said by lzrprf at start (06-behind.pl): shown in About
+function menuBarNamed(name) {
+    try {
+        ObjC.bindFunction('_LSGetCurrentApplicationASN', ['id', []]);
+        ObjC.bindFunction('_LSSetApplicationInformationItem', ['int', ['int', 'id', 'id', 'id', 'id']]);
+        $._LSSetApplicationInformationItem(-2, $._LSGetCurrentApplicationASN(), $('LSDisplayName'), $(name), $());    // -2: this login session
+    } catch (e) { }    // a macOS without these calls keeps the name "osascript" in the bar; the window works the same
+}
+ObjC.registerSubclass({ name: 'LzrprfMenu', methods: {
+    'newWindow:': { types: ['void', ['id']], implementation: function (sender) { say('window new'); } },    // lzrprf starts a second lzrprf: this process starts nothing
+    'torWindow:': { types: ['void', ['id']], implementation: function (sender) { say('window tor'); } },
+    'closeWindow:': { types: ['void', ['id']], implementation: function (sender) { win.performClose($()); } },    // as the red dot
+    'about:': { types: ['void', ['id']], implementation: function (sender) { aboutOpened(); } },
+    'privacy:': { types: ['void', ['id']], implementation: function (sender) { if (takes()) sent('help privacy'); } },
+    'terms:': { types: ['void', ['id']], implementation: function (sender) { if (takes()) sent('help terms'); } }
+} });
+var menuHand = null;
+function menusMore(main) {    // called by menus() before the bar is handed to the application
+    menuHand = $.LzrprfMenu.alloc.init;
+    var made = function (menu, words, action, key, mask, target) {
+        var one = menu.addItemWithTitleActionKeyEquivalent($(words), action, $(key));
+        one.target = target;
+        if (mask) one.keyEquivalentModifierMask = mask;
+        return one;
+    };
+    var appMenu = main.itemAtIndex(0).submenu, about = appMenu.insertItemWithTitleActionKeyEquivalentAtIndex($('About ' + NAME), 'about:', $(''), 0);
+    about.target = menuHand;
+    appMenu.insertItemAtIndex($.NSMenuItem.separatorItem, 1);
+    var file = $.NSMenu.alloc.initWithTitle($('File')), fileItem = $.NSMenuItem.alloc.init;
+    made(file, 'New Tab', 'newTab:', 't', 0, hand);
+    made(file, 'New Window', 'newWindow:', 'n', 0, menuHand);
+    made(file, 'New Incognito Window', 'incognito:', 'N', 0, hand);
+    made(file, 'New Tor Window', 'torWindow:', 'n', CMD | OPTION, menuHand);
+    file.addItem($.NSMenuItem.separatorItem);
+    made(file, 'Close Tab', 'closeTab:', 'w', 0, hand);
+    made(file, 'Close Window', 'closeWindow:', 'W', 0, menuHand);
+    fileItem.submenu = file;
+    main.insertItemAtIndex(fileItem, 1);
+    var help = $.NSMenu.alloc.initWithTitle($('Help')), helpItem = $.NSMenuItem.alloc.init;
+    made(help, 'About ' + NAME, 'about:', '', 0, menuHand);
+    made(help, 'Privacy Policy', 'privacy:', '', 0, menuHand);
+    made(help, 'Terms and Conditions', 'terms:', '', 0, menuHand);
+    helpItem.submenu = help;
+    main.addItem(helpItem);
+    app.helpMenu = help;
+}
+function aboutOpened() {
+    if (modalOpen || asking) return;
+    modal('About ' + NAME, NAME + (releaseNumber ? ', release ' + releaseNumber : '') + '.\nIt runs in lzrprf, whose source is open: github.com/lzrbrwsr/lzrprf.', [['Close', closeModal]], 'about');
 }
 END
 }
@@ -14816,7 +15557,7 @@ function pointerMethods(methods) {    // the methods of LzrprfLaid, with the poi
 var PILL_REACH = 6;    // DECLARED(the points around the address bar's pill that take its press: past the pill's 36 by a finger's slip, and short of the reload arrow's reach at 125 and of the 56 point row's edges, which still move the window)
 function pillReach() { return { x: PILL.origin.x - PILL_REACH, y: PILL.origin.y - PILL_REACH, w: PILL.size.width + 2 * PILL_REACH, h: PILL.size.height + 2 * PILL_REACH }; }    // the address bar's hit rectangle in the bar's row
 function pillHit(at) { var r = pillReach(); return at.x >= r.x && at.x <= r.x + r.w && at.y >= r.y && at.y <= r.y + r.h; }
-function pointerFree() { return liveOn && !trmnlKeys && sheet && free && !modalOpen; }
+function pointerFree() { return liveOn && !trmnlKeys && sheet && !asking && !modalOpen; }    // [1235] also while lzrprf is busy (a page that keeps loading, as yle.fi does): the lines wait in the pipe in their order and lzrprf hands them to the page when it reads them; only a question or a sheet holds the page's pointer
 function pointerPlace(event, held) {    // "X Y" in the laid page's points, or null outside it; held: kept to its edges instead
     var at = pointIn(canvas, event), x = Math.round(at.x), y = Math.round(at.y), wide = Math.min(sheet.wide, 200001), high = Math.min(sheet.high, 200001);
     if (held) { x = Math.max(0, Math.min(wide - 1, x)); y = Math.max(0, Math.min(high - 1, y)); }
@@ -14957,6 +15698,222 @@ function videoGone(k, one) {    // lzrprf lets go of its MP4, and the sound proc
 END
 }
 
+# Website decisions in the LZRDFNDR window.
+# SYNC: managed-projects/lzrbrwsr/architecture/lzrdfndr.md
+sub window_website_text {
+    return <<'END';
+var WEB_PILLS = [['Always allow', 'always'], ['Allow once', 'allow-once'], ['Always Deny', 'deny'], ['Deny once', 'deny-once'], ['Forget', 'forget']];
+var WEB_EFFECT = { 'allowed always': 'always', 'allowed once': 'allow-once', 'denied always': 'deny', 'denied once': 'deny-once',
+    'proceed always': 'always', 'cancel always': 'deny', proceeded: 'allow-once', cancelled: 'deny-once', pending: 'forget', 'no decision': 'forget' };
+var ESSENTIAL_TITLE = 'Essential Allow and deny list';
+var essentialScriptPrompt = false, essentialList = null, essentialIn = null, essentialOpen = false, essentialOn = false, essentialChanges = {}, essentialError = '';
+var sendsList = null, sendsIn = null, webReturn = null, webReviewButton = null, webReviewLabel = null;
+function webEffect(decision) { return WEB_EFFECT[decision] || decision; }
+function webPillsFit(one, w) {
+    var width = Math.min(115, (w - 44) / WEB_PILLS.length - 6), active = webEffect(one.web.decision);
+    return WEB_PILLS.map(function (pill, k) {
+        return { word: pill[0], to: pill[1], x: 16 + k * (width + 6), y: one.y + 38 + one.detail, w: width, h: 24, active: active == pill[1] };
+    });
+}
+function webRow(one, words, sayWhat, y, w, tall) {
+    var detail = tall(words, sans(11.5), w - 32);
+    return { web: one, words: words, says: sayWhat, y: y, h: 91 + detail, detail: detail };
+}
+function webLaid(items, w, tall) {
+    var y = 2, headline = ESSENTIAL_TITLE + (essentialOpen ? '  \u25be' : '  \u25b8');
+    items.push({ essentialHead: true, y: y, h: 48, text: headline });
+    y += 59;
+    if (essentialOpen) {
+        if (essentialList) essentialList.forEach(function (one) {
+            var row = webRow({ n: one.n, name: one.name, decision: essentialChanges[one.n] || one.decision },
+                (one.kind == 'redirect' ? 'Redirect to ' + one.to : 'Script on ' + one.site), 'essential', y, w, tall);
+            items.push(row); y += row.h + 8;
+        });
+    }
+    if (essentialError) {
+        var error = { text: essentialError, font: sans(12, true), colour: YELLOW, y: y, h: tall(essentialError, sans(12, true), w - 8) };
+        items.push(error); y += error.h + 12;
+    }
+    if (webReturn) return y;
+    var groups = Object.create(null);
+    function add(list, kind) {
+        (list || []).forEach(function (one) {
+            if (one.n === undefined) return;
+            var domain = one.site.replace(/^https:\/\//, ''), group = groups[domain] || (groups[domain] = []);
+            group.push({ one: one, kind: kind });
+        });
+    }
+    add(sitesList, 'script'); add(redirectsList, 'redirect'); add(sendsList, 'send');
+    Object.keys(groups).sort().forEach(function (site) {
+        var h = tall(site, sans(14, true), w - 8);
+        items.push({ text: site, font: sans(14, true), colour: WHITE, y: y, h: h }); y += h + 8;
+        groups[site].forEach(function (entry) {
+            var one = entry.one, kind = entry.kind;
+            var words = kind == 'redirect' ? 'Redirect ' + one.status + (one.to ? ' to ' + one.to : '') + (one.fit ? '' : ' (unavailable)') :
+                kind == 'send' ? 'Send to ' + one.name : ['Script', one.where, one.bytes ? one.bytes + ' bytes' : '', one.who,
+                    one.cls == 'strings' ? 'turns text into code (eval)' : ''].filter(Boolean).join(', ');
+            var row = webRow(one, words, { script: 'scripts decide', redirect: 'redirects decide', send: 'sends decide' }[kind], y, w, tall);
+            row.fit = kind != 'redirect' || one.fit;
+            items.push(row); y += row.h + 8;
+        });
+    });
+    return y;
+}
+function webPaintHead(one, w) {
+    var card = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1.5, one.y + 0.5, w - 3, one.h - 1), 10, 10);
+    FILL.setFill; card.fill; stroked(card, LINE, 1);
+    var tick = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(14, one.y + 9, 30, 30), 6, 6);
+    if (essentialOn) {
+        GREEN.setFill; tick.fill;
+        var check = $.NSBezierPath.bezierPath;
+        check.moveToPoint($.NSMakePoint(21, one.y + 24)); check.lineToPoint($.NSMakePoint(27, one.y + 31)); check.lineToPoint($.NSMakePoint(38, one.y + 17));
+        stroked(check, DARK, 2.5);
+    } else stroked(tick, ICON, 1.5);
+    styled(one.text, inked(sans(14, true), WHITE)).drawAtPoint($.NSMakePoint(54, one.y + 15));
+}
+function webPaintRow(one, w) {
+    var card = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1.5, one.y + 0.5, w - 3, one.h - 1), 10, 10);
+    FILL.setFill; card.fill; stroked(card, LINE, 1);
+    $(one.web.name).drawInRectWithAttributes($.NSMakeRect(16, one.y + 10, w - 32, 19), inked(sans(13.5, true), WHITE, true));
+    styled(one.words, inked(sans(11.5), GREY)).drawInRect($.NSMakeRect(16, one.y + 30, w - 32, one.detail + 2));
+    var active = 'Forget';
+    webPillsFit(one, w).forEach(function (pill) {
+        var box = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(pill.x, pill.y, pill.w, pill.h), 8, 8);
+        if (pill.active) { glass(box, true); active = pill.word; }
+        stroked(box, pill.active ? GREEN : ICON, 1);
+        var inactive = one.fit === false && /^(always|allow-once)$/.test(pill.to), label = styled(pill.word, inked(sans(11, pill.active), inactive ? GREY : WHITE));
+        label.drawAtPoint($.NSMakePoint(pill.x + Math.max(2, (pill.w - label.size.width) / 2), pill.y + 4));
+    });
+    styled(active, inked(sans(11.5, true), GREEN)).drawAtPoint($.NSMakePoint(16, one.y + 67 + one.detail));
+}
+function webClick(at, items, w) {
+    for (var i = 0; i < items.length; i++) {
+        var row = items[i];
+        if (at.y < row.y || at.y >= row.y + row.h) continue;
+        if (row.essentialHead) {
+            if (at.x < 50 && essentialList) { essentialOn = !essentialOn; essentialOpen = true; }
+            else essentialOpen = !essentialOpen;
+            toolChanged(); return;
+        }
+        if (!row.web) continue;
+        var hit = webPillsFit(row, w).filter(function (pill) { return at.x >= pill.x && at.x <= pill.x + pill.w && at.y >= pill.y && at.y <= pill.y + pill.h; })[0];
+        if (!hit || (row.fit === false && /^(always|allow-once)$/.test(hit.to))) return;
+        if (row.says == 'essential') { essentialChanges[row.web.n] = hit.to; toolChanged(); return; }
+        var decision = row.says == 'redirects decide' ? { always: 'proceed', deny: 'cancel' }[hit.to] || hit.to : hit.to;
+        say(row.says + ' ' + row.web.n + ' ' + decision);
+        return;
+    }
+}
+function webSettingsShown() { return modalOpen && modalKind == 'tool' && toolTab == 'websites'; }
+function webRead() {
+    sitesList = redirectsList = sendsList = essentialList = null;
+    essentialOpen = false; essentialChanges = {}; essentialError = '';
+    say('scripts sites'); say('redirects list'); say('sends list'); say('essential list');
+}
+function sendsTold(rest) {
+    var fields = rest.split('\t');
+    if (rest == 'begin') sendsIn = [];
+    else if (rest == 'end' && sendsIn) { sendsList = sendsIn; sendsIn = null; if (webSettingsShown()) toolChanged(); }
+    else if (sendsIn && /^one [0-9]{1,4}$/.test(fields[0]) && fields.length == 4)
+        sendsIn.push({ n: +fields[0].slice(4), site: fields[1], name: fields[2], decision: fields[3] });
+}
+function essentialTold(rest) {
+    var f = rest.split('\t');
+    if (rest == 'script') essentialScriptPrompt = true;
+    else if (/^begin [01]$/.test(rest)) { essentialIn = []; essentialOn = rest == 'begin 1'; }
+    else if (rest == 'end' && essentialIn) { essentialList = essentialIn; essentialIn = null; if (webSettingsShown()) toolChanged(); }
+    else if (essentialIn && /^row [0-9]$/.test(f[0]) && f.length == 6)
+        essentialIn.push({ n: +f[0].slice(4), kind: f[1], site: f[2], name: f[3], to: f[4], decision: f[5] });
+    else if (rest == 'saved failed') { essentialError = 'The list could not be saved.'; toolChanged(); }
+    else if (rest == 'saved ok' || rest == 'saved resolved') {
+        essentialChanges = {}; essentialError = '';
+        if (webReturn) webReviewEnded(rest == 'saved resolved');
+    }
+}
+function essentialSave() {
+    var changes = Object.keys(essentialChanges).map(function (id) { return ' ' + id + '=' + essentialChanges[id]; }).join('');
+    say('essential save ' + (essentialOn ? '1' : '0') + changes);
+}
+function webQuestionTold(rest) {
+    var f = rest.split('\t'), number = ++asked;
+    webQuestionShown({ kind: f[0], words: f[1], essential: f[2] != '-', fit: f[3] == '1', titles: f.slice(4), number: number });
+}
+function webQuestionShown(one) {
+    var answerByPosition = [3, 2, 4, 1, 5, 6];
+    var choices = one.titles.map(function (title, i) {
+        return [title, function () { closeModal(); say('button ' + one.number + ' ' + answerByPosition[i]); }];
+    });
+    modal('LZRDFNDR ' + (one.kind == 'redirect' ? 'redirect' : 'send'), one.words || '', choices, 'tall');
+    if (!one.fit) { panelButtons[0].enabled = false; panelButtons[1].enabled = false; }
+    if (one.essential) webWarning('redirect', function () { webQuestionShown(one); });
+}
+function webWarning(kind, again) {
+    webReturn = null;
+    if (!webReviewButton) {
+        webReviewButton = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 0, 0));
+        webReviewButton.title = $('Review and enable Essential Allow and deny list');
+        webReviewButton.font = sans(12, true); webReviewButton.bezelStyle = 1; webReviewButton.target = hand; webReviewButton.action = 'essentialReview:';
+        panel.addSubview(webReviewButton);
+        webReviewLabel = $.NSTextField.wrappingLabelWithString($(''));
+        webReviewLabel.font = sans(12, true); webReviewLabel.textColor = GREEN;
+        panel.addSubview(webReviewLabel);
+    }
+    webReviewLabel.stringValue = $('This ' + kind + ' belongs to our LZRDFNDR "Essential Allow and deny list" - Do you want to enable "Essential Allow and deny list"');
+    webReviewLabel.hidden = webReviewButton.hidden = false;
+    webReviewButton.toolTip = $('Edit the entries before turning the list on');
+    webReviewAction = again;
+    placeModal();
+}
+var webReviewAction = null;
+function webWarningHidden() {
+    if (webReviewButton) webReviewButton.hidden = webReviewLabel.hidden = true;
+    webReviewAction = null;
+}
+function isWebQuestion() { return /^LZRDFNDR (scripts|redirect|send)$/.test(String(panelTitle.stringValue.js)); }
+function webQuestionPlaced(m, w, h) {
+    if (!panelButtons.length || !isWebQuestion()) return;
+    var permit = modalKind == 'permit', extra = panelButtons.length > WEB_PILLS.length, count = Math.min(panelButtons.length, WEB_PILLS.length);
+    var wButton = Math.floor((w - 52 - (count - 1) * 5) / count), line = m + (permit ? 53 : 18);
+    for (var i = 0; i < count; i++) {
+        var button = panelButtons[i];
+        button.font = sans(11, i == 3);
+        button.frame = $.NSMakeRect(m + 26 + i * (wButton + 5), line, wButton, 32);
+    }
+    if (extra) {
+        var last = panelButtons[count], lastW = permit ? 105 : 221;
+        last.frame = $.NSMakeRect(m + w - 26 - lastW, m + (permit ? 18 : 53), lastW, 32);
+    }
+    var warning = webReviewButton && !webReviewButton.hidden;
+    var under = !permit && extra ? 97 : 65;
+    if (permit) {
+        var top = h - (warning ? 261 : 204);
+        panelScroll.frame = $.NSMakeRect(m + 26, m + 93, w - 52, Math.max(28, top - 93));
+    } else {
+        var bodyFloor = under + (warning ? 65 : 0);
+        panelSub.frame = $.NSMakeRect(m + 26, m + bodyFloor, w - 52, Math.max(28, h - bodyFloor - 60));
+    }
+    if (!warning) return;
+    var right = Math.min(312, Math.floor((w - 62) * 0.48)), y = m + (permit ? h - 253 : under + 5);
+    webReviewLabel.frame = $.NSMakeRect(m + 26, y, Math.max(100, w - 62 - right), 55);
+    webReviewButton.frame = $.NSMakeRect(m + w - 26 - right, y + 8, right, 34);
+}
+function webReviewOpened() {
+    if (!webReviewAction) return;
+    webReturn = webReviewAction;
+    tool = tool || { title: TOOL_TITLE, words: '', head: '', said: '', buttons: {}, rows: [] };
+    tool.busy = ''; tool.confirm = false; toolTab = 'websites';
+    essentialList = null; essentialOpen = true; essentialChanges = {}; essentialError = '';
+    say('essential list');
+    modal(TOOL_TITLE, '', toolChoices(), 'tool'); toolChanged();
+}
+function webReviewEnded(resolved) {
+    var again = webReturn;
+    webReturn = null;
+    if (resolved) { permitLater = null; closeModal(); }
+    else if (again) again();
+}
+END
+}
 # The window. This text is run by the system's own osascript, in the window
 # container. It makes one window with the application's name: the bar on top,
 # lzrprf's strip under it, the page below, and under the page a pane that
@@ -15337,14 +16294,14 @@ function heard(line) {
     }
     var at = line.indexOf(' '), word = at < 0 ? line : line.slice(0, at), rest = at < 0 ? '' : line.slice(at + 1);
     var aside = selected != perlTab;    // the window shows a tab lzrprf has not been told of yet: what lzrprf says of its own tab's bar, lock and arrows is said again once it is told
-    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
+    if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); if (word == 'page') inspectClose(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
     if (word == 'picture') pictureBegun(rest); else if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
     else if (word == 'patch' || word == 'runs') { var p = (word == 'patch' ? /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/ : /^(\d{1,2}) (\d{1,3})$/).exec(rest); if (p) { listFor = +p[1]; listPatch = word == 'patch' ? [+p[2], +p[3]] : [+p[2]]; list = []; again = true; } }    // runs: several stretches in one list (runsOf, 28-window-pointer.pl)
     else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
-    else if (word == 'tabs') tabsTold(rest);
+    else if (word == 'tabs') { tabsTold(rest); if (!inspectFits(inspectUI)) inspectClose(); }
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
     else if (word == 'install') installTold(rest);
-    else if (word == 'checked') checkedTold(rest);
+    else if (word == 'checked') checkedTold(rest); else if (word == 'release') releaseNumber = rest;    // for About (28-window-menu.pl)
     else if (word == 'licence') licenceTold(rest);
     else if (word == 'profiles') profilesTold(rest);
     else if (word == 'sso') ssoTold(rest);
@@ -15378,16 +16335,18 @@ function heard(line) {
     else if (word == 'mark') markTold(rest);
     else if (word == 'pictures') { picturesRow = true; picturesBlocked = rest == 'block'; if (cogOpen) cogPlaced(); }
     else if (word == 'marksbar') { marksOn = rest == 'on'; marksView.hidden = !marksOn; if (barMenuItem) barMenuItem.title = $(barToggleWords(marksOn, true)); place(); }
-    else if (word == 'redirect') redirectTold(rest);
     else if (word == 'flagged' || word == 'flagreport') flagTold(word, rest);    // [C28] LZRDFNDR's red page, and the report of a wrong block before it is sent
     else if (word == 'permit') permitTold(rest);    // [C26] lzrprf's question about the scripts of the page shown
     else if (word == 'permitscript') permitScriptTold(rest);    // [C26] one script of that question, with its source
     else if (word == 'scripts') scriptsTold(rest);    // [C26] the list of LZRDFNDR scripts
+    else if (word == 'webquestion') webQuestionTold(rest);
+    else if (word == 'sends') sendsTold(rest);
+    else if (word == 'essential') essentialTold(rest);
     else if (word == 'sites') sitesTold(rest);    // [C26] LZRDFNDR's On Websites
     else if (word == 'redirects') redirectsTold(rest);    // [C4] LZRDFNDR's Redirects
     else if (word == 'filters') filtersTold(rest);    // [C27] the list page of Filters
     else if (word == 'layers') layersTold(rest);    // [C18] the layers of the page kept running
-    else if (word == 'live') liveTold(rest);
+    else if (word == 'live') { liveTold(rest); if (!liveOn || trmnlKeys) inspectClose(); } else if (word == 'inspect') inspectTold(rest);
     else if (word == 'video') videoTold(rest);
     else if (word == 'scroll') pageScrollTo(rest); else if (word == 'cursor') pointerShaped(rest);    // the pointer's shape over the page (28-window-pointer.pl)
     else if (word == 'quit') app.terminate($());
@@ -16060,6 +17019,7 @@ function shareNow() { return sheet && sheet.high > 0 && scroll.documentView.isEq
 // shown with its kept drawing (tabClosed). Only an open question or modal takes the press instead.
 function tabSaid(line, closed, kept) {
     if (modalOpen || asking) return;
+    if (closed !== undefined && tabs.length < 2 && /^tab close /.test(line)) { win.performClose($()); return; }    // T6 (Henry, 2026-11-26): closing the last tab closes the window, as the red dot does, and no empty tab is opened in its place
     var chose = /^tab select (\d+)$/.exec(line), to = chose ? +chose[1] : undefined;
     if (chose && kept === undefined) kept = tabChosen(to); else if (closed !== undefined && takes() && tabClosed(closed)) { kept = true; closed = undefined; }
     if (kept && line.slice(0, 4) == 'tab ') line += ' kept';
@@ -16712,7 +17672,10 @@ function supportAbout() {
 function windowPicture() {    // the window's own drawing of itself, at one pixel a point, made smaller until its PNG is one lzrprf sends; null when none is
     var r = root.bounds, big = root.bitmapImageRepForCachingDisplayInRect(r);
     if (!big || big.isNil()) return null;
-    root.cacheDisplayInRectToBitmapImageRep(r, big);
+    var localPane = inspectUI && inspectUI.pane, locallyHidden = localPane && localPane.hidden;
+    if (localPane) localPane.hidden = true;
+    try { root.cacheDisplayInRectToBitmapImageRep(r, big); }
+    finally { if (localPane) localPane.hidden = locallyHidden; }
     for (var scale = 1; scale >= 0.25; scale /= 2) {
         var w = Math.max(1, Math.round(r.size.width * scale)), h = Math.max(1, Math.round(r.size.height * scale));
         var rep = $.NSBitmapImageRep.alloc.initWithBitmapDataPlanesPixelsWidePixelsHighBitsPerSampleSamplesPerPixelHasAlphaIsPlanarColorSpaceNameBytesPerRowBitsPerPixel(null, w, h, 8, 4, true, false, $('NSDeviceRGBColorSpace'), 0, 0);
@@ -16973,7 +17936,7 @@ var shot = null, shotView = null, shotParts = null, SHOT_FLY = 0.11, SHOT_FLASH 
 function homeActionShot(action) {
     if (!homePress || Date.now() - homePress.at > 1000 || !flightAllowed()) return;
     var target = action == 'search' ? bar : tabsView, k = layersKit(), now = $.NSProcessInfo.processInfo.systemUptime;    // Core Animation's clock
-    var to = action == 'search' ? $.NSMakePoint(Math.min(bar.frame.size.width / 2, 160), bar.frame.size.height / 2)
+    var to = action == 'search' ? $.NSMakePoint(PILL.origin.x + PILL.size.width / 2 - bar.frame.origin.x, bar.frame.size.height / 2)    // T4 (Henry, 2026-11-26): the horizontal middle of the search box, the pill the bar is drawn in (both in the bar's row)
         : $.NSMakePoint(TABS_X + (tabs.length + 0.5) * Math.max(1, Math.min(260, Math.floor((tabsView.frame.size.width - TABS_X - 48) / (tabs.length + 1)))), tabsView.frame.size.height / 2);
     if (!shotView) { shotView = $.LzrprfLayers.alloc.initWithFrame(root.bounds); shotView.layer = k.layer.layer; shotView.wantsLayer = true; root.addSubview(shotView); shotParts = [k.shape.layer, k.shape.layer]; shotParts.forEach(function (one) { shotView.layer.addSublayer(one); }); }
     shotView.frame = root.bounds; shotView.hidden = false;
@@ -17305,7 +18268,7 @@ function paintIcon(view, glyph, hot, on, lit) {
 // replaces it, so nothing is ticked against an old look; measured, the wait for lzrprf's answer was the lag.
 var gameHelper = false, gameStaged = false, TOOL_READING = 'Reading this computer', tool = null, toolIn = null, toolIcon = null, toolScroll = null, toolView = null, toolCopy = null, toolWaiting = false, toolBack = 0, toolItems = null, TOOL_WIDE = 800, TOOL_HIGH = 660;    // DECLARED(as wide as its three buttons side by side, and as tall as most laptop windows leave)
 function toolPressed(tab) {    // TAB: the tab it opens on, On Your Computer unless named ("other": the minigame's Setup LZRDFNDR)
-    if (modalOpen) { if (modalKind == 'tool') closeModal(); return; }
+    if (modalOpen) { if (modalKind == 'tool') { if (webReturn) webReviewEnded(false); else closeModal(); } return; } if (permitReopened()) return;    // a minimized question about scripts comes back first (28-window1-tabs.pl)
     techHidden(); secureHidden(); suggestHidden();
     toolWaiting = true; toolBack = 0; toolIcon.needsDisplay = true;
     say('tool open');    // first: lzrprf reads while the panel is made
@@ -17340,7 +18303,7 @@ function toolTold(rest) {
 // copy button of the question about scripts, is the only thing that writes to the clipboard;
 // clipboardWrite is that one write, for both (selftest puts its own in its place).
 var TOOL_TITLE = 'LZRDFNDR \u2014 Spyware and Scripts', toolTab = 'computer', toolTabs = [], sitesIn = null, sitesList = null;    // the panel's three tabs: On Your Computer, the application's list; On Websites, the scripts of each site and your decision on each; Redirects, every redirect put to you and your decision on each
-var TOOL_TABS = ['computer', 'websites', 'redirects', 'other'], redirectsIn = null, redirectsList = null;
+var TOOL_TABS = ['computer', 'websites', 'other'], redirectsIn = null, redirectsList = null;
 var TOOL_COPY_WORDS = 'Copy found apps information to clipboard', TOOL_COPY_LEAD = 'These apps were found using LZRDFNDR by LZRBRWSR. We recommend analyzing and understanding what they are so you can make an informed choice to disable or keep them:';
 var clipboardWrite = function (text) { var board = $.NSPasteboard.generalPasteboard; board.clearContents; return !!board.setStringForType($(text), $('public.utf8-plain-text')); };
 function toolPicked() { return tool ? tool.rows.filter(function (row) { return row.on; }) : []; }
@@ -17354,6 +18317,7 @@ function toolTicked(mode) { return tool ? tool.rows.filter(function (row) { retu
 function toolNumbers(mode) { return toolTicked(mode).map(function (row) { return row.i; }).join(','); }
 function toolChoices() {
     if (tool && toolTab == 'other') return [['Close', closeModal], [gameStaged ? 'Switch on' : 'Switch off', gameApplied]];    // the sentry's box ticked or not stages the choice, and this button applies it
+    if (toolTab == 'websites') return [[webReturn ? 'Back' : 'Close', webReturn ? function () { webReviewEnded(false); } : closeModal], ['Save', essentialSave]];
     if (!tool || toolTab != 'computer') return [['Close', closeModal]];
     if (tool.confirm) return [['Back', toolBacked], ['Switch off ' + toolTicked('act').length, toolConfirmed]];
     var out = [['Close', closeModal]];
@@ -17366,7 +18330,7 @@ function toolEnabled() {    // which buttons take a press now: the one that chan
     var acts = toolTicked('act').length, undos = toolTicked('undo').length;
     panelButtons.forEach(function (one, k) { var act = modalActions[k]; one.enabled = act == closeModal || !!tool && (!tool.busy || toolTab == 'other') && (act == gameApplied ? gameStaged != gameHelper : act == toolActed || act == toolConfirmed ? acts > 0 : act == toolUndone ? undos > 0 : true); });
     toolTabs.forEach(function (one, k) {    // the three tabs: not on the question; the one shown in the beam's colour
-        one.hidden = !tool || !!tool.confirm || !modalOpen || modalKind != 'tool';
+        one.hidden = !tool || !!tool.confirm || !!webReturn || !modalOpen || modalKind != 'tool';
         one.bezelColor = TOOL_TABS[k] == toolTab ? $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.05, 0.42, 0.52, 1) : $.NSColor.clearColor;
         one.state = TOOL_TABS[k] == toolTab ? 1 : 0;
     });
@@ -17389,8 +18353,7 @@ function toolSized() {
 function toolTabbed(which) {    // a tab pressed: On Websites asks lzrprf for its scripts each time it is shown
     if (!tool || tool.busy && !tool.reading || tool.confirm || !modalOpen || modalKind != 'tool' || toolTab == which) return;
     toolTab = which;
-    if (which == 'websites') { sitesList = null; say('scripts sites'); }
-    if (which == 'redirects') { redirectsList = null; say('redirects list'); }
+    if (which == 'websites') webRead();
     gameStaged = gameHelper; toolChanged(); toolView.scrollPoint($.NSMakePoint(0, 0));
 }
 // [C26] On Websites, as lzrprf tells it: "sites begin", "sites site SITE", "sites script N<tab>SITE<tab>NAME<tab>inline|external<tab>
@@ -17412,11 +18375,8 @@ function redirectsTold(rest) {
     else if (!redirectsIn) return;
     else if (word == 'site') redirectsIn.push({ site: more });
     else if (word == 'one' && f.length == 7 && /^\d{1,4}$/.test(f[0])) redirectsIn.push({ n: +f[0], site: f[1], status: f[2], name: f[3], to: f[4], decision: f[5], fit: f[6] == '1' });
-    else if (word == 'end') { redirectsList = redirectsIn; redirectsIn = null; if (modalOpen && modalKind == 'tool' && toolTab == 'redirects') toolChanged(); }
+    else if (word == 'end') { redirectsList = redirectsIn; redirectsIn = null; if (modalOpen && modalKind == 'tool' && toolTab == 'websites') toolChanged(); }
 }
-var REDIRECT_PILLS = [['Proceed', 'proceed'], ['Cancel', 'cancel'], ['Forget', 'forget']];
-var SITE_PILLS = [['Always', 'always'], ['Deny', 'deny'], ['Forget', 'forget']];
-function sitePills(one, w) { var pills = one.pills || SITE_PILLS; return pills.map(function (pill, k) { return { word: pill[0], to: pill[1], x: w - 14 - (pills.length - k) * 74 + 6, y: one.y + 10, w: 68, h: 24 }; }); }
 function gameApplied() { if (gameStaged == gameHelper) return; gameHelper = gameStaged; say('game helper ' + (gameStaged ? 'on' : 'off')); toolChanged(); }    // H-0071: the sentry as staged, shown at once and kept by lzrprf, whose "game helper 0|1" wins
 function toolBacked() { tool.confirm = false; toolChanged(); }
 function toolActed() { if (!toolTicked('act').length) return; tool.confirm = true; toolChanged(); toolView.scrollPoint($.NSMakePoint(0, 0)); }
@@ -17436,29 +18396,8 @@ function toolLaid() {    // what the list draws, from its top: each piece with w
         items.push({ row: { on: gameStaged, mode: gameHelper ? 'undo' : 'act', tag: gameHelper ? 'on' : 'off', title: 'LZRDFNDR minigame sentry', detail: said, fact: '' }, game: true, y: y, h: high, detail: detail, fact: 0 });    // H-0071: a box as a row of On Your Computer; its tag says what is switched now
         toolItems = { items: items, high: y + high + 10, wide: w }; return toolItems;
     }
-    if (toolTab == 'redirects' && !tool.confirm) {    // [C4] every redirect put to you in this window, under the site that redirected, with its decision and the pills that change it
-        note('Every redirect lzrprf put to you in this window, and your decision on each. Proceed or Cancel here answers that same redirect for you from now on, in this window; Forget asks again. Nothing of it is written.', sans(13), WHITE, 12);
-        if (!redirectsList) note('Reading the redirects', sans(12.5, true), GREEN, 12);
-        else if (!redirectsList.length) note('No redirect has been put to you in this window yet.', sans(12.5), GREY, 12);
-        else redirectsList.forEach(function (one) {
-            if (one.n === undefined) return note(one.site.replace(/^https:\/\//, ''), sans(14, true), WHITE, 8);
-            var words = one.status + (one.to ? ' to ' + one.to : ', naming no address to go to') + (one.fit ? '' : ', which lzrprf cannot follow'), detail = tall(words, sans(11.5), inner - 230), h = 11 + 19 + detail + 11;
-            items.push({ web: one, words: words, y: y, h: h, detail: detail, pills: REDIRECT_PILLS, says: 'redirects decide' });
-            y += h + 8;
-        });
-        toolItems = { items: items, high: y + 2, wide: w };
-        return toolItems;
-    }
     if (toolTab == 'websites' && !tool.confirm) {
-        note('The scripts of each website that were put to you, and your decision on each: allowed or denied always is kept in LZRDFNDR scripts, once holds for one visit.', sans(13), WHITE, 12);
-        if (!sitesList) note('Reading the scripts of the websites', sans(12.5, true), GREEN, 12);
-        else if (!sitesList.length) note('No website has asked to run a script that needed your decision yet.', sans(12.5), GREY, 12);
-        else sitesList.forEach(function (one) {
-            if (one.n === undefined) return note(one.site.replace(/^https:\/\//, ''), sans(14, true), WHITE, 8);
-            var words = [one.where].concat(one.bytes ? [one.bytes + ' bytes'] : [], one.who ? [one.who] : [], one.cls == 'strings' ? ['wants to turn text into code (eval)'] : []).join(', '), detail = tall(words, sans(11.5), inner - 230), h = 11 + 19 + detail + 11;
-            items.push({ web: one, words: words, y: y, h: h, detail: detail });
-            y += h + 8;
-        });
+        y = webLaid(items, w, tall);
         toolItems = { items: items, high: y + 2, wide: w };
         return toolItems;
     }
@@ -17484,7 +18423,8 @@ function paintTool() {
     var laid = toolLaid(), w = laid.wide, seen = toolView.visibleRect;
     laid.items.forEach(function (one) {
         if (one.y + one.h < seen.origin.y - 4 || one.y > seen.origin.y + seen.size.height + 4) return;    // only what shows is drawn
-        if (one.web) return paintSite(one, w);
+        if (one.essentialHead) return webPaintHead(one, w);
+        if (one.web) return webPaintRow(one, w);
         if (one.proc || one.procs) return paintProc(one, w);
         if (!one.row) return styled(one.text, inked(one.font, one.colour)).drawInRect($.NSMakeRect(4, one.y, w - 8, one.h + 2));
         var row = one.row, can = row.mode != 'none', card = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1.5, one.y + 0.5, w - 3, one.h - 1), 10, 10);
@@ -17508,33 +18448,10 @@ function paintTool() {
         if (one.fact) styled(row.fact, inked(mono(10.5), DIM)).drawInRect($.NSMakeRect(42, one.y + 30 + one.detail + 6, w - 54, one.fact));
     });
 }
-function paintSite(one, w) {    // [C26] one script of On Websites: its name, what it is, your decision, and the three pills that change it
-    var web = one.web, card = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1.5, one.y + 0.5, w - 3, one.h - 1), 10, 10), none = /^(no decision|pending|off)$/.test(web.decision);
-    FILL.setFill; card.fill;
-    stroked(card, LINE, 1);
-    $(web.name).drawInRectWithAttributes($.NSMakeRect(16, one.y + 10, w - 16 - 240, 19), inked(sans(13.5, true), WHITE, true));
-    styled(one.words, inked(sans(11.5), GREY)).drawInRect($.NSMakeRect(16, one.y + 30, w - 16 - 240, one.detail + 2));
-    var said = styled(web.decision.toUpperCase(), inked(sans(9.5, true), none ? GREY : /^denied|^cancel/.test(web.decision) ? YELLOW : GREEN));
-    said.drawAtPoint($.NSMakePoint(w - 14 - said.size.width, one.y + 40));
-    sitePills(one, w).forEach(function (pill) {
-        var box = $.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(pill.x, pill.y, pill.w, pill.h), 8, 8);
-        stroked(box, ICON, 1);
-        var label = styled(pill.word, inked(sans(11.5), WHITE));
-        label.drawAtPoint($.NSMakePoint(pill.x + (pill.w - label.size.width) / 2, pill.y + 4));
-    });
-}
 function toolClicked(event) {
     if (!tool || tool.confirm || tool.busy && toolTab != 'other') return;
     var at = pointIn(toolView, event), items = toolLaid().items; if (toolTab == 'other') { items.forEach(function (one) { if (one.game && at.y >= one.y && at.y < one.y + one.h) { gameStaged = !gameStaged; toolChanged(); } }); return; }    // the sentry's box: staged, applied by Switch on or Switch off (gameApplied)
-    if (toolTab != 'computer') {    // a pill of a script or a redirect: the decision changed by lzrprf, which tells the list again
-        var w = toolLaid().wide;
-        for (var j = 0; j < items.length; j++) {
-            if (!items[j].web) continue;
-            var hit = sitePills(items[j], w).filter(function (pill) { return at.x >= pill.x && at.x <= pill.x + pill.w && at.y >= pill.y && at.y <= pill.y + pill.h; })[0];
-            if (hit) { say((items[j].says || 'scripts decide') + ' ' + items[j].web.n + ' ' + hit.to); return; }
-        }
-        return;
-    }
+    if (toolTab == 'websites') { webClick(at, items, toolLaid().wide); return; }
     if (procClicked(at, items)) return;
     for (var k = 0; k < items.length; k++) {
         var one = items[k];
@@ -18020,7 +18937,8 @@ function torBeamDrawn(view) {
 
 function modal(title, about, choices, kind) {
     welcoming = false;
-    installState = '';    // set again by installTold when this modal is the installer's
+    installState = '';
+    webWarningHidden();    // set again by installTold when this modal is the installer's
     cogHidden();
     modalOpen = true;
     modalKind = kind;
@@ -18087,7 +19005,7 @@ function buttons(choices) {
         one.bezelStyle = 1;
         one.font = sans(13, i == choices.length - 1);
         if (choices.length == 1 || (modalKind == 'flag' && i == 0)) one.keyEquivalent = $('\r');    // Return presses it, and it is drawn as the button Return presses; [C28] on LZRDFNDR's page the first, Close the Tab or Cancel
-        if (modalEscape < 0 && (modalKind == 'tall' || modalKind == 'flag' ? i == 0 : MODAL_ESCAPES.indexOf(choice[0]) >= 0)) modalEscape = i;
+        if (modalEscape < 0 && (isWebQuestion() ? choice[0] == 'Deny once' : modalKind == 'tall' || modalKind == 'flag' ? i == 0 : MODAL_ESCAPES.indexOf(choice[0]) >= 0)) modalEscape = i;
         if (modalKind == 'flag') { one.font = sans(13, i == 0); if (i == 0) one.bezelColor = $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.55, 0.05, 0.05, 1); }    // [C28] the first is the primary one there
         else if (i == choices.length - 1 && choices.length > 1) one.bezelColor = $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.05, 0.42, 0.52, 1);    // the step forward, in the beam's colour; the step back stays plain
         one.target = hand;
@@ -18106,6 +19024,7 @@ function closeModal() {
     var back = flyBack();    // before anything in the panel changes, so the picture that flies is the panel as it was
     if (techOpen) { techOpen = false; under.hidden = true; }
     modalOpen = false;
+    webWarningHidden();
     veil.hidden = !back;
     bar.enabled = free;
     logs.enabled = free || listing == 'log';
@@ -18229,6 +19148,7 @@ function placeModal() {
         panelButtons[i].frame = $.NSMakeRect(x, M + 18, bw, 32);
         x -= 10;
     }
+    webQuestionPlaced(M, w, h);
     procsPlaced(M, w);
 }
 
@@ -18279,15 +19199,9 @@ function permitCodeText(scripts) {    // the code block: each script under a lin
 }
 function permitTold(rest) {
     asked++;
-    var parts = rest.split('\t'), number = permitAsked = asked;
-    permitShown = permitScripts;
+    var parts = rest.split('\t'); parts.essential = essentialScriptPrompt; essentialScriptPrompt = false;
+    permitShow(parts, permitAsked = asked, permitShown = permitScripts);    // drawn by permitShow (28-window1-tabs.pl), which also minimizes it
     permitScripts = [];
-    modal('LZRDFNDR scripts', parts[1] || '', parts.slice(2).map(function (title, i) { return [title, function () { closeModal(); say('button ' + number + ' ' + (i + 1)); }]; }), permitShown.length ? 'permit' : 'tall');
-    if (!permitShown.length) return;
-    panelText.string = $(permitCodeText(permitShown));
-    panelText.font = mono(11.5);
-    panelText.textColor = WHITE;
-    panelText.scrollRangeToVisible($.NSMakeRange(0, 0));
 }
 function permitCopied() { if (modalOpen && modalKind == 'permit' && permitShown.length) permitCopy.title = $(clipboardWrite(permitCodeText(permitShown)) ? 'Copied' : 'Not copied'); }
 
@@ -18377,17 +19291,6 @@ function flagTold(word, rest) {
     if (word == 'flagged') modal('LZRDFNDR \u2014 CONTENT FLAGGED', 'This content has been blocked by LZRDFNDR because it was identified as potentially harmful or prohibited.\n\nDetected category: ' + parts[0], [['Close the Tab', answer(1)], ['Report False Positive Anonymously', answer(2)]], 'flag');
     else modal('Report False Positive Anonymously', 'This is the whole report. Nothing is sent until you press Send.\n\nCategory: ' + parts[0] + '\nList: ' + parts[1] + '\nConfidence: ' + parts[2] + '\nPage: ' + parts[3] + '\n\nIt goes to ' + parts[4] + '. It holds no address of yours, no history and nothing of the page, and the page is not opened again.', [['Cancel', answer(1)], ['Send', answer(2)]], 'flag');
     if (panelButtons[0]) win.makeFirstResponder(panelButtons[0]);
-}
-
-function redirectTold(rest) {
-    asked++;
-    var parts = rest.split('\t'), number = asked;
-    modal('Redirect', '', parts.slice(4).map(function (title, i) { return [title, function () { closeModal(); say('button ' + number + ' ' + (i + 1)); }]; }), 'tall');
-    var said = $.NSMutableAttributedString.alloc.init;
-    [['You tried to navigate to:\n', GREY], [parts[1] + '\n\n', WHITE], ['The page redirects to (' + parts[0] + '):\n', GREY], [(parts[2] || '(no address)') + (parts[3] ? '\n\n' : ''), WHITE], [parts[3] || '', YELLOW]].forEach(function (one) {
-        said.appendAttributedString(styled(one[0], inked(mono(12.5), one[1])));
-    });
-    panelSub.attributedStringValue = said;    // the reason an address cannot be opened, in yellow under it: lzrprf's own words (its sub unfit)
 }
 
 // The installer's run, as lzrprf tells it: "install begin", "install sum HEX", "install line C TEXT"
@@ -18496,6 +19399,7 @@ function face(flags, size, hex) {
         how.setObjectForKey(one, $.NSFontAttributeName);
         how.setObjectForKey(colour(hex), $.NSForegroundColorAttributeName);    // a link too: the page chose its colour, and a white link on a blue button stays white
         if (flags & 8) how.setObjectForKey($.NSNumber.numberWithInt(1), $.NSUnderlineStyleAttributeName);
+        if (flags & 16) how.setObjectForKey($.NSNumber.numberWithInt(1), $.NSStrikethroughStyleAttributeName);    // line-through (laid.rs looks 16)
         typefaces[key] = [how, one.ascender];
     }
     return typefaces[key];
@@ -18886,12 +19790,8 @@ function viewDrawn(view, paintIt) {
 }
 
 ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: clickThrough({
-    // The page's own menu: Copy, and nothing that looks anything up or opens anything.
-    'menuForEvent:': { types: ['id', ['id']], implementation: function (event) {
-        var menu = $.NSMenu.alloc.initWithTitle($(''));
-        menu.addItemWithTitleActionKeyEquivalent($('Copy'), 'copy:', $(''));
-        return menu;
-    } }
+    // The browser's own Copy and local Inspect actions.
+    'menuForEvent:': { types: ['id', ['id']], implementation: function (event) { return inspectMenu(true); } }
 }) });
 
 ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
@@ -19082,7 +19982,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowDidEndLiveResize:': { types: ['void', ['id']], implementation: function (note) { sizing(false); viewNow(); } },
     'windowDidChangeBackingProperties:': { types: ['void', ['id']], implementation: function (note) { glassPlaced(); view(); } },    // a move to a screen of another scale: the page is drawn again at its pixels
     'windowDidEnterFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
-    'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
+    'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },    // full screen keeps the system's own options, which hide the menu bar and show it at the top: options of its own (auto-hide toolbar on a window with no toolbar) hung a window that opened in full screen (release 131, 2026-11-26)
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },
     'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
@@ -19104,6 +20004,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'tool:': { types: ['void', ['id']], implementation: function (sender) { toolPressed(); } },
     'toolCopy:': { types: ['void', ['id']], implementation: function (sender) { toolCopied(); } },
     'toolAll:': { types: ['void', ['id']], implementation: function (sender) { procsPressed(); } }, 'procNote:': { types: ['void', ['id']], implementation: function (sender) { procNoted(); } },
+    'essentialReview:': { types: ['void', ['id']], implementation: function () { webReviewOpened(); } },
     'toolTab:': { types: ['void', ['id']], implementation: function (sender) { toolTabbed(TOOL_TABS[sender.tag] || 'computer'); } },
     'permitCopy:': { types: ['void', ['id']], implementation: function (sender) { permitCopied(); } },
     'torTick:': { types: ['void', ['id']], implementation: function (timer) { try { torTicked(); } catch (fault) { torTimer.invalidate; torTimer = null; } } },
@@ -19224,13 +20125,13 @@ var CMD = 1 << 20, SHIFT = 1 << 17, OPTION = 1 << 19, CONTROL = 1 << 18;
 function menus() {
     var main = $.NSMenu.alloc.initWithTitle($(''));
     var tabKeys = [1, 2, 3, 4, 5, 6, 7, 8].map(function (n) { return ['Tab ' + n, 'tabNumber:', String(n), true, CMD, n - 1]; }).concat([['Last Tab', 'tabNumber:', '9', true, CMD, -1]]);
-    [[NAME, [['New Incognito Window', 'incognito:', 'N', true], ['Settings...', 'settings:', ',', true], ['Quit ' + NAME, 'terminate:', 'q', false]]],
+    [[NAME, [['Settings...', 'settings:', ',', true], ['Quit ' + NAME, 'terminate:', 'q', false]]],
      ['Edit', [['Undo', 'undo:', 'z', false], ['Redo', 'redo:', 'Z', false], ['Cut', 'cut:', 'x', false], ['Copy', 'copy:', 'c', false], ['Paste', 'paste:', 'v', false], ['Select All', 'selectAll:', 'a', false],
         ['Find...', 'finding:', 'f', true], ['Find Next', 'findNext:', 'g', true], ['Find Previous', 'findPrevious:', 'g', true, CMD | SHIFT]]],
      ['View', [['Zoom In', 'zoomIn:', '+', true], ['Zoom In', 'zoomIn:', '=', true, CMD, 0, true], ['Zoom Out', 'zoomOut:', '-', true], ['Actual Size', 'zoomReset:', '0', true]]],
      ['Go', [['Address', 'bar:', 'l', true], ['Back', 'back:', '[', true], ['Forward', 'forward:', ']', true], ['Reload', 'reload:', 'r', true], ['Clear Browsing History...', 'clearing:', String.fromCharCode(8), true, CMD | SHIFT], ['Clear Cookies of This Site...', 'cookieSite:', '', true], ['Log', 'log:', '', true]]],
      ['Bookmarks', [['Bookmark This Tab...', 'markThis:', 'd', true], ['Show Bookmarks Bar', 'marksBar:', 'b', true, CMD | SHIFT], ['Bookmark Manager', 'bookmarks:', 'b', true, CMD | OPTION], ['Import Bookmarks...', 'importing:', '', true]]],
-     ['Tab', [['New Tab', 'newTab:', 't', true], ['Close Tab', 'closeTab:', 'w', true], ['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
+     ['Tab', [['Reopen Closed Tab', 'reopenTab:', 't', true, CMD | SHIFT], ['Show All Tabs', 'tabsPage:', 'a', true, CMD | SHIFT],
         ['Select Next Tab', 'nextTab:', String.fromCharCode(0xF703), true, CMD | OPTION], ['Select Previous Tab', 'previousTab:', String.fromCharCode(0xF702), true, CMD | OPTION],
         ['Next Tab', 'nextTab:', '\t', true, CONTROL], ['Previous Tab', 'previousTab:', '\t', true, CONTROL | SHIFT]].concat(tabKeys)]].forEach(function (one) {
         var item = $.NSMenuItem.alloc.init, menu = $.NSMenu.alloc.initWithTitle($(one[0]));
@@ -19246,7 +20147,7 @@ function menus() {
         item.submenu = menu;
         main.addItem(item);
     });
-    app.mainMenu = main;
+    menusMore(main); app.mainMenu = main;    // File and Help, and the name in the bar (28-window-menu.pl)
 }
 
 function tabMoved(by) { if (!modalOpen && !asking && tabs.length > 1) tabSaid('tab select ' + ((selected + by + tabs.length) % tabs.length)); }
@@ -19440,6 +20341,31 @@ function veilPressed(event) {
     closeModal();
     say('button ' + permitAsked + ' 1');
     tabsView.mouseDown(event);
+}
+// [C26] The question about scripts can be minimized (ticket 1230): Minimize closes it unanswered, so the page and the window go
+// on as with Deny Once, the answer when nobody answers, and the LZRDFNDR icon brings it back while it is still the newest
+// question. A newer question, or the page going on to another, ends it: lzrprf takes no late answer (sub permit_visited).
+var permitLater = null;    // { parts, number, scripts } of the question minimized, or null
+function permitShow(parts, number, scripts) {
+    var answerByPosition = [4, 3, 2, 1, 5];
+    var choices = WEB_PILLS.map(function (choice, i) {
+        return [choice[0], function () { permitLater = null; closeModal(); say('button ' + number + ' ' + answerByPosition[i]); }];
+    });
+    choices.push(['Minimize', function () { permitLater = { parts: parts, number: number, scripts: scripts }; closeModal(); if (toolIcon) toolIcon.needsDisplay = true; }]);
+    modal('LZRDFNDR scripts', parts[1] || '', choices, scripts.length ? 'permit' : 'tall');
+    if (parts.essential) webWarning('script', function () { permitShow(parts, number, scripts); });
+    if (!scripts.length) return;
+    panelText.string = $(permitCodeText(scripts));
+    panelText.font = mono(11.5);
+    panelText.textColor = WHITE;
+    panelText.scrollRangeToVisible($.NSMakeRange(0, 0));
+}
+function permitReopened() {    // true when the LZRDFNDR icon brought a minimized question back
+    if (!permitLater || permitLater.number != asked) { permitLater = null; return false; }
+    var later = permitLater; permitLater = null;
+    permitShown = later.scripts; permitAsked = later.number;
+    permitShow(later.parts, later.number, later.scripts);
+    return true;
 }
 // The window, continued from 28-window.pl (split there at 800+ lines, HC-0843): LZRDFNDR's Show all
 // processes, then the window's start (function run).
@@ -19697,13 +20623,14 @@ function partsMade() {    // the boxes of the two modals, made once with the pan
 }
 
 function run(argv) {
-    NAME = argv[0] || NAME;
+    NAME = (argv[0] || NAME).replace(/-Staging$/, ' - Staging');    // the staging application, LZRBRWSR-Staging.app, is named "LZRBRWSR - Staging" in the menu bar (Henry, 2026-11-26)
     TORWINDOW = argv[1] == 'tor';
     INCOGNITO = argv[1] == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
     if (INCOGNITO) $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSQuitAlwaysKeepsWindows: false, ApplePersistenceIgnoreState: true }));    // in memory only: macOS is asked to keep no window of it to restore (and this container lets it write no file anyway)
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;
     app.setActivationPolicy(kind());
+    menuBarNamed(NAME);
     app.applicationIconImage = icon(256);
     hand = $.LzrprfHand.alloc.init;
     app.delegate = hand;
@@ -19977,7 +20904,7 @@ function run(argv) {
     panel.addSubview(toolCopy);
     procsMade();    // Show all processes and its Notes field (HC-0843), once toolView is made
     partsMade();    // the boxes of Add or remove LZR modules and of LZRTNNL
-    toolTabs = ['On Your Computer', 'On Websites', 'Redirects', 'Other'].map(function (words, k) {    // the panel's three tabs, under its title
+    toolTabs = ['On Your Computer', 'Scripts, Redirects and Sends', 'Other'].map(function (words, k) {    // the panel's three tabs, under its title
         var one = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 170, 28));
         one.title = $(words); one.bezelStyle = 1; one.font = sans(13, true); one.tag = k; one.target = hand; one.action = 'toolTab:'; one.hidden = true;
         panel.addSubview(one);
@@ -20037,7 +20964,7 @@ elsif ($command eq 'tnnldrop' && @ARGV == 1 && $ARGV[0] =~ m{\A/[\x21-\x7e]*/\.l
 elsif ($command eq 'parts' && @ARGV <= 1 && (!@ARGV || $ARGV[0] =~ m{\A/[\x21-\x7e]*/\.lzrprf\z})) { $ROOT = $ARGV[0] if @ARGV; print 'on ', join(' ', grep { part_on($_) } @PARTS_ALL), "\nabsent as installed:", map({ part_left_out($_) ? " $_" : '' } qw(arti core-lzrbrwsr-trmnl)), "\n" }    # the parts installed, as the record of that folder says (sub parts_read), and the programs whose absence sub paired takes for what was installed: for the tests
 elsif ($command eq 'partsset' && @ARGV >= 2 && $ARGV[0] =~ m{\A/[\x21-\x7e]*/\.lzrprf\z} && $ARGV[1] =~ m{\A/[\x21-\x7e]*\.app/Contents/MacOS/lzrbrwsr-bin\z}) { ($TRY, $ROOT, $PROGRAM) = (1, shift @ARGV, shift @ARGV); $DIR = $ROOT; parts_set(@ARGV) }    # Restart with these modules, as the modal sends it, for the tests: "lzrprf try" starts nothing again
 elsif ($command eq 'incognito') { $INCOGNITO = 1; run(@ARGV ? @ARGV : '/Applications/LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin') }    # [C16] with no program named: the installed application's
-elsif ($command eq 'try' && @ARGV > 4 && $ARGV[0] =~ m{^\Q$DIR\E/[A-Za-z0-9][A-Za-z0-9.]*\z} && $ARGV[1] =~ /^(?:-|127\.0\.0\.1:\d+)$/ && $ARGV[3] =~ /^(?:allow|deny|ask|[1234]{1,9})$/) {
+elsif ($command eq 'try' && @ARGV > 4 && $ARGV[0] =~ m{^\Q$DIR\E/[A-Za-z0-9][A-Za-z0-9.]*\z} && $ARGV[1] =~ /^(?:-|127\.0\.0\.1:\d+)$/ && $ARGV[3] =~ /^(?:allow|deny|ask|[1-6]{1,9})$/) {
     ($TRY, $DIR, $PEER, $TYPED, $ANSWER) = (1, splice @ARGV, 0, 4);    # for tests: lzrprf try FOLDER PEER|- TYPED|- allow|deny|ask|DIGITS /path/to/program
     if (open my $in, '<', "$DIR/live-seconds") { (<$in> // '') =~ /^([0-9]{1,2}(?:\.[0-9]{1,3})?) ([0-9]{1,2}(?:\.[0-9]{1,3})?)$/ and ($LIVE_STOP_SECONDS, $LIVE_FRAME_SECONDS) = ($1, $2) }    # [C18] "lzrprf try" only: a test's own $LIVE_STOP_SECONDS and $LIVE_FRAME_SECONDS, so what it tries does not hang on how busy the computer is
     if (open my $in, '<', "$DIR/view-scale") { $VIEW_SCALE = 2 if (<$in> // '') eq "2\n" }    # "lzrprf try" only: a test's own retina screen, its tiles drawn at scale 2 (the load test's --scale2)

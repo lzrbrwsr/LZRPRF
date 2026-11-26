@@ -33,7 +33,7 @@ the reader to check against the code. Regenerate with `perl tools/doc-index --wr
 | - Address suggestions. While you type in the ... | - | C4 | - |
 | - No footer. Nothing stands at the window's ... | `parts_told`, `parts_set`, `parts_fetched`, `contained` | - | - |
 | - Clearing. "Clear browsing history" empties the addresses ... | - | C7 | - |
-| - Redirects. An answer 301, 302, 303, 307 ... | `redirected`, `asked`, `unfit`, `redirect_noted`, `redirects_decide` | C7 | - |
+| - Redirects. lzrprf reads the Location from a ... | `web_question`, `redirect_noted`, `redirects_decide`, `essential_web_redirect` | C7 | - |
 | - The game page opens LZRDFNDR. The program's ... | `live_answered` | - | `liveopen`, `liveopenno` |
 | - LZRDFNDR's satellite in the minigame. The Other ... | `game_helper_set` | - | `gamehelper`, `gamehelperincognito` |
 | - LZRDFNDR's panel opens at once. A press ... | `tool_shown` | - | - |
@@ -277,19 +277,16 @@ before, and masked to it the home page showed nothing once the window was made l
   cleared by its own button and by nothing else. Clearing the sessions also drops every page
   lzrprf keeps for a tab. lzrprf sends no cookie and keeps none `[C7]`, so no login was kept by
   it either way.
-- **Redirects.** An answer 301, 302, 303, 307 or 308 is never laid out and never followed by
-  `curl` `[C7]`. lzrprf reads its `Location` itself, in plain characters only, resolves it
-  against the address, and asks in its own modal, with the status, both addresses and Cancel
-  first (`sub redirected`, `sub asked`). Proceed is a new visit, with every check of a typed
-  address and its line in the log first. An address lzrprf does not fetch (plain http, a host
-  that is a bare number, another port) gets Cancel alone, and the modal says why in plain words
-  (`sub unfit`). A page opened from a bookmark gets a third button, "Proceed and update
-  bookmark". One redirect a visit is followed without asking: to the same https address with
-  `www.` put in front of its host or taken off, the same path and query, written in the log as
-  one line first (`example.com redirected to www.example.com (301); followed, the same site`).
-  Every redirect put to you is listed in LZRDFNDR's third tab, Redirects, with your answer; a
-  Proceed or Cancel kept there answers that same redirect without asking, in this window, and
-  Forget asks again (`sub redirect_noted`, `sub redirects_decide`). It is kept in memory only.
+- **Redirects.** lzrprf reads the Location from a 301, 302, 303, 307 or 308 response in plain
+  characters and resolves it against the address `[C7]`. LZRDFNDR shows the status and both
+  addresses in its modal. Deny once is the default choice. Allowing a redirect starts a new
+  visit with the same checks as a typed address and its line in the log first. An address
+  lzrprf cannot fetch shows the reason and disables the allow buttons. A bookmark also offers
+  Proceed and update bookmark. The existing same-site `www.` redirect rule can follow one
+  redirect per visit and writes its line first. Scripts, Redirects and Sends lists each redirect
+  by source domain and shows your choice. A redirect decision made there holds in the window.
+  Forget asks again. Enabled entries in the Essential Allow and deny list can also answer the
+  question (`sub web_question`, `sub redirect_noted`, `sub redirects_decide`, `sub essential_web_redirect`).
 - **The game page opens LZRDFNDR.** The program's own page https://lzrbrwsr.com/play has
   Activate LZRDFNDR beside its Start button, Setup LZRDFNDR once the satellite is active. A press
   sends the page to one address, https://lzrbrwsr.com/play/lzrdfndr, which lzrprf never fetches:

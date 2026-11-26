@@ -17,6 +17,7 @@ the reader to check against the code. Regenerate with `perl tools/doc-index --wr
 <!-- index begin -->
 | statement begins | subs | marks | selftest runs |
 | --- | --- | --- | --- |
+| The Essentials switch and edits are scoped to ... | `essential_web_settings`, `essential_web_save`, `redirects_decide`, `sends_decide` | - | - |
 | The principle: every outgoing network request must be ... | - | - | - |
 | So every line of the log is kept ... | `record`, `keeping` | C12 | - |
 | mode what the Log button shows what stays ... | - | - | - |
@@ -44,6 +45,12 @@ the reader to check against the code. Regenerate with `perl tools/doc-index --wr
 | - What macOS itself keeps is outside lzrprf: ... | - | - | - |
 | - A window process that text took over ... | - | - | - |
 <!-- index end -->
+
+The Essentials switch and edits are scoped to the profile. The \`essential-web\` file holds the
+enabled bit and numbered choices. Incognito edits and once choices stay in memory. Redirect and
+cross-host send decisions made outside the essential list also stay in the current window
+(\`sub essential_web_settings\`, \`sub essential_web_save\`, \`sub redirects_decide\`, \`sub sends_decide\`).
+
 
 The principle: every outgoing network request must be observable by you, but no browsing
 activity should be permanently retained without your explicit consent.

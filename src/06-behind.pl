@@ -61,6 +61,7 @@ sub behind {
     elsif (length $pulled) { go($pulled, 'you pulled a tab out into this window') }    # [C4] checked as a typed address is, and [C5] written before its name is looked up: the address of a tab pulled out of another window, handed on a pipe
     elsif (my $home = home()) { go($home, 'you opened your home page') }    # [C4] an address that came from the bar, kept when you made it the home page
     newer() unless $INCOGNITO || $local_home;           # [C16] it would write its answer and an installer's lines. Only now, once the window is idle and its first page is drawn: a look for a newer release never stands before the first drawing
+    window('release ' . ((beside())[0] // '-'));    # the release number, shown in Help > About
     window('checked ' . ($INCOGNITO ? 'none' : checked_kept()));    # when lzrprf last looked for a newer release, shown under Check for updates
     licence_told();                       # whether a licence code is kept, shown under Enter licence code
     support_told();                       # where a support request would go, and whether one is kept to read its answer
@@ -81,11 +82,23 @@ sub behind {
         elsif ($event eq 'live') { live_turn(); trmnl_opened() if $TRMNL_OPEN; permits_later(); my $home = live_of($TABS[$TAB]); if ($home_update_due && $home && $home->{home_ready}) { $home_update_due = 0; newer() } $IDLE_WORK //= \&identity_asked if $local_home && $home && $home->{home_ready} }    # a page kept running with its tab answered, or is to end (sub live_answered); [C26] what it asked meanwhile is put to you after
         elsif ($event =~ /^scripts (list|reset|revoke|set)(?: (0|[1-9][0-9]{0,3}))?(?: (always|deny))?$/ && ($1 eq 'revoke' ? defined $2 && !defined $3 : $1 eq 'set' ? defined $2 && defined $3 : !defined $2 && !defined $3)) { scripts_set($1, $2, $3); said_noted() }    # [C26] [C4] LZRDFNDR scripts, from the cogwheel's menu
         elsif ($event =~ /^scripts (e1|curated)(?: (0|[1-9][0-9]{0,3}))? (on|off)$/ && ($1 eq 'curated') == defined $2) { scripts_set($1, $2, $3); said_noted() }    # [C26] the switch of the sandbox (E1), or of one curated rule (E2)
-        elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-4])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
+        elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-5])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
         elsif ($event eq 'scripts sites') { sites_told() }    # [C26] LZRDFNDR's On Websites: the scripts of each site and your decision on each
-        elsif ($event =~ /^scripts decide (0|[1-9][0-9]{0,3}) (always|deny|forget)$/) { sites_decide($1, $2); said_noted() }    # [C26] [C4] a decision changed there
+        elsif ($event =~ /^scripts decide (0|[1-9][0-9]{0,3}) (always|deny|allow-once|deny-once|forget)$/) { sites_decide($1, $2); said_noted() }    # [C26] [C4] a decision changed there
+        elsif ($event eq 'sends list') { sends_told() }
+        elsif ($event =~ /\Asends decide (0|[1-9][0-9]{0,3}) (always|deny|allow-once|deny-once|forget)\z/) { sends_decide($1, $2) }
+        elsif ($event eq 'essential list') { essential_web_told() }
+        elsif ($event =~ /\Aessential save ([01])((?: [0-9]=[a-z-]+){0,8})\z/) {
+            my ($on, $changes) = ($1, $2);
+            my $ok = essential_web_save($on, grep length, split / /, $changes);
+            my ($again, $resolved) = $ok ? permit_essentials_saved() : ();
+            window('essential saved ' . ($ok ? $resolved ? 'resolved' : 'ok' : 'failed'));
+            essential_web_told();
+            if ($again) { $PERMIT_RELOAD = $again; go($again, 'you reloaded') }
+            elsif ($resolved) { permits_later() }
+        }
         elsif ($event eq 'redirects list') { redirects_told() }    # [C4] LZRDFNDR's Redirects: every redirect put to you and your decision on each
-        elsif ($event =~ /^redirects decide (0|[1-9][0-9]{0,3}) (proceed|cancel|forget)$/) { redirects_decide($1, $2); said_noted() }    # [C4] a decision changed there
+        elsif ($event =~ /^redirects decide (0|[1-9][0-9]{0,3}) (proceed|cancel|allow-once|deny-once|forget)$/) { redirects_decide($1, $2); said_noted() }    # [C4] a decision changed there
         elsif ($event =~ /^filters (list|switch|allow|revoke)(?: (0|[1-9][0-9]{0,3}))?(?: (on|off))?$/ && ($1 eq 'list' ? !defined $2 && !defined $3 : $1 eq 'switch' ? defined $2 && defined $3 : defined $2 && !defined $3)) { filters_set($1, $2, $3); said_noted() }    # [C27] [C4] Filters, from the cogwheel's menu: the lists, a list switched, a blocked request's host let through on its site, or that revoked
         elsif ($event =~ /^video (0|[1-9][0-9]?)$/ && $1 < $VIDEOS) { videoed($1) }    # [C22] you clicked the place of a video: the one moment a video is fetched
         elsif ($event =~ /^video at (0|[1-9][0-9]?) ((?:playing|paused|ended|off|gone) [0-9]{1,6}\.[0-9]{3} [0-9]{1,2}(?:\.[0-9]{1,3})? [0-9]{13})$/ && $1 < $VIDEOS) { video_sound_at($1, $2) }    # [C22] the picture's clock of a video whose sound you turned on: its sound plays in the sound process, in step
@@ -93,6 +106,7 @@ sub behind {
         elsif ($event =~ /^page ((?:click|move|down|up|scroll (?:0|[1-9][0-9]?)) (?:0|[1-9][0-9]{0,5}) (?:0|[1-9][0-9]{0,5})|out|key (?:[\x21-\x7e]|Space|Escape|Enter|Tab|Backspace|Delete|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|PageUp|PageDown)(?: shift)?|text [^\x00-\x1f\x7f]{1,$LIVE_TEXT})$/) { live_input($1) }    # a click in the page, the pointer moved over it, its button down or up, the pointer out of it, a key while it has the keyboard, text typed into its field, where the window shows it from: handed to the page kept running, and to nothing else
         elsif ($event =~ /^page ctrl ([a-z@\[\]\\^_])$/) { trmnl_input("ctrl $1") }    # [C29] a key held with Control, in a terminal's tab alone
         elsif ($event =~ /^page ((?:drag|context) (?:0|[1-9][0-9]{0,5}) (?:0|[1-9][0-9]{0,5})|(?:menu|tkey) [a-z]{1,8}(?:-[a-z]{1,8})?|wheel -?[1-9][0-9]{0,2}|copy|pastelong|paste [\x21-\x7e]+)$/) { trmnl_input($1) }    # [C29] in a terminal's tab alone: a drag that selects or moves a divider, a right press, an item of its menus, a key of its own (24-trmnl-panes.pl), the wheel, your copy, and your paste as the window read it from the clipboard
+        elsif ($event =~ /^inspect (0|[1-9][0-9]?) ([1-9][0-9]{0,8}) ([1-9][0-9]{0,8}) (open|-|(?:[0-9a-f]{2}){1,500})$/) { inspect_input($1, $2, $3, $4) }    # [C18] the user opened or typed into the Inspect pane of this tab
         elsif (viewing($event)) { relaid() }    # the window's page has a new size: the page shown is laid out again at its width, from what was kept, and nothing is fetched
         elsif ($event =~ /^tab move (0|[1-9][0-9]?) (0|[1-9][0-9]?)$/) { tab_moved($1, $2) }    # a tab dragged along the strip to another place among the tabs: the page shown stays as it is
         elsif ($event =~ /^tab (new|select|close)(?: (0|[1-9][0-9]?))?( kept)?$/) { tabbed($1, $2, $3); relaid() }    # a tab chosen in the strip: the window shows the drawing it kept of it ("kept"), or lzrprf sends the one it kept, and only a page kept at another width is laid out again; nothing is fetched, unless a new tab opens the home page
@@ -123,6 +137,9 @@ sub behind {
         elsif ($event eq 'update-check') { $INCOGNITO ? idle('An incognito window looks for no newer release; a window that is not incognito does, in its cogwheel menu.') : newer(1) }
         elsif ($event =~ /^frame (full|-?[0-9]{1,5} -?[0-9]{1,5} [1-9][0-9]{1,4} [1-9][0-9]{1,4})$/) { frame_said($1) }    # the window was moved, resized or made full screen: kept for the next window
         elsif ($event eq 'incognito') { incognito_opened(); said_noted() }
+        elsif ($event eq 'window new') { window_opened(); said_noted() }    # File > New Window (sub window_opened)
+        elsif ($event eq 'window tor') { tor_window_opened(); said_noted() }    # File > New Tor Window: as the onion icon
+        elsif ($event =~ /^help (privacy|terms)$/) { help_opened($1); relaid() }    # Help > Privacy Policy and Terms and Conditions: the site's own page in a new tab
         elsif ($INCOGNITO && $event =~ /^profiles? /) { profiles_refused('An incognito window has no profile, and opens, makes or changes none.') }
         elsif ($event eq 'sso list') { sso_told() }    # "Connect seamless SSO accounts" was opened: each provider as connected now
         elsif ($event =~ /^sso connect ([a-z]{1,16})$/) { sso_connect($1); relaid() }    # Connect: the provider's own sign-in page in a new tab

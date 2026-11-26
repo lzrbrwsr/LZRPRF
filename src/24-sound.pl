@@ -64,8 +64,14 @@ function soundVideoAt(key, one, more) {    // the picture's clock: the sound fol
         soundSay('video ' + key + ' drift ' + Math.round(drift * 1000));
         if (Math.abs(drift) < SOUND_VIDEO_SLACK) return;
     }
-    p.stop; p.prepareToPlay; p.rate = rate; p.currentTime = now() + SOUND_VIDEO_LEAD * rate;    // stopped and prepared again: a paused player starts at once and keeps the lead as drift (93 ms measured), a prepared one starts on the device clock (0 to 3 ms)
-    var started = !!p.playAtTime(p.deviceCurrentTime + SOUND_VIDEO_LEAD);
+    p.stop; p.prepareToPlay; p.rate = rate;    // stopped and prepared again: a paused player starts at once and keeps the lead as drift (93 ms measured), a prepared one starts on the device clock (0 to 3 ms)
+    var lead = SOUND_VIDEO_LEAD, set = Date.now(), late = 0;
+    for (var tries = 0; tries < 2; tries++) {    // the seek itself takes time (41 to 44 ms on a busy Mac, 2026-11-26): it is taken from the lead, and a seek longer than the lead is made again with a lead twice as long as it took
+        set = Date.now(); p.currentTime = now() + lead * rate; late = (Date.now() - set) / 1000;
+        if (late < lead * 0.8 || tries == 1) break;    // the lead played below is the one this seek was made with (lzr3's review)
+        lead = Math.min(0.5, Math.max(lead, late * 2));
+    }
+    var started = !!p.playAtTime(p.deviceCurrentTime + Math.max(0.002, lead - (Date.now() - set) / 1000));
     busy = Date.now();
     if (!one.said) { one.said = true; soundSay('video ' + key + (one.ready && started ? ' yes' : ' no') + ' ready=' + !!one.ready + ' started=' + started + ' length=' + Math.round(p.duration * 1000)); }
 }

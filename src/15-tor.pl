@@ -186,8 +186,8 @@ sub tor_phase {                           # [C17] the next step of the Tor windo
     return 1;
 }
 
-sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window: a Tor window apart from it, and this one as it was
-    window('tor off');
+sub tor_window_opened {                   # [C17] the onion icon of a window that is not a Tor window, or File > New Tor Window in any window: a Tor window apart from it, and this one as it was
+    window('tor off') unless $TOR_WINDOW;    # the onion of a Tor window stays as its own Tor says
     return idle('LZRTNNL is not installed, so no Tor window opens. Add it in Add or remove LZR modules, in the cogwheel menu.') unless part_on('lzrtnnl');
     return idle('A Tor window was asked for: "lzrprf try" starts none. Tor never carries this window.') if $TRY;
     return idle('No Tor window was started: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'tor', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);
@@ -223,7 +223,7 @@ sub tor_session_asked {                   # [C17] Stop Tor in a Tor window, aske
 }
 
 sub tor_session_tables {                  # [C17] how many entries the Tor window's tables in memory hold
-    return @LIVE + @CLOSED + @SESSION + @WAY + @PICTURED + @PERMIT_SEEN + @FILTER_SEEN + @PERMIT_HELD + @HELD + @LATER + keys(%PERMIT_PASSWORD) + keys(%PERMIT_PATHS) + keys(%PERMIT_DENIED) + keys(%PERMIT_NEXT) + keys(%PERMIT_ONCE) + keys(%PERMIT_INFO) + keys(%PERMIT_WEB) + listed_said() + @MARKS + length($TITLED)
+    return sends_count() + essential_web_count() + keys(%REDIRECTS) + @LIVE + @CLOSED + @SESSION + @WAY + @PICTURED + @PERMIT_SEEN + @FILTER_SEEN + @PERMIT_HELD + @HELD + @LATER + keys(%PERMIT_PASSWORD) + keys(%PERMIT_PATHS) + keys(%PERMIT_DENIED) + keys(%PERMIT_NEXT) + keys(%PERMIT_ONCE) + keys(%PERMIT_INFO) + keys(%PERMIT_WEB) + listed_said() + @MARKS + length($TITLED)
         + (grep { length($_->{url} // '') || @{ $_->{visited} // [] } } @TABS) + (defined $SHOWN) + (defined $FLAGGED) + (defined $PERMIT_ASK) + (defined $NEXT);
 }
 
@@ -253,6 +253,7 @@ sub tor_session_end {                     # [C17] the end of a Tor window, step 
     @$_ = () for \@LIVE, \@CLOSED, \@SESSION, \@WAY, \@PICTURED, \@PERMIT_SEEN, \@FILTER_SEEN, \@PERMIT_HELD, \@HELD, \@LATER;
     undef $_ for $PERMIT_UNREAD, $PERMIT_STRIPPED; %$_ = () for \%PERMIT_PASSWORD, \%PERMIT_PATHS, \%PERMIT_DENIED, \%PERMIT_NEXT, \%PERMIT_ONCE, \%PERMIT_INFO, \%PERMIT_WEB;
     @MARKS = ();
+    %REDIRECTS = (); sends_clear(); essential_web_clear();
     listed_said(1);
     ($TAB, $TITLED, @TABS) = (0, '', fresh_tab());
     ($SHOWN, $FLAGGED, $PERMIT_ASK, $NEXT) = ();

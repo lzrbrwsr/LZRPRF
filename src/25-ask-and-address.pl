@@ -11,19 +11,29 @@ sub ask { my ($words, @buttons) = @_; return asked('ask ' . $words =~ s/\s+/ /gr
 
 sub asked_later { my ($line, @buttons) = @_; $ASKED++; window(join "\t", $line, @buttons); return $ASKED }    # a question whose answer the main loop hears as any line (sub permit_button): it holds nothing
 
-sub asked {                               # a question in a line of its own kind: "ask" in the strip, "redirect" in a modal; up to four buttons
+sub asked {                               # a question in a line of its own kind: "ask" in the strip, "webquestion" in the LZRDFNDR modal
     my ($line, @buttons) = @_;
+    my $saved = ref($buttons[0]) eq 'CODE' ? shift @buttons : undef;
     $ASKED++;
     window(join "\t", $line, @buttons);
     if (!$FROM) {                         # "lzrprf try" only: the test's answer
-        my $press = $ANSWER eq 'allow' ? 2 : $ANSWER =~ s/^([1-4])// ? $1 : 1;    # a digit for each question in turn; a third button is answered by 3, a fourth by 4
+        my $press = $ANSWER eq 'allow' ? 2 : $ANSWER =~ s/^([1-6])// ? $1 : 1;    # a digit for each question in turn; one through six
         window("answered $press");
         return $press;
     }
     my $until = now() + $ANSWER_SECONDS;
     while ((my $left = $until - now()) > 0) {
         my $event = hear($left) // leave();
-        return $1 if $event =~ /^button $ASKED ([1-4])$/ && $1 <= @buttons;
+        return $1 if $event =~ /^button $ASKED ([1-6])$/ && $1 <= @buttons;
+        if ($saved && $event eq 'essential list') { essential_web_told(); next }
+        if ($saved && $event =~ /\Aessential save ([01])((?: [0-9]=[a-z-]+){0,8})\z/) {
+            my ($on, $changes) = ($1, $2);
+            my $ok = essential_web_save($on, grep length, split / /, $changes);
+            my $press = $ok ? $saved->() : undef;
+            window('essential saved ' . ($ok ? defined $press ? 'resolved' : 'ok' : 'failed'));
+            return $press if defined $press;
+            next;
+        }
         if ($event =~ /^button /) { push @LATER, $event; next }    # the answer to the question about scripts, which stood before this one: heard after it (sub permit_button)
         viewing($event); if ($event =~ /^page scroll [0-9]{1,2} [0-9]{1,6} [0-9]{1,6}$/) { my $back = live_scroll_back(); @LATER = ((grep { !/^page scroll / || $_ eq $back && $_ ne $event } @LATER), $event) } elsif ($event =~ /^tor (?:on|off)$/) { push @LATER, $event }    # a new size of the window's page said meanwhile is still its size; the page is laid out at it after the question (sub relaid); Tor turned on or off is heard after it too, and where the window shows the page from, the newest place only: one said each frame of a long question is not kept by the hundred, but the page's own scroll said back is kept too, so the window's places are heard again after it (sub live_input)
     }

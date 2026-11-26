@@ -33,7 +33,7 @@ sub run {
     my $behind = fork // die "lzrprf: cannot fork: $!\n";
     become($from, $to, $TRY ? \*STDOUT : undef, '/usr/bin/perl', $SELF, 'behind', $TRY, defined $PROFILE && !$INCOGNITO ? $ROOT : $DIR, $PEER, $ANSWER, $window, $INCOGNITO ? $ROOT : '-', $PROFILE // '-', $program, @arguments) unless $behind;    # descriptor 0 is what the window says, descriptor 1 what it is told; a profile by its id alone, never by its name, and behind finds its folder from the state folder
     close $_ for $to, $from;
-    my $more = window_pointer_text() . window_trmnl_text() . window_link_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
+    my $more = window_pointer_text() . window_trmnl_text() . window_link_text() . window_menu_text() . window_inspect_text() . window_website_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)
@@ -115,6 +115,23 @@ sub incognito_opened {                    # "New Incognito Window": a second lzr
     return idle('A new incognito window was asked for: "lzrprf try" starts none.') if $TRY;
     return idle('No incognito window was started: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'incognito', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);    # it reads the settings of this window's profile, named by its id alone
     return idle('An incognito window is opening. It writes nothing: when it closes, it leaves nothing behind.');
+}
+
+sub window_opened {                       # File > New Window: a second lzrprf, of its own, started as "New Incognito Window" starts one, not incognito
+    return idle('A new window was asked for: "lzrprf try" starts none.') if $TRY;
+    return idle("No window was opened: this window has opened $PULLED_MOST windows from its tabs, profiles and File menu, the most one window may. Open it from another window.") if $PULLED >= $PULLED_MOST;
+    return idle('No window was opened: lzrprf could not start a process.') unless apart(undef, '/usr/bin/perl', $SELF, 'run', defined $PROFILE ? ('--profile', $PROFILE) : (), $PROGRAM, @ARGUMENTS);    # this window's profile, by its id alone
+    $PULLED++;
+    return idle('A new window is opening.');
+}
+
+sub help_opened {                         # Help > Privacy Policy or Terms and Conditions: the page of the site the installer comes from, in a new tab, so the text is the web's own
+    my ($which) = @_;
+    my (undef, undef, undef, $installer) = beside();
+    my ($site) = ($installer // '') =~ m{^(https://[A-Za-z0-9.-]{1,253})/};
+    return idle('This application names no site, so it has no privacy policy or terms to open.') unless $site;
+    tabbed('new');
+    go("$site/$which.html", $which eq 'privacy' ? 'you opened the privacy policy from the Help menu' : 'you opened the terms and conditions from the Help menu');
 }
 
 sub apart {                               # a second lzrprf, of its own, that goes through every start check itself; true when it was started. A line given is its standard input, then closed

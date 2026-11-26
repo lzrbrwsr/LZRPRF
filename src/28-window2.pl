@@ -254,13 +254,14 @@ function partsMade() {    // the boxes of the two modals, made once with the pan
 }
 
 function run(argv) {
-    NAME = argv[0] || NAME;
+    NAME = (argv[0] || NAME).replace(/-Staging$/, ' - Staging');    // the staging application, LZRBRWSR-Staging.app, is named "LZRBRWSR - Staging" in the menu bar (Henry, 2026-11-26)
     TORWINDOW = argv[1] == 'tor';
     INCOGNITO = argv[1] == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
     if (INCOGNITO) $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSQuitAlwaysKeepsWindows: false, ApplePersistenceIgnoreState: true }));    // in memory only: macOS is asked to keep no window of it to restore (and this container lets it write no file anyway)
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;
     app.setActivationPolicy(kind());
+    menuBarNamed(NAME);
     app.applicationIconImage = icon(256);
     hand = $.LzrprfHand.alloc.init;
     app.delegate = hand;
@@ -534,7 +535,7 @@ function run(argv) {
     panel.addSubview(toolCopy);
     procsMade();    // Show all processes and its Notes field (HC-0843), once toolView is made
     partsMade();    // the boxes of Add or remove LZR modules and of LZRTNNL
-    toolTabs = ['On Your Computer', 'On Websites', 'Redirects', 'Other'].map(function (words, k) {    // the panel's three tabs, under its title
+    toolTabs = ['On Your Computer', 'Scripts, Redirects and Sends', 'Other'].map(function (words, k) {    // the panel's three tabs, under its title
         var one = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 170, 28));
         one.title = $(words); one.bezelStyle = 1; one.font = sans(13, true); one.tag = k; one.target = hand; one.action = 'toolTab:'; one.hidden = true;
         panel.addSubview(one);

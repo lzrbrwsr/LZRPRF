@@ -69,21 +69,27 @@ sub visit {
             $NEXT = [$fit, 'lzrprf follows that redirect to', $mark, 1];
             return idle("$host redirected to $there ($status): the same site, so lzrprf follows it.");
         }
+        my $essential = essential_web_redirect($url, $fit);
+        my $rule = essential_web_answer($essential, 0);
         my $family = sso_of($host);
-        if (defined $fit && defined $family && sso_on() && sso_state($family) ne 'none' && (sso_of($there) // '') eq $family && ($auto // 0) < $SSO_HOPS) {    # within the family of a provider you connected or are connecting: its own sign-in redirects, followed without a question and written down first, at most $SSO_HOPS a visit (sub sso_cookie)
+        if ($rule eq 'forget' && defined $fit && defined $family && sso_on() && sso_state($family) ne 'none' && (sso_of($there) // '') eq $family && ($auto // 0) < $SSO_HOPS) {    # within the family of a provider you connected or are connecting: its own sign-in redirects, followed without a question and written down first, at most $SSO_HOPS a visit (sub sso_cookie)
             record("$host redirected to $there ($status); followed, the same sign-in family", $kept) or return idle($UNWRITTEN);
             push @WAY, "$url answered $status, to $fit (followed by lzrprf: the same sign-in family)";
             $NEXT = [$fit, 'lzrprf follows that sign-in redirect to', $mark, ($auto // 0) + 1];
             return idle("$host redirected to $there ($status), the same sign-in family, so lzrprf follows it.");
         }
         my $why = !defined $to ? 'The answer names no address to go to.' : defined $fit ? '' : unfit($to);
-        my $decided = redirect_noted($url, $to, $status, defined $fit);    # [C4] a decision you kept for this redirect in LZRDFNDR's Redirects answers it: 2 to proceed, 1 to cancel, 0 to ask
-        my $press = $decided || asked("redirect $status\t$url\t" . ($to // '') . "\t$why", 'Cancel', defined $fit ? ('Proceed', defined $mark ? 'Proceed and update bookmark' : ()) : ());
-        redirect_answered($url, $to, $press >= 2 && defined $fit) unless $decided;
-        noted("your kept decision answered the redirect of $url: " . ($decided == 2 ? 'proceed' : 'cancel')) if $decided;
-        if ($press >= 2 && defined $fit) {
+        my $decided = redirect_noted($url, $to, $status, defined $fit);    # [C4] 2 to follow, 1 to stop, 0 to ask
+        my $by_rule = $decided ? 0 : $rule eq 'deny' || $rule eq 'deny-once' ? 1 : defined $fit && ($rule eq 'always' || $rule eq 'allow-once') ? 2 : 0;
+        essential_web_answer($essential, 1) if $by_rule;
+        my $words = "$url redirects to " . ($to // '(no address)') . " ($status)." . (length $why ? " $why" : '');
+        my $press = $decided || $by_rule || web_question('redirect', $words, $essential, defined $fit, defined $fit && defined $mark);
+        my $go = defined $fit && ($press == 2 || $press == 3 || $press == 6);
+        redirect_answered($url, $to, $press, $go) unless $decided || $by_rule;
+        noted("your kept decision answered the redirect of $url: " . ($go ? 'proceed' : 'cancel')) if $decided || $by_rule;
+        if ($go) {
             push @WAY, "$url answered $status, to $fit (you chose to follow it)";
-            my $moved = $press == 3 ? (mark_moved($mark, $fit) ? ' The bookmark now holds that address.' : ' The bookmark could not be changed.') : '';
+            my $moved = $press == 6 ? (mark_moved($mark, $fit) ? ' The bookmark now holds that address.' : ' The bookmark could not be changed.') : '';
             $NEXT = [$fit, 'you chose to follow a redirect to', undef];
             return idle("$url redirects to $fit ($status). lzrprf goes there as a new request.$moved");
         }
@@ -726,13 +732,19 @@ sub redirect_noted {                      # [C4] a redirect about to be put to y
     my $key = "$url\t" . ($to // '');
     my $one = $REDIRECTS{$key};
     return $one->{decision} eq 'proceed always' && $fit ? 2 : 1 if $one && $one->{decision} =~ /always\z/;
+    if ($one && delete $one->{once}) { return $one->{decision} eq 'proceeded' && $fit ? 2 : 1 }
     if (!$one && keys %REDIRECTS >= $REDIRECTS_MOST) { my ($oldest) = sort { $REDIRECTS{$a}{n} <=> $REDIRECTS{$b}{n} } keys %REDIRECTS; delete $REDIRECTS{$oldest} }
     my ($host) = $url =~ m{\Ahttps://([^/?#:]+)};
     $REDIRECTS{$key} = { site => 'https://' . lc($host // ''), status => $status, from => $url, to => $to // '', fit => $fit ? 1 : 0, decision => 'pending', n => ++$REDIRECTS_SEEN };
     return 0;
 }
 
-sub redirect_answered { my ($url, $to, $went) = @_; my $one = $REDIRECTS{"$url\t" . ($to // '')} or return; $one->{decision} = $went ? 'proceeded' : 'cancelled' }    # [C4] what you answered, as the Redirects tab says it
+sub redirect_answered {
+    my ($url, $to, $press, $went) = @_;
+    my $one = $REDIRECTS{"$url\t" . ($to // '')} or return;
+    if ($press == 5) { $one->{decision} = 'pending'; return }
+    $one->{decision} = $press == 3 && $went ? 'proceed always' : $press == 4 ? 'cancel always' : $went ? 'proceeded' : 'cancelled';
+}
 
 sub redirects_listed {                    # [C4] the redirects of LZRDFNDR's Redirects, each site's together, in the order of their site and address: their keys, and the lines that tell them
     my @keys = sort { $REDIRECTS{$a}{site} cmp $REDIRECTS{$b}{site} || $a cmp $b } keys %REDIRECTS;
@@ -746,18 +758,23 @@ sub redirects_listed {                    # [C4] the redirects of LZRDFNDR's Red
     return \@keys, \@lines;
 }
 
-sub redirects_told { my (undef, $lines) = redirects_listed(); window('redirects begin', map({ unlisted($_) } @$lines), 'redirects end') }    # [C4] [C23] "redirects begin", "redirects site SITE", "redirects one N<tab>SITE<tab>STATUS<tab>FROM<tab>TO<tab>DECISION<tab>FIT" for each, "redirects end"
+my @REDIRECT_WEB_KEYS;
+sub redirects_told { my ($keys, $lines) = redirects_listed(); @REDIRECT_WEB_KEYS = @$keys; window('redirects begin', map({ unlisted($_) } @$lines), 'redirects end') }    # [C4] [C23] "redirects begin", "redirects site SITE", "redirects one N<tab>SITE<tab>STATUS<tab>FROM<tab>TO<tab>DECISION<tab>FIT" for each, "redirects end"
 
 sub redirects_decide {                    # [C4] a decision changed in LZRDFNDR's Redirects, for the redirect numbered $n as redirects_told last numbered it: "proceed" or "cancel" keeps it as always, "forget" takes it away
     my ($n, $to) = @_;
-    my ($keys) = redirects_listed();
-    my $key = $keys->[$n];
+    my $key = $REDIRECT_WEB_KEYS[$n];
     my $words = 'Nothing was changed: that redirect is no longer in the list.';
-    if (defined $key) {
+    if (defined $key && exists $REDIRECTS{$key}) {
         my $one = $REDIRECTS{$key};
         if ($to eq 'forget') { delete $REDIRECTS{$key}; $words = "No decision is kept for the redirect of $one->{from}: it is asked about again." }
-        elsif ($to eq 'proceed' && !$one->{fit}) { $words = "The redirect of $one->{from} cannot be followed, so it is not kept as proceed." }
-        else { $one->{decision} = "$to always"; $words = "The redirect of $one->{from} is now answered $to, in this window, without asking." }
+        elsif (($to eq 'proceed' || $to eq 'allow-once') && !$one->{fit}) { $words = "The redirect of $one->{from} cannot be followed, so its decision stays unchanged." }
+        else {
+            delete $one->{once};
+            $one->{once} = 1 if $to =~ /-once\z/;
+            $one->{decision} = $to eq 'allow-once' ? 'proceeded' : $to eq 'deny-once' ? 'cancelled' : "$to always";
+            $words = "The redirect of $one->{from} is now answered $to in this window.";
+        }
         noted('LZRDFNDR Redirects: ' . unlisted($words));
     }
     redirects_told();
