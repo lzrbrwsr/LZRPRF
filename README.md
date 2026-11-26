@@ -266,7 +266,7 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 158
+    release 159
     home local
     new yle.fi works: its articles, the electricity price graph, link clicks and the Kirjaudu login window.
     new A window a site opens in a frame after a click now loads and runs, even when the page has spent its fuel.
@@ -279,7 +279,7 @@ record:
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin 15d796cf5644a6f6cb3947f82c13260f7674c8a9606ec6c15b87b911b6c8352f
+    file lzrbrwsr-bin 070e9bb8c5305c18f7b255a2400803e7a932e1b0d34e060b1f3dc008ddf2495b
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
     lzrprf ae9b6e94cb486340656c74be43a635f2d936e939bff78938a8a1865cc0a782e1
