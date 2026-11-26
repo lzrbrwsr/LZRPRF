@@ -68,7 +68,7 @@ sub hear {                                # the next thing the window says; noth
     return shift @HELD if @HELD;
     my $until = defined $seconds ? now() + $seconds : undef;
     while (1) {
-        return 'live' if $main && grep { live_due($_) || (live_scroll_left($_) // 1) <= 0 } @LIVE;    # or a place of its own scroll waited for the frame to be over (sub live_scroll_told)
+        return 'live' if $main && grep { live_due($_) || (live_scroll_left($_) // 1) <= 0 || (live_home_left($_) // 1) <= 0 } @LIVE;    # or a place of its own scroll waited for the frame to be over (sub live_scroll_told)
         if ($main && !$FROM && @EVENTS && $EVENTS[0] eq 'idle') { shift @EVENTS; my $work = idle_taken(); $work->(), timed('idle-work') if $work; next }    # "lzrprf try": the test's line "=idle" stands for a window that waits for you, as a real one does before you type (scripts/snappy.pl)
         if (!$FROM && @EVENTS && $EVENTS[0] =~ /\Apause ([1-9][0-9]{0,3})\z/) { shift @EVENTS; select undef, undef, undef, $1 / 1000; next }    # "lzrprf try": the test's line "=pause MS" stands for a person who looks at the page that long before the next line (scripts/snappy.pl)
         return substr(shift @EVENTS, 1) if !$FROM && @EVENTS && substr($EVENTS[0], 0, 1) eq '~';    # "lzrprf try": a test's line marked "~" is said at once, while a page kept running has not answered yet, as a window says it whenever it likes
@@ -92,6 +92,8 @@ sub hear {                                # the next thing the window says; noth
             $wait = $left < 0 ? 0 : $left if !defined $wait || $left < $wait;
             my $frame = $main ? live_scroll_left($live) : undef;    # up to the end of the frame a place of its own scroll waits for
             $wait = $frame if defined $frame && $frame < $wait;
+            my $home = $main ? live_home_left($live) : undef;    # T3: up to when a settling home is said ready
+            $wait = $home if defined $home && $home < $wait;
         }
         trmnl_select(\$ready, \$writable);    # [C29] each terminal's shell and container, heard as the window is
         if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it

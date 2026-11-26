@@ -266,21 +266,18 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 140
+    release 143
     home local
-    new The staging debug log now says what each click met and whether the page let it act, to find why yle.fi links do nothing.
-    new A video's sound starts in step with its picture on a busy Mac too.
-    new A box of floated links, like the top bar of w3schools.com, keeps them on one line as Chrome does.
-    new Struck-out text (line-through), like an old price beside a sale price, now shows its line.
+    new A tab pulled out into its own window shows no second app icon in the Dock or menu bar.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin ad97e607aa8f2365b3b1906c4acf632fa25a24c94a74eaa0d67bf96e7c626795
+    file lzrbrwsr-bin 0c70a577e95948e4f3f3441607d6af8d6ea5387b8c0457b606493e383f72271a
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf cf678d4fe777d60799636072ec202e0e4da885ed62c1b2c68e41659744be909e
+    lzrprf f0afa7c7872aa9f1470ae3b2370d3d258b01aba25fe74dc69283f0608a396699
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

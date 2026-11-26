@@ -428,7 +428,7 @@ sub home_shown {
     my $old = live_of($TABS[$TAB]);
     return if $old && $old->{home} && $old->{wide} == $wide && $old->{home_high} == $high && !$game;
     if ($old && $old->{home}) {
-        $old->{wide} = $wide; $old->{home_high} = $high; delete $old->{home_ready};
+        $old->{wide} = $wide; $old->{home_high} = $high; delete @$old{qw(home_ready home_owed home_first)};
         live_wrote($old, "resize $wide $high");
         live_wrote($old, 'key Enter') if $game;
         return;

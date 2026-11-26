@@ -61,11 +61,19 @@ function clippedTo(path, draw) {    // draw() inside path, when there is one; th
     context.saveGraphicsState;
     try { path.addClip; draw(); } finally { context.restoreGraphicsState; }
 }
-function namedOp(line, grey) {    // the drawing of a line N: the kept bitmap in its place, as a line M with rows is drawn, or a grey box when the window does not hold it
-    var parts = line.slice(1).split(','), n = parts.slice(1).map(Number), one = pictureNames[parts[0]];
+function namedOp(line, grey, next, old) {    // the drawing of a line N: the kept bitmap in its place, as a line M with rows is drawn, or a grey box when the window holds it nowhere
+    var parts = line.slice(1).split(','), n = parts.slice(1).map(Number), one = pictureNames[parts[0]] || namedHeld(parts[0], old);
     if (!one) { namedMissing = true; return [n[1], n[3], 'G', n[0], n[2], grey]; }
     one.used = namedTick;
+    if (next) (next.named || (next.named = Object.create(null)))[parts[0]] = one;    // the laid page keeps what it drew by name, so a list sent again finds it
     return [n[1], n[3], 'M', n[0], n[2], one.image, n.length > 9 ? $.NSMakeRect(n[6] / 100, n[5] - (n[7] + n[9]) / 100, n[8] / 100, n[9] / 100) : $.NSZeroRect];
+}
+// A bitmap let go of by name (namedSettled bounds the names) that the drawing shown or a tab's kept drawing still
+// draws: it is in memory all the same, so it is taken again by its name. Without it a tab chosen again drew its
+// pictures as grey boxes for a frame, a grid over the page, until "page refresh" brought their rows again.
+function namedHeld(name, old) {
+    var held = [old].concat((typeof drawings == 'undefined' ? [] : drawings).map(function (d) { return d && d.sheet; })).find(function (s) { return s && s.named && s.named[name]; });
+    return held ? (pictureNames[name] = held.named[name]) : null;
 }
 function namedSettled() {    // after a list is drawn: a missing bitmap asked for once, and the kept ones bounded
     if (namedMissing && !namedAsked) { namedAsked = true; say('page refresh ' + selected); } else if (!namedMissing) namedAsked = false;

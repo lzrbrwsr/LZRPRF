@@ -20,6 +20,7 @@ sub window_text {
 ObjC.import('Cocoa');
 var TORWINDOW = false, TOR_APART = 'Tor opens a Tor window of its own, apart from this one: it shares nothing with this window, and Tor never carries this one.';    // [C17] a Tor window: lzrprf says so as the window's second word, "tor"
 var INCOGNITO = false, UNKEPT_TIP = 'An incognito window writes nothing, so it adds no bookmark and imports none.';    // an incognito window [C16]: lzrprf says so as the window's second word
+var PULLED = false;    // T5 (Henry, 2026-11-26): a window a tab was pulled out into is its own process, which macOS showed as a second app named osascript; it runs as an accessory, with no Dock or menu-bar icon of its own
 var NAME = 'lzrprf', app, win, bar, logs, words, first, second, scroll, page, under, made, hand, asking = false, asked = 0, list = null;
 var to = $.NSFileHandle.fileHandleWithStandardOutput, from = $.NSFileHandle.fileHandleWithStandardInput, held = $.NSMutableData.data;
 var looks = {}, paragraphs = {};
@@ -601,7 +602,7 @@ function laid(lines, first) {
         if (saved && /[RGVX]/.test(kind)) { next.ops.push(saved); next.saved[line] = saved; if (kind == 'X') characters += saved[8].length; continue; }
         var n = kind == 'X' ? line.slice(1).split(',', 3).map(Number) : line.slice(1).split(',').map(Number);
         if (kind == 'R') next.ops.push([n[1], n[3], 'R', n[0], n[2], colour(line.split(',')[4])]);    // [top, height, kind, left, width, what draws it, ...]
-        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(roundedOp(namedOp(line, grey), roundFor)); else if (kind == 'Q') roundNext = n;    // a picture placed by its name, cut to the rounded edge a Q line before it gave (28-window-pointer.pl)
+        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(roundedOp(namedOp(line, grey, next, old), roundFor)); else if (kind == 'Q') roundNext = n;    // a picture placed by its name, cut to the rounded edge a Q line before it gave (28-window-pointer.pl)
         else if (kind == 'V') next.ops.push([n[1], n[3], 'V', n[0], n[2], n[4]]);    // a video's place and its number: a play mark over its poster, drawn by videoMark, and the video once clicked
         else if (kind == 'M' || kind == 'K') {
             var s = kind == 'K' && n[5] == 2 ? 2 : 1, height = kind == 'M' ? n[5] : n[4] * s, rows = lines.slice(at + 1, at + 1 + height), before = old && old.tiles && old.tiles[line];
@@ -1059,7 +1060,7 @@ function shownAgain(one) {
     if (one.sheet) {    // the laid page as it was made: nothing of it is made again
         sheet = one.sheet;
         if (!scroll.documentView.isEqual(canvas)) scroll.documentView = canvas;
-        fit();
+        fit(); pageBack(false);    // the room beside the page is this page's, never the colour of the tab before
         canvas.scrollPoint($.NSMakePoint(0, Math.round(one.share * sheet.high)));
         listed(one.lines.slice(0, first));
     } else {
@@ -4237,7 +4238,7 @@ function menus() {
 function tabMoved(by) { if (!modalOpen && !asking && tabs.length > 1) tabSaid('tab select ' + ((selected + by + tabs.length) % tabs.length)); }
 
 // The test seams keep physical window ordering separate from startup readiness: a test can order an invisible real window without replacing the startup gate.
-function kind() { return 0; }                // an application with a window and a place in the Dock
+function kind() { return PULLED ? 1 : 0; }    // an application with a window and a place in the Dock; a pulled-out window an accessory (T5)
 function shown() { startupRequested = true; if (startupReady) windowOrdered(); }
 function windowOrdered() { win.makeKeyAndOrderFront($()); app.activateIgnoringOtherApps(true); }
 function drawn(lines, characters) { }

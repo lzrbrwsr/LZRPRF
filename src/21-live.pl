@@ -92,6 +92,7 @@ sub live_turn {
     my @due = grep { live_due($_) } @LIVE;
     $_->{starting} ? home_arrived($_) : live_answered($_) for @due;
     live_scroll_told($_) for grep { (live_scroll_left($_) // 1) <= 0 } @LIVE;    # [C18] a place of the page's own scroll that waited for the frame to be over
+    live_home_told($_) for grep { (live_home_left($_) // 1) <= 0 } @LIVE;    # T3: a home whose scene stopped growing
 }
 
 # A request of a page kept running ([C19]). While it is kept, and while it is

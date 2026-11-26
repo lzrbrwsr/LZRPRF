@@ -263,6 +263,7 @@ my $TRMNL_OPEN = 0;                       # [C29] the local home's terminal icon
 my @TRMNL_VIEW;                           # the size of the window's page as it said it, before it is held to a page's steps: a terminal's screen fills it (sub trmnl_sized)
 my @LIVE_TOLD = ('off', 0);               # what the window was last told of the selected tab's page kept running (sub live_told)
 my $LIVE_STOP_SECONDS = 0.25;             # DECLARED(a quarter of a second, many frames of the screen: the window says where it stopped on the frame after it read lzrprf's scroll): how long after the window said a page's own scroll back its next place may say where its view stopped short of it (sub live_input)
+my $HOME_SETTLE_MOST = 0.25;             # DECLARED(T3: a home scene still growing a quarter second after its first layers is shown as it is, never held longer)
 my $LIVE_FRAME_SECONDS = 1 / 60;          # DECLARED(one frame of a screen that draws 60 times a second; the window shows no more places than that): the least time between two places of a page's own scroll that lzrprf tells the window; one sooner waits, and only the newest (sub live_scroll_told)
 my $LIVE_UNKNOWN_NAMES = 16;              # DECLARED(far more than one later application adds at once): the most names of answer lines it does not know that lzrprf writes in the log for one page kept running (sub live_unknown)
 my %LIVE_KNOWN = map { $_ => 1 } qw(pressed focus go statement scroll layers sound samples play hush again patch ready fetch fetched end page live permit permitted permits keep jar inspect);    # the names of the lines of an answer and of the frame around it: one of these out of its form or its place ends the page
@@ -1148,7 +1149,7 @@ sub run {
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)
-    become($window_in, $window_out, $TRY ? \*STDERR : undef, '/usr/bin/sandbox-exec', '-D', "HOME=$HOME", '-p', $WINDOW_CONTAINER, $SCRIPT, '-l', 'JavaScript', '-e', window_text() . window_sound_text() . $more, $APP, $TOR_WINDOW ? 'tor' : $INCOGNITO ? 'incognito' : 'window', $OPEN_FRAME // frame_kept());    # the size and place the last window was left at (sub frame_kept), so it opens there and does not jump; a pulled tab's window opens where the tab was let go
+    become($window_in, $window_out, $TRY ? \*STDERR : undef, '/usr/bin/sandbox-exec', '-D', "HOME=$HOME", '-p', $WINDOW_CONTAINER, $SCRIPT, '-l', 'JavaScript', '-e', window_text() . window_sound_text() . $more, $APP, ($TOR_WINDOW ? 'tor' : $INCOGNITO ? 'incognito' : 'window') . (defined $OPEN_FRAME ? '+' : ''), $OPEN_FRAME // frame_kept());    # T5: a window a tab was pulled out into is told so by a "+" after its kind, and runs without a Dock icon of its own    # the size and place the last window was left at (sub frame_kept), so it opens there and does not jump; a pulled tab's window opens where the tab was let go
 }
 
 sub runs_swept {                          # what runs that have ended left in a folder: a request's socket, the folder of the tries at the start
@@ -4346,7 +4347,7 @@ sub home_shown {
     my $old = live_of($TABS[$TAB]);
     return if $old && $old->{home} && $old->{wide} == $wide && $old->{home_high} == $high && !$game;
     if ($old && $old->{home}) {
-        $old->{wide} = $wide; $old->{home_high} = $high; delete $old->{home_ready};
+        $old->{wide} = $wide; $old->{home_high} = $high; delete @$old{qw(home_ready home_owed home_first)};
         live_wrote($old, "resize $wide $high");
         live_wrote($old, 'key Enter') if $game;
         return;
@@ -10110,7 +10111,7 @@ sub hear {                                # the next thing the window says; noth
     return shift @HELD if @HELD;
     my $until = defined $seconds ? now() + $seconds : undef;
     while (1) {
-        return 'live' if $main && grep { live_due($_) || (live_scroll_left($_) // 1) <= 0 } @LIVE;    # or a place of its own scroll waited for the frame to be over (sub live_scroll_told)
+        return 'live' if $main && grep { live_due($_) || (live_scroll_left($_) // 1) <= 0 || (live_home_left($_) // 1) <= 0 } @LIVE;    # or a place of its own scroll waited for the frame to be over (sub live_scroll_told)
         if ($main && !$FROM && @EVENTS && $EVENTS[0] eq 'idle') { shift @EVENTS; my $work = idle_taken(); $work->(), timed('idle-work') if $work; next }    # "lzrprf try": the test's line "=idle" stands for a window that waits for you, as a real one does before you type (scripts/snappy.pl)
         if (!$FROM && @EVENTS && $EVENTS[0] =~ /\Apause ([1-9][0-9]{0,3})\z/) { shift @EVENTS; select undef, undef, undef, $1 / 1000; next }    # "lzrprf try": the test's line "=pause MS" stands for a person who looks at the page that long before the next line (scripts/snappy.pl)
         return substr(shift @EVENTS, 1) if !$FROM && @EVENTS && substr($EVENTS[0], 0, 1) eq '~';    # "lzrprf try": a test's line marked "~" is said at once, while a page kept running has not answered yet, as a window says it whenever it likes
@@ -10134,6 +10135,8 @@ sub hear {                                # the next thing the window says; noth
             $wait = $left < 0 ? 0 : $left if !defined $wait || $left < $wait;
             my $frame = $main ? live_scroll_left($live) : undef;    # up to the end of the frame a place of its own scroll waits for
             $wait = $frame if defined $frame && $frame < $wait;
+            my $home = $main ? live_home_left($live) : undef;    # T3: up to when a settling home is said ready
+            $wait = $home if defined $home && $home < $wait;
         }
         trmnl_select(\$ready, \$writable);    # [C29] each terminal's shell and container, heard as the window is
         if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
@@ -10659,6 +10662,7 @@ sub live_turn {
     my @due = grep { live_due($_) } @LIVE;
     $_->{starting} ? home_arrived($_) : live_answered($_) for @due;
     live_scroll_told($_) for grep { (live_scroll_left($_) // 1) <= 0 } @LIVE;    # [C18] a place of the page's own scroll that waited for the frame to be over
+    live_home_told($_) for grep { (live_home_left($_) // 1) <= 0 } @LIVE;    # T3: a home whose scene stopped growing
 }
 
 # A request of a page kept running ([C19]). While it is kept, and while it is
@@ -12487,6 +12491,26 @@ sub live_scroll_back {                    # [C18] the line the window says when 
     return $live && defined $live->{scroll_sent} ? "page scroll $TAB $live->{scroll_sent}" : '';
 }
 
+sub live_home_settling {                  # T3: a home whose answer made layers is said ready only once a frame passes with no new layer, at most $HOME_SETTLE_MOST after its first: the window showed the background grid of a scene laid over several answers
+    my ($live, @layers) = @_;
+    my $grew = grep { /(?:\A|;)n / } @layers;
+    $live->{home_first} //= now();
+    $live->{home_owed} = now() + 2 * $LIVE_FRAME_SECONDS if $grew || !$live->{home_owed};
+    $live->{home_owed} = $live->{home_first} + $HOME_SETTLE_MOST if $live->{home_owed} > $live->{home_first} + $HOME_SETTLE_MOST;
+}
+sub live_home_left {                      # T3: seconds until a settling home is said ready, 0 when now, nothing when none waits
+    my ($live) = @_;
+    return undef unless $live->{home_owed} && !$live->{ended};
+    my $left = $live->{home_owed} - now();
+    return $left > 0 ? $left : 0;
+}
+sub live_home_told {                      # T3: the home's scene stopped growing; the window, if it shows it, shows it whole
+    my ($live) = @_;
+    delete @$live{qw(home_owed home_first)};
+    return if $live->{home_ready} || $live->{tab} != $TABS[$TAB];
+    $live->{home_ready} = 1;
+    window('home ready');
+}
 sub live_scroll_left {                    # [C18] the seconds until a place of the page's own scroll that waits may be told to the window, 0 when it may be now; nothing when none waits for the window
     my ($live) = @_;
     return undef unless defined $live->{scroll_unsent} && !$live->{ended} && $DRAWN && $live->{tab} == $TABS[$TAB];
@@ -12650,7 +12674,7 @@ sub live_answered {                       # [C18]
         window("cursor $TAB $cursor") if defined $cursor;    # the shape of the pointer over the page shown (CSS cursor)
         if ($shown) { live_scroll_told($live); $quick ? window("patch $TAB @$quick[0, 1]", @{ $quick->[2] }, '.') : live_window_patch($before_shown, $shown); $live->{unsent} = 0; $DRAWN = 1 }    # where it was read in the page is kept, and where its script scrolled it goes just before
         live_told();
-        window('home ready') if @layers && $live->{home} && !$live->{home_ready}++;
+        live_home_settling($live, @layers) if @layers && $live->{home} && !$live->{home_ready};    # T3 (Henry, 2026-11-26): no flash of a half-made home; it is said ready once its scene stops growing (sub live_home_left)
         idle($words) if defined $words;
         if (defined $go && (($go eq $LZRDFNDR_OPEN && $live->{url} =~ $LZRDFNDR_PAGE) || ($live->{home} && $go =~ m{\Ahttps://lzrbrwsr\.invalid/_home/lzrdfndr(?:-other)?\z}))) { noted("the game page asked for LZRDFNDR's panel; it was opened, and nothing was fetched"); game_helper_set(1, 1) if $live->{home}; window('tool show' . ($go =~ /-other\z/ ? ' other' : '')); undef $go }    # [C26] its Activate LZRDFNDR button, or Setup LZRDFNDR (".../lzrdfndr-other": on the panel's Other tab): the page stays, and the window opens the panel as a press on its icon does
         if ($live->{home} && defined $go) {
@@ -12822,7 +12846,7 @@ sub live_sounded {                        # [C12] what a page's answer sounds, f
 sub live_layers_again {                   # [C18] the page of the tab shown now, whose layers the window does not hold, is written "=layers": it tells every layer gone and makes it again
     my $live = live_of($TABS[$TAB]) or return;
     return unless delete $live->{layers_lost} or %{ $live->{layer_kind} // {} };
-    delete $live->{home_ready} if $live->{home};
+    delete @$live{qw(home_ready home_owed home_first)} if $live->{home};
     live_wrote($live, 'layers') unless $live->{ended};
 }
 
@@ -15522,11 +15546,19 @@ function clippedTo(path, draw) {    // draw() inside path, when there is one; th
     context.saveGraphicsState;
     try { path.addClip; draw(); } finally { context.restoreGraphicsState; }
 }
-function namedOp(line, grey) {    // the drawing of a line N: the kept bitmap in its place, as a line M with rows is drawn, or a grey box when the window does not hold it
-    var parts = line.slice(1).split(','), n = parts.slice(1).map(Number), one = pictureNames[parts[0]];
+function namedOp(line, grey, next, old) {    // the drawing of a line N: the kept bitmap in its place, as a line M with rows is drawn, or a grey box when the window holds it nowhere
+    var parts = line.slice(1).split(','), n = parts.slice(1).map(Number), one = pictureNames[parts[0]] || namedHeld(parts[0], old);
     if (!one) { namedMissing = true; return [n[1], n[3], 'G', n[0], n[2], grey]; }
     one.used = namedTick;
+    if (next) (next.named || (next.named = Object.create(null)))[parts[0]] = one;    // the laid page keeps what it drew by name, so a list sent again finds it
     return [n[1], n[3], 'M', n[0], n[2], one.image, n.length > 9 ? $.NSMakeRect(n[6] / 100, n[5] - (n[7] + n[9]) / 100, n[8] / 100, n[9] / 100) : $.NSZeroRect];
+}
+// A bitmap let go of by name (namedSettled bounds the names) that the drawing shown or a tab's kept drawing still
+// draws: it is in memory all the same, so it is taken again by its name. Without it a tab chosen again drew its
+// pictures as grey boxes for a frame, a grid over the page, until "page refresh" brought their rows again.
+function namedHeld(name, old) {
+    var held = [old].concat((typeof drawings == 'undefined' ? [] : drawings).map(function (d) { return d && d.sheet; })).find(function (s) { return s && s.named && s.named[name]; });
+    return held ? (pictureNames[name] = held.named[name]) : null;
 }
 function namedSettled() {    // after a list is drawn: a missing bitmap asked for once, and the kept ones bounded
     if (namedMissing && !namedAsked) { namedAsked = true; say('page refresh ' + selected); } else if (!namedMissing) namedAsked = false;
@@ -15936,6 +15968,7 @@ sub window_text {
 ObjC.import('Cocoa');
 var TORWINDOW = false, TOR_APART = 'Tor opens a Tor window of its own, apart from this one: it shares nothing with this window, and Tor never carries this one.';    // [C17] a Tor window: lzrprf says so as the window's second word, "tor"
 var INCOGNITO = false, UNKEPT_TIP = 'An incognito window writes nothing, so it adds no bookmark and imports none.';    // an incognito window [C16]: lzrprf says so as the window's second word
+var PULLED = false;    // T5 (Henry, 2026-11-26): a window a tab was pulled out into is its own process, which macOS showed as a second app named osascript; it runs as an accessory, with no Dock or menu-bar icon of its own
 var NAME = 'lzrprf', app, win, bar, logs, words, first, second, scroll, page, under, made, hand, asking = false, asked = 0, list = null;
 var to = $.NSFileHandle.fileHandleWithStandardOutput, from = $.NSFileHandle.fileHandleWithStandardInput, held = $.NSMutableData.data;
 var looks = {}, paragraphs = {};
@@ -16517,7 +16550,7 @@ function laid(lines, first) {
         if (saved && /[RGVX]/.test(kind)) { next.ops.push(saved); next.saved[line] = saved; if (kind == 'X') characters += saved[8].length; continue; }
         var n = kind == 'X' ? line.slice(1).split(',', 3).map(Number) : line.slice(1).split(',').map(Number);
         if (kind == 'R') next.ops.push([n[1], n[3], 'R', n[0], n[2], colour(line.split(',')[4])]);    // [top, height, kind, left, width, what draws it, ...]
-        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(roundedOp(namedOp(line, grey), roundFor)); else if (kind == 'Q') roundNext = n;    // a picture placed by its name, cut to the rounded edge a Q line before it gave (28-window-pointer.pl)
+        else if (kind == 'G') next.ops.push([n[1], n[3], 'G', n[0], n[2], grey]); else if (kind == 'N') next.ops.push(roundedOp(namedOp(line, grey, next, old), roundFor)); else if (kind == 'Q') roundNext = n;    // a picture placed by its name, cut to the rounded edge a Q line before it gave (28-window-pointer.pl)
         else if (kind == 'V') next.ops.push([n[1], n[3], 'V', n[0], n[2], n[4]]);    // a video's place and its number: a play mark over its poster, drawn by videoMark, and the video once clicked
         else if (kind == 'M' || kind == 'K') {
             var s = kind == 'K' && n[5] == 2 ? 2 : 1, height = kind == 'M' ? n[5] : n[4] * s, rows = lines.slice(at + 1, at + 1 + height), before = old && old.tiles && old.tiles[line];
@@ -16975,7 +17008,7 @@ function shownAgain(one) {
     if (one.sheet) {    // the laid page as it was made: nothing of it is made again
         sheet = one.sheet;
         if (!scroll.documentView.isEqual(canvas)) scroll.documentView = canvas;
-        fit();
+        fit(); pageBack(false);    // the room beside the page is this page's, never the colour of the tab before
         canvas.scrollPoint($.NSMakePoint(0, Math.round(one.share * sheet.high)));
         listed(one.lines.slice(0, first));
     } else {
@@ -20153,7 +20186,7 @@ function menus() {
 function tabMoved(by) { if (!modalOpen && !asking && tabs.length > 1) tabSaid('tab select ' + ((selected + by + tabs.length) % tabs.length)); }
 
 // The test seams keep physical window ordering separate from startup readiness: a test can order an invisible real window without replacing the startup gate.
-function kind() { return 0; }                // an application with a window and a place in the Dock
+function kind() { return PULLED ? 1 : 0; }    // an application with a window and a place in the Dock; a pulled-out window an accessory (T5)
 function shown() { startupRequested = true; if (startupReady) windowOrdered(); }
 function windowOrdered() { win.makeKeyAndOrderFront($()); app.activateIgnoringOtherApps(true); }
 function drawn(lines, characters) { }
@@ -20624,8 +20657,10 @@ function partsMade() {    // the boxes of the two modals, made once with the pan
 
 function run(argv) {
     NAME = (argv[0] || NAME).replace(/-Staging$/, ' - Staging');    // the staging application, LZRBRWSR-Staging.app, is named "LZRBRWSR - Staging" in the menu bar (Henry, 2026-11-26)
-    TORWINDOW = argv[1] == 'tor';
-    INCOGNITO = argv[1] == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
+    PULLED = /\+$/.test(argv[1] || '');    // T5: "+" after the kind, said by lzrprf for a window a tab was pulled out into (sub pulled_command, --open)
+    var kindWord = (argv[1] || '').replace(/\+$/, '');
+    TORWINDOW = kindWord == 'tor';
+    INCOGNITO = kindWord == 'incognito' || TORWINDOW;    // a Tor window is an incognito window, and more
     if (INCOGNITO) $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSQuitAlwaysKeepsWindows: false, ApplePersistenceIgnoreState: true }));    // in memory only: macOS is asked to keep no window of it to restore (and this container lets it write no file anyway)
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;
