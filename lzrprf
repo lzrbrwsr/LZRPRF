@@ -13051,7 +13051,7 @@ function soundVideoAt(key, one, more) {    // the picture's clock: the sound fol
     var lead = SOUND_VIDEO_LEAD, set = Date.now(), late = 0;
     for (var tries = 0; tries < 2; tries++) {    // the seek itself takes time (41 to 44 ms on a busy Mac, 2026-11-26): it is taken from the lead, and a seek longer than the lead is made again with a lead twice as long as it took
         set = Date.now(); p.currentTime = now() + lead * rate; late = (Date.now() - set) / 1000;
-        if (late < lead * 0.8) break;
+        if (late < lead * 0.8 || tries == 1) break;    // the lead played below is the one this seek was made with (lzr3's review)
         lead = Math.min(0.5, Math.max(lead, late * 2));
     }
     var started = !!p.playAtTime(p.deviceCurrentTime + Math.max(0.002, lead - (Date.now() - set) / 1000));

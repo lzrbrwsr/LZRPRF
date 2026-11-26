@@ -266,9 +266,10 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 138
+    release 139
     home local
     new The staging debug log now says what each click met and whether the page let it act, to find why yle.fi links do nothing.
+    new A video's sound starts in step with its picture on a busy Mac too.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
@@ -277,7 +278,7 @@ record:
     file lzrbrwsr-bin 2f1187f1517028c8403a80fb4485b9b4a4c492ff8744972bf2afca86daecb22b
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf a15bda4c85876dcf53145f9d64fd11bd18bddfb1d9e44ab458bc14096387ffbf
+    lzrprf 8d8120c83edd6e7fb5c393d96062279e4810271aa566ae12332e776fd7efd994
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.
