@@ -163,9 +163,13 @@ function veilPressed(event) {
 // question. A newer question, or the page going on to another, ends it: lzrprf takes no late answer (sub permit_visited).
 var permitLater = null;    // { parts, number, scripts } of the question minimized, or null
 function permitShow(parts, number, scripts) {
-    var choices = parts.slice(2).map(function (title, i) { return [title, function () { permitLater = null; closeModal(); say('button ' + number + ' ' + (i + 1)); }]; });
+    var answerByPosition = [4, 3, 2, 1, 5];
+    var choices = WEB_PILLS.map(function (choice, i) {
+        return [choice[0], function () { permitLater = null; closeModal(); say('button ' + number + ' ' + answerByPosition[i]); }];
+    });
     choices.push(['Minimize', function () { permitLater = { parts: parts, number: number, scripts: scripts }; closeModal(); if (toolIcon) toolIcon.needsDisplay = true; }]);
     modal('LZRDFNDR scripts', parts[1] || '', choices, scripts.length ? 'permit' : 'tall');
+    if (parts.essential) webWarning('script', function () { permitShow(parts, number, scripts); });
     if (!scripts.length) return;
     panelText.string = $(permitCodeText(scripts));
     panelText.font = mono(11.5);

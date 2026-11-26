@@ -223,7 +223,7 @@ sub tor_session_asked {                   # [C17] Stop Tor in a Tor window, aske
 }
 
 sub tor_session_tables {                  # [C17] how many entries the Tor window's tables in memory hold
-    return @LIVE + @CLOSED + @SESSION + @WAY + @PICTURED + @PERMIT_SEEN + @FILTER_SEEN + @PERMIT_HELD + @HELD + @LATER + keys(%PERMIT_PASSWORD) + keys(%PERMIT_PATHS) + keys(%PERMIT_DENIED) + keys(%PERMIT_NEXT) + keys(%PERMIT_ONCE) + keys(%PERMIT_INFO) + keys(%PERMIT_WEB) + listed_said() + @MARKS + length($TITLED)
+    return sends_count() + essential_web_count() + keys(%REDIRECTS) + @LIVE + @CLOSED + @SESSION + @WAY + @PICTURED + @PERMIT_SEEN + @FILTER_SEEN + @PERMIT_HELD + @HELD + @LATER + keys(%PERMIT_PASSWORD) + keys(%PERMIT_PATHS) + keys(%PERMIT_DENIED) + keys(%PERMIT_NEXT) + keys(%PERMIT_ONCE) + keys(%PERMIT_INFO) + keys(%PERMIT_WEB) + listed_said() + @MARKS + length($TITLED)
         + (grep { length($_->{url} // '') || @{ $_->{visited} // [] } } @TABS) + (defined $SHOWN) + (defined $FLAGGED) + (defined $PERMIT_ASK) + (defined $NEXT);
 }
 
@@ -253,6 +253,7 @@ sub tor_session_end {                     # [C17] the end of a Tor window, step 
     @$_ = () for \@LIVE, \@CLOSED, \@SESSION, \@WAY, \@PICTURED, \@PERMIT_SEEN, \@FILTER_SEEN, \@PERMIT_HELD, \@HELD, \@LATER;
     undef $_ for $PERMIT_UNREAD, $PERMIT_STRIPPED; %$_ = () for \%PERMIT_PASSWORD, \%PERMIT_PATHS, \%PERMIT_DENIED, \%PERMIT_NEXT, \%PERMIT_ONCE, \%PERMIT_INFO, \%PERMIT_WEB;
     @MARKS = ();
+    %REDIRECTS = (); sends_clear(); essential_web_clear();
     listed_said(1);
     ($TAB, $TITLED, @TABS) = (0, '', fresh_tab());
     ($SHOWN, $FLAGGED, $PERMIT_ASK, $NEXT) = ();

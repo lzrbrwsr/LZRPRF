@@ -222,7 +222,7 @@ sub live_fetched {                        # [C19]
     my $boxed = !$url || defined $filter || $allowed ne 'sandbox' ? '' : $method eq 'POST' ? 'post' : $host ne $live->{host} && $dest !~ /^(?:script|module)$/ ? 'fetch-other' : '';    # [C26] E1: what of the sandbox's table this request is, when the table refuses it
     $boxed = '' if $boxed && sandbox_says($boxed) ne 'refused';
     my $away = $url && !$boxed && !defined $filter && $method eq 'POST' && $host ne $live->{host};    # [C5] a POST to another host than the page's: never covered by a script permission
-    my $sent = $away && $live->{until} ? ask("The page $live->{host} wants to send something to $host, another host. No script permission covers that. Send it this once?", "Don't send", 'Send') : 0;    # asked before the log is held, so a question left open keeps nothing waiting; a page that is still read, before it is shown, is not asked for
+    my $sent = $away && $live->{until} ? send_question($site, $url) : 0;    # [C5] before the log is held; a page still being read cannot send to another host
     my ($status, $head, $answer, $why) = (0, '', '');
     my ($kept) = keeping();               # read once, as in visit
     open my $request, '>>', "$DIR/busy" or return live_replied($live, 0, '', '');
@@ -244,11 +244,21 @@ sub live_fetched {                        # [C19]
         record("$asked_for; refused: " . ($live->{until} ? 'you did not let it send to another host' : 'a page that is still read is not let send to another host'), $kept);
         return live_replied($live, 0, '', '');
     }
-    record("you let the page $live->{url} send to $host, this once", $kept) or return live_replied($live, 0, '', '') if $away;
+    record("you let the page $live->{url} send to $host by a LZRDFNDR decision", $kept) or return live_replied($live, 0, '', '') if $away;
     if ($code && !$allowed) {             # [C26] not fetched at all: the site's scripts do not run
         record("$asked_for; refused: the scripts of $live->{host} are not allowed", $kept);
         $PERMIT_ASK->{refused}++ if $PERMIT_ASK && $PERMIT_ASK->{site} eq $site && !($PERMIT_DENIED{$site} && $PERMIT_DENIED{$site}{''});
         return live_replied($live, 403, '', '');
+    }
+    if ($code) {
+        my (undef, $path) = website_path($url);
+        my $essential = essential_web_script($site, 'code', "https://$host", $path // '');
+        my $decision = essential_web_answer($essential, 0);
+        if ($decision eq 'deny' || $decision eq 'deny-once') {
+            essential_web_answer($essential, 1);
+            record("$asked_for; refused by the Essential Allow and deny list", $kept);
+            return live_replied($live, 403, '', '');
+        }
     }
     record($asked_for, $kept) or return live_replied($live, 0, '', '');    # [C5] before the name is even looked up
     $why = "the page asked for more than $LIVE_FETCH_MOST addresses" if ++$live->{fetches} > $LIVE_FETCH_MOST;

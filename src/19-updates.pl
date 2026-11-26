@@ -278,7 +278,8 @@ sub welcome {
     window("welcome line g What $APP keeps you from", (map { "welcome line b $_" } @PROTECTS), "welcome line y What $APP cannot keep you from: yours to watch", map { "welcome line b " . s/\$APP/$APP/gr } @CANNOT);
     window('welcome end');
     my @held;
-    while (defined(my $line = hear())) {
+    while (defined(my $line = hear(scalar link_due(undef)))) {    # [C31] with the live debug link on, its commands are still looked at while the welcome waits: a staging browser left on it took none for hours (2026-11-26)
+        if ($line eq '') { eval { link_watch() }; next }
         if ($line ne 'welcomed') { push @held, $line; next }
         unlink "${\ shared()}/welcomed";
         my $out;

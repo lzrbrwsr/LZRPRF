@@ -266,9 +266,10 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 134
+    release 137
     home local
-    new Right-click Inspect opens a console that runs JavaScript in the page and warns before a paste, like Chrome.
+    new Closing the last tab closes LZRBRWSR, and the home page laser lands in the middle of the search box.
+    new LZRDFNDR asks about sends and redirects in its own window, keeps scripts, redirects and sends in one tab, and offers the Essential Allow and deny list.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
@@ -277,7 +278,7 @@ record:
     file lzrbrwsr-bin cf0d57187f3169e5f820433dcb7902c4816d2e6824b3600bd7e836cf11240ece
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-    lzrprf 3135c42a8b7ebf0fd8d18152c7c5b052b7bd7e86a2aa49b61f059c5cfbd7735a
+    lzrprf 7dc2b362d0967b3f7c72bbb8beb8fac295cb69e3bf785968bfa2a08b8ba42878
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

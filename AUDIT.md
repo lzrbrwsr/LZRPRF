@@ -293,11 +293,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
 06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C18 C15
-06-behind.pl	160	unheard	-
-06-behind.pl	204	paired	-
-06-behind.pl	219	unnamed	-
-06-behind.pl	226	leave	C17 C7 C29 C12 C16
-06-behind.pl	243	closed	-
+06-behind.pl	172	unheard	-
+06-behind.pl	216	paired	-
+06-behind.pl	231	unnamed	-
+06-behind.pl	238	leave	C17 C7 C29 C12 C16
+06-behind.pl	255	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-
@@ -309,28 +309,28 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 07-visit-beside.pl	98	run_read	C19 C26 C28
 07-visit.pl	1	-	-
 07-visit.pl	4	visit	C19 C29 C17 C23 C26 C5 C28 C8 C7 C4 C14 C30
-07-visit.pl	237	laid_out	C28 C9
-07-visit.pl	253	outrun	-
-07-visit.pl	268	faces	C13
-07-visit.pl	304	contained	C28 C20 C13 C14 C26 C7 C3
-07-visit.pl	358	page_started	C1 C3
-07-visit.pl	381	spare_for	-
-07-visit.pl	389	spare_taken	-
-07-visit.pl	400	spare_dropped	-
-07-visit.pl	408	spare_work	-
-07-visit.pl	415	idle_taken	C1
-07-visit.pl	427	run_seal	-
-07-visit.pl	453	keeper	C9
-07-visit.pl	541	unhung	-
-07-visit.pl	549	parted	-
-07-visit.pl	558	checked	C30 C9 C22 C14
-07-visit.pl	661	laid	-
-07-visit.pl	674	laid_run	C4
-07-visit.pl	724	redirect_noted	C4
-07-visit.pl	735	redirect_answered	C4
-07-visit.pl	737	redirects_listed	C4
-07-visit.pl	749	redirects_told	C4 C23
-07-visit.pl	751	redirects_decide	C4
+07-visit.pl	243	laid_out	C28 C9
+07-visit.pl	259	outrun	-
+07-visit.pl	274	faces	C13
+07-visit.pl	310	contained	C28 C20 C13 C14 C26 C7 C3
+07-visit.pl	364	page_started	C1 C3
+07-visit.pl	387	spare_for	-
+07-visit.pl	395	spare_taken	-
+07-visit.pl	406	spare_dropped	-
+07-visit.pl	414	spare_work	-
+07-visit.pl	421	idle_taken	C1
+07-visit.pl	433	run_seal	-
+07-visit.pl	459	keeper	C9
+07-visit.pl	547	unhung	-
+07-visit.pl	555	parted	-
+07-visit.pl	564	checked	C30 C9 C22 C14
+07-visit.pl	667	laid	-
+07-visit.pl	680	laid_run	C4
+07-visit.pl	730	redirect_noted	C4
+07-visit.pl	742	redirect_answered	-
+07-visit.pl	749	redirects_listed	C4
+07-visit.pl	762	redirects_told	C4 C23
+07-visit.pl	764	redirects_decide	C4
 08-pictures.pl	1	-	C7 C5 C17 C8 C22
 08-pictures.pl	46	pictures_state	C28
 08-pictures.pl	57	pictures_begun	C23 C28 C27 C4 C5 C8 C6 C7 C1 C3 C21
@@ -715,15 +715,15 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 19-updates.pl	155	release_signed	C25
 19-updates.pl	185	newer	C16
 19-updates.pl	214	newer_looked	C25
-19-updates.pl	267	welcome	C5 C6 C3
-19-updates.pl	329	installed	C25
-19-updates.pl	356	install_run	C25 C5
-19-updates.pl	457	install_drained	-
-19-updates.pl	490	install_guarded	-
-19-updates.pl	505	restarted	C5
-19-updates.pl	537	install_line	-
-19-updates.pl	555	install_end	-
-19-updates.pl	568	body_of	-
+19-updates.pl	267	welcome	C31 C5 C6 C3
+19-updates.pl	330	installed	C25
+19-updates.pl	357	install_run	C25 C5
+19-updates.pl	458	install_drained	-
+19-updates.pl	491	install_guarded	-
+19-updates.pl	506	restarted	C5
+19-updates.pl	538	install_line	-
+19-updates.pl	556	install_end	-
+19-updates.pl	569	body_of	-
 20-window-side.pl	1	-	C29
 20-window-side.pl	14	window	C12
 20-window-side.pl	24	strip_back	-
@@ -772,10 +772,24 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-live.pl	147	live_asked	C19 C26
 21-live.pl	180	live_early	C19
 21-live.pl	200	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	293	live_parts	C19
-21-live.pl	312	unchunked	-
-21-live.pl	327	live_replied	C19
-21-live.pl	332	live_sent	C19
+21-live.pl	303	live_parts	C19
+21-live.pl	322	unchunked	-
+21-live.pl	337	live_replied	C19
+21-live.pl	342	live_sent	C19
+22-essential-web.pl	1	-	-
+22-essential-web.pl	17	essential_web_count	-
+22-essential-web.pl	18	essential_web_clear	-
+22-essential-web.pl	20	website_path	-
+22-essential-web.pl	27	essential_web_redirect	-
+22-essential-web.pl	39	essential_web_script	-
+22-essential-web.pl	53	essential_web_settings	-
+22-essential-web.pl	71	essential_web_choice	-
+22-essential-web.pl	77	essential_web_told	-
+22-essential-web.pl	88	essential_web_save	-
+22-essential-web.pl	123	essential_web_site	-
+22-essential-web.pl	129	essential_web_answer	-
+22-essential-web.pl	140	web_question	-
+22-essential-web.pl	153	essential_test_text	-
 22-permits.pl	1	-	C26
 22-permits.pl	43	permit_rules	C26
 22-permits.pl	65	permit_written	C26
@@ -790,36 +804,46 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 22-permits.pl	147	permit_named	C26
 22-permits.pl	156	permit_part	C26
 22-permits.pl	172	permit_decision	C26
-22-permits.pl	185	sites_told	C26
-22-permits.pl	190	sites_listed	C26
-22-permits.pl	207	sites_decide	C26 C4
-22-permits.pl	241	permit_layers	C26
-22-permits.pl	259	permit_layers_kept	C26
-22-permits.pl	288	curated	C26
-22-permits.pl	319	curated_read	C26
-22-permits.pl	356	curated_rule	C26
-22-permits.pl	393	curated_on	C26
-22-permits.pl	400	permit_curated	C26
-22-permits.pl	411	permit_refused	C26
-22-permits.pl	418	permit_decided	C26
-22-permits.pl	434	permit_queued	C26
-22-permits.pl	451	permit_page	C26
-22-permits.pl	489	permit_parts	C26
-22-permits.pl	505	permit_unread	-
-22-permits.pl	513	permit_read	-
-22-permits.pl	522	permit_stripped	C26
-22-permits.pl	537	permit_body	C26
-22-permits.pl	576	permit_tag	C26
-22-permits.pl	590	permit_scripted	C26
-22-permits.pl	600	live_permitted	C26
-22-permits.pl	616	permit_visited	C26
-22-permits.pl	627	permits_asked	C26
-22-permits.pl	660	permit_button	C26
-22-permits.pl	668	permit_answered	C26
-22-permits.pl	724	permits_later	C26
-22-permits.pl	729	scripts_set	C26 C4
-22-permits.pl	753	scripts_layer	C26 C4
-22-permits.pl	771	scripts_told	C26
+22-permits.pl	186	sites_told	C26
+22-permits.pl	192	sites_listed	C26
+22-permits.pl	217	permit_layers	C26
+22-permits.pl	235	permit_layers_kept	C26
+22-permits.pl	264	curated	C26
+22-permits.pl	295	curated_read	C26
+22-permits.pl	332	curated_rule	C26
+22-permits.pl	369	curated_on	C26
+22-permits.pl	376	permit_curated	C26
+22-permits.pl	387	permit_refused	C26
+22-permits.pl	394	permit_essential_id	-
+22-permits.pl	403	permit_decided	C26
+22-permits.pl	423	permit_queued	C26
+22-permits.pl	440	permit_page	C26
+22-permits.pl	478	permit_parts	C26
+22-permits.pl	494	permit_unread	-
+22-permits.pl	502	permit_read	-
+22-permits.pl	511	permit_stripped	C26
+22-permits.pl	526	permit_body	C26
+22-permits.pl	565	permit_tag	C26
+22-permits.pl	579	permit_scripted	C26
+22-permits.pl	589	live_permitted	C26
+22-permits.pl	605	permit_visited	C26
+22-permits.pl	616	permits_asked	C26
+22-permits.pl	651	permit_button	C26
+22-permits.pl	659	permit_answered	C26
+22-permits.pl	716	permits_later	C26
+22-permits.pl	721	scripts_set	C26 C4
+22-permits.pl	745	scripts_layer	C26 C4
+22-permits.pl	763	scripts_told	C26
+22-sends.pl	1	-	-
+22-sends.pl	7	send_keys	-
+22-sends.pl	11	sends_told	-
+22-sends.pl	20	sends_decide	-
+22-sends.pl	34	send_question	-
+22-sends.pl	52	sends_count	-
+22-sends.pl	53	sends_clear	-
+22-website-scripts.pl	1	-	-
+22-website-scripts.pl	3	sites_decide	C26 C4
+22-website-scripts.pl	37	permit_essentials_saved	-
 23-filters.pl	1	-	C27 C23 C26
 23-filters.pl	34	filters	C27
 23-filters.pl	67	filter_empty	C27
@@ -871,15 +895,15 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 24-parts.pl	47	parts_set	C5
 24-parts.pl	79	parts_fetched	C25
 24-sound.pl	1	-	C12 C3 C22
-24-sound.pl	162	sounding	-
-24-sound.pl	167	sound_told	C12
-24-sound.pl	176	sound_started	C12 C3
-24-sound.pl	189	sound_flushed	C12
-24-sound.pl	196	sound_heard	C12 C22
-24-sound.pl	219	video_sound_kept	C22
-24-sound.pl	228	video_sound_at	C22
-24-sound.pl	247	sound_hushed	C12
-24-sound.pl	255	sound_ended	C12
+24-sound.pl	168	sounding	-
+24-sound.pl	173	sound_told	C12
+24-sound.pl	182	sound_started	C12 C3
+24-sound.pl	195	sound_flushed	C12
+24-sound.pl	202	sound_heard	C12 C22
+24-sound.pl	225	video_sound_kept	C22
+24-sound.pl	234	video_sound_at	C22
+24-sound.pl	253	sound_hushed	C12
+24-sound.pl	261	sound_ended	C12
 24-trmnl-panes.pl	1	-	C29
 24-trmnl-panes.pl	69	trmnl_leaves	-
 24-trmnl-panes.pl	70	trmnl_panes	-
@@ -967,8 +991,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 25-ask-and-address.pl	10	ask	-
 25-ask-and-address.pl	12	asked_later	-
 25-ask-and-address.pl	14	asked	-
-25-ask-and-address.pl	38	address	C23 C8
-25-ask-and-address.pl	55	own_network	-
+25-ask-and-address.pl	48	address	C23 C8
+25-ask-and-address.pl	65	own_network	-
 26-log.pl	1	-	C12
 26-log.pl	13	log_shown	C16
 26-log.pl	50	choose_keeping	-
@@ -1016,6 +1040,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 28-window-pointer.pl	23	window_pointer_text	C22
 28-window-sound.pl	1	-	C22
 28-window-sound.pl	10	window_sound_text	-
+28-window-website.pl	1	-	-
+28-window-website.pl	3	window_website_text	-
 28-window.pl	1	-	C22
 28-window.pl	18	window_text	C17 C16 C29 C18 C22 C12 C28 C26 C4 C27 C15
 28-window1-tabs.pl	1	-	C26

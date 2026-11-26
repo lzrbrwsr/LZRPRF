@@ -99,7 +99,7 @@ sub permit_site {                         # [C26] whether a site may run scripts
     return 'person' if $PERMIT_ONCE{$site} || grep { $_->[0] eq 'always' && $_->[1] eq $site } @$rules;
     return '' if permit_signin($url) || ($PERMIT_DENIED{$site} && $PERMIT_DENIED{$site}{''});
     my $layers = permit_layers();
-    return 'sandbox' if $layers->{e1} || grep { $_->{site} eq $site } curated_on($layers);
+    return 'sandbox' if $layers->{e1} || essential_web_site($site) || grep { $_->{site} eq $site } curated_on($layers);
     return '';
 }
 
@@ -182,8 +182,10 @@ sub permit_decision {                     # [C26] your decision on one script of
     return ('no decision', -1);
 }
 
+my @WEBSITE_SCRIPT_KEYS;
 sub sites_told {                          # [C26] LZRDFNDR's On Websites: "sites begin", then for each site in order "sites site SITE", and under it "sites script N<tab>SITE<tab>NAME<tab>inline|external<tab>BYTES<tab>WHO<tab>CLASS<tab>DECISION" for each script put to you in this window and each rule of yours; then "sites end"
     my ($keys, $all, $lines) = sites_listed();
+    @WEBSITE_SCRIPT_KEYS = @$keys;
     window('sites begin', @$lines, 'sites end');
 }
 
@@ -202,32 +204,6 @@ sub sites_listed {                        # [C26] the scripts of On Websites, ea
         push @lines, 'sites script ' . join("\t", $n++, $site, $name, $where, $bytes, $who, $class, (permit_decision($site, $class, $origin, $sha, $rules))[0]);
     }
     return \@keys, \%all, \@lines;
-}
-
-sub sites_decide {                        # [C26] [C4] a decision changed in LZRDFNDR's On Websites, for the script numbered $n as sites_told last numbered it: "always" or "deny" keeps a rule of yours for it, "forget" takes away every decision of yours for it; then the list is told again
-    my ($n, $to) = @_;
-    my ($keys, $all) = sites_listed();    # numbered as sites_told numbered them
-    my $key = $keys->[$n];
-    my $words = 'Nothing was changed: that script is no longer in the list.';
-    if (defined $key) {
-        my ($site, $kind, $origin, $sha, $caps) = @{ $all->{$key} };
-        my $class = permit_class($kind);
-        my $date = strftime('%Y-%m-%d', gmtime);
-        delete $PERMIT_DENIED{$site}{"$class $origin $sha"} if $PERMIT_DENIED{$site};
-        for my $once (grep { $_ } $PERMIT_ONCE{$site}, $PERMIT_NEXT{$site}) { delete $once->{keys}{$_} for grep { my ($k, $o, $s) = split / /; permit_class($k) eq $class && $o eq $origin && $s eq $sha } keys %{ $once->{keys} } }
-        my $done = permit_stored(sub {
-            my ($rules, $memory) = @_;
-            my $had = @$rules;
-            @$rules = grep { !($_->[1] eq $site && $_->[2] eq $class && $_->[3] eq $origin && $_->[4] eq $sha && !($memory && $_->[7] eq 'file')) } @$rules;
-            push @$rules, [$to, $site, $class, $origin, $sha, $caps // '-', $date] if $to ne 'forget';
-            return $to ne 'forget' || $had != @$rules;
-        });
-        my ($name) = permit_named($site, $kind, $origin, $sha);
-        $words = $to eq 'forget' ? "No decision of yours is kept for $name: it is asked about again." : $done ? "$name is now " . ($to eq 'always' ? 'allowed' : 'denied') . ' always.' : 'Nothing was changed: the scripts file could not be written.';
-        noted("LZRDFNDR On Websites: $words");
-    }
-    sites_told();
-    return idle($words);
 }
 
 # The two switches of the layers, in the plain file scriptlayers of yours, one
@@ -415,13 +391,26 @@ sub permit_refused {                      # [C26] bytes you denied for the class
     return scalar grep { $_->[0] eq 'deny' && $_->[1] eq $site && $_->[2] eq $class && $_->[3] eq $origin && $_->[4] eq $sha } @$rules;
 }
 
+sub permit_essential_id {
+    my ($site, $kind, $origin, $sha, $caps, $url) = @_;
+    return if $kind !~ /\A(?:external|module|import)\z/ || permit_signin($url);
+    my $id = essential_web_script($site, permit_class($kind), $origin, $PERMIT_PATHS{"$site $origin $sha"} // '');
+    return unless defined $id;
+    return $id if $ESSENTIAL_WEB[$id][-1] eq 'deny' || permit_covers(join(',', keys %PERMIT_E1), $caps);
+    return;
+}
+
 sub permit_decided {                      # [C26] the policy, in its order, for a script on the page at $url: "always", "once" or "deny"; in a list, also the layer that decided: "e1", "e2", "e3", or "none" for a deny no rule of yours names
-    my ($site, $kind, $origin, $sha, $caps, $rules, $url) = @_;
+    my ($site, $kind, $origin, $sha, $caps, $rules, $url, $take) = @_;
     my $said = sub { return wantarray ? @_ : $_[0] };
     return $said->('deny', 'e3') if permit_refused($site, $kind, $origin, $sha, $rules);    # your Deny wins over E1 and E2
     my $layer = permit_site($site, $rules, $url);
     return $said->('deny', 'none') unless $layer;
     my $class = permit_class($kind);
+    my $essential = permit_essential_id($site, $kind, $origin, $sha, $caps, $url);
+    my $decision = essential_web_answer($essential, $take);
+    return $said->('deny', 'essential') if $decision eq 'deny' || $decision eq 'deny-once';
+    return $said->($decision eq 'always' ? 'always' : 'once', 'essential') if ($decision eq 'always' || $decision eq 'allow-once') && permit_covers(join(',', keys %PERMIT_E1), $caps);
     return $said->('once', 'e1') if ($layer eq 'person' || permit_layers()->{e1}) && $kind =~ /\A(?:inline|external|module|handler|import)\z/ && ($origin eq 'inline' || $origin eq $site) && permit_covers(join(',', keys %PERMIT_E1), $caps);    # E1: never data: or blob:, which are neither; a module the site imports from itself is its own code too
     return $said->('once', 'e2') if permit_curated($site, $kind, $origin, $sha, $caps, $url);    # E2, a curated rule
     return $said->('always', 'e3') if grep { $_->[0] eq 'always' && $_->[1] eq $site && $_->[2] eq $class && $_->[3] eq $origin && $_->[4] eq $sha && permit_covers($_->[5], $caps) } @$rules;    # E3, your rules, of the class asked
@@ -604,12 +593,12 @@ sub live_permitted {                      # [C26] "=permit KIND ORIGIN SHA256 CA
     $origin = lc $origin;
     my $site = "https://$live->{host}";
     my ($rules) = permit_rules();
-    my ($said, $layer) = permit_decided($site, $kind, $origin, $sha, $caps, $rules, $live->{url});
-    permit_queued($site, $kind, $origin, $sha, $caps) if $said eq 'deny' && !permit_refused($site, $kind, $origin, $sha, $rules);
+    my ($said, $layer) = permit_decided($site, $kind, $origin, $sha, $caps, $rules, $live->{url}, 1);
+    permit_queued($site, $kind, $origin, $sha, $caps) if $said eq 'deny' && $layer ne 'essential' && !permit_refused($site, $kind, $origin, $sha, $rules);
     my $what = "$kind script " . ($origin eq 'inline' ? 'in the page' : "from $origin") . ' ' . substr($sha, 0, 12);
     permit_seen($layer, $site, $what, 'ran') if $layer =~ /\Ae[12]\z/;    # [C26] what E1 and E2 decided, for Script permissions
     permit_seen('e1', $site, $what, 'asked') if $said eq 'deny' && $layer eq 'none' && permit_site($site, $rules, $live->{url}) eq 'sandbox';
-    noted("the page $live->{url} asked to run a script ($kind, " . ($origin eq 'inline' ? 'in the page' : "from $origin") . ", capabilities $caps): " . ($said eq 'deny' ? 'not run' : "run ($said, " . { e1 => 'E1, the sandbox', e2 => 'E2, a curated rule', e3 => 'E3, your rule' }->{$layer} . ')'));
+    noted("the page $live->{url} asked to run a script ($kind, " . ($origin eq 'inline' ? 'in the page' : "from $origin") . ", capabilities $caps): " . ($said eq 'deny' ? 'not run' : "run ($said, " . { e1 => 'E1, the sandbox', e2 => 'E2, a curated rule', e3 => 'E3, your rule', essential => 'the Essential Allow and deny list' }->{$layer} . ')'));
     return live_sent($live, "=permitted $said\n");
 }
 
@@ -650,8 +639,10 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
     my $i = 0;
     window(map { my ($name, $where, $bytes, $who) = permit_named($site, @$_[0 .. 2]); my $info = $PERMIT_INFO{"$site $_->[1] $_->[2]"}; my $source = $info ? $info->{source} : '';
         'permitscript ' . join("\t", $i++, $name, $where, $bytes, $who, length $source, MIME::Base64::encode_base64($source, '')) } @items);    # [C26] each script with its source, shown in the question as text that never runs
+    my $essential = grep { defined permit_essential_id($site, @$_, $ask->{url}) } @items;
+    window('essential script') if $essential;
     my $state = { site => $site, url => $ask->{url}, items => \@items, allowed => $allowed, host => $host };
-    my @buttons = ('Deny Once', 'Deny Always', 'Allow Once', 'Always Allow');
+    my @buttons = ('Deny Once', 'Deny Always', 'Allow Once', 'Always Allow', 'Forget');
     return permit_answered($state, asked("permit $site\t$words", @buttons)) unless $FROM;    # "lzrprf try": the test's answer at once
     $state->{n} = asked_later("permit $site\t$words", @buttons); $PERMIT_PENDING = $state;    # Henry 2026-11-25: the page goes on while the question stands; its answer comes as any other line (sub permit_button)
     return 0;
@@ -667,6 +658,7 @@ sub permit_button {                       # [C26] the answer to the question abo
 
 sub permit_answered {                     # [C26] what Deny Once, Deny Always, Allow Once and Always Allow do; true when the page is to be loaded again
     my ($state, $press) = @_;
+    return 0 if $press == 5;
     my ($site, $allowed, $host, @items) = (@$state{qw(site allowed host)}, @{ $state->{items} });
     my $ask = { url => $state->{url} };
     if ($press == 1 || $press == 2) {

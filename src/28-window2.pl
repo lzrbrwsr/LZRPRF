@@ -535,7 +535,7 @@ function run(argv) {
     panel.addSubview(toolCopy);
     procsMade();    // Show all processes and its Notes field (HC-0843), once toolView is made
     partsMade();    // the boxes of Add or remove LZR modules and of LZRTNNL
-    toolTabs = ['On Your Computer', 'On Websites', 'Redirects', 'Other'].map(function (words, k) {    // the panel's three tabs, under its title
+    toolTabs = ['On Your Computer', 'Scripts, Redirects and Sends', 'Other'].map(function (words, k) {    // the panel's three tabs, under its title
         var one = $.NSButton.alloc.initWithFrame($.NSMakeRect(0, 0, 170, 28));
         one.title = $(words); one.bezelStyle = 1; one.font = sans(13, true); one.tag = k; one.target = hand; one.action = 'toolTab:'; one.hidden = true;
         panel.addSubview(one);

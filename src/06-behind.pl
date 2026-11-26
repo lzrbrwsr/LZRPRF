@@ -82,11 +82,23 @@ sub behind {
         elsif ($event eq 'live') { live_turn(); trmnl_opened() if $TRMNL_OPEN; permits_later(); my $home = live_of($TABS[$TAB]); if ($home_update_due && $home && $home->{home_ready}) { $home_update_due = 0; newer() } $IDLE_WORK //= \&identity_asked if $local_home && $home && $home->{home_ready} }    # a page kept running with its tab answered, or is to end (sub live_answered); [C26] what it asked meanwhile is put to you after
         elsif ($event =~ /^scripts (list|reset|revoke|set)(?: (0|[1-9][0-9]{0,3}))?(?: (always|deny))?$/ && ($1 eq 'revoke' ? defined $2 && !defined $3 : $1 eq 'set' ? defined $2 && defined $3 : !defined $2 && !defined $3)) { scripts_set($1, $2, $3); said_noted() }    # [C26] [C4] LZRDFNDR scripts, from the cogwheel's menu
         elsif ($event =~ /^scripts (e1|curated)(?: (0|[1-9][0-9]{0,3}))? (on|off)$/ && ($1 eq 'curated') == defined $2) { scripts_set($1, $2, $3); said_noted() }    # [C26] the switch of the sandbox (E1), or of one curated rule (E2)
-        elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-4])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
+        elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-5])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
         elsif ($event eq 'scripts sites') { sites_told() }    # [C26] LZRDFNDR's On Websites: the scripts of each site and your decision on each
-        elsif ($event =~ /^scripts decide (0|[1-9][0-9]{0,3}) (always|deny|forget)$/) { sites_decide($1, $2); said_noted() }    # [C26] [C4] a decision changed there
+        elsif ($event =~ /^scripts decide (0|[1-9][0-9]{0,3}) (always|deny|allow-once|deny-once|forget)$/) { sites_decide($1, $2); said_noted() }    # [C26] [C4] a decision changed there
+        elsif ($event eq 'sends list') { sends_told() }
+        elsif ($event =~ /\Asends decide (0|[1-9][0-9]{0,3}) (always|deny|allow-once|deny-once|forget)\z/) { sends_decide($1, $2) }
+        elsif ($event eq 'essential list') { essential_web_told() }
+        elsif ($event =~ /\Aessential save ([01])((?: [0-9]=[a-z-]+){0,8})\z/) {
+            my ($on, $changes) = ($1, $2);
+            my $ok = essential_web_save($on, grep length, split / /, $changes);
+            my ($again, $resolved) = $ok ? permit_essentials_saved() : ();
+            window('essential saved ' . ($ok ? $resolved ? 'resolved' : 'ok' : 'failed'));
+            essential_web_told();
+            if ($again) { $PERMIT_RELOAD = $again; go($again, 'you reloaded') }
+            elsif ($resolved) { permits_later() }
+        }
         elsif ($event eq 'redirects list') { redirects_told() }    # [C4] LZRDFNDR's Redirects: every redirect put to you and your decision on each
-        elsif ($event =~ /^redirects decide (0|[1-9][0-9]{0,3}) (proceed|cancel|forget)$/) { redirects_decide($1, $2); said_noted() }    # [C4] a decision changed there
+        elsif ($event =~ /^redirects decide (0|[1-9][0-9]{0,3}) (proceed|cancel|allow-once|deny-once|forget)$/) { redirects_decide($1, $2); said_noted() }    # [C4] a decision changed there
         elsif ($event =~ /^filters (list|switch|allow|revoke)(?: (0|[1-9][0-9]{0,3}))?(?: (on|off))?$/ && ($1 eq 'list' ? !defined $2 && !defined $3 : $1 eq 'switch' ? defined $2 && defined $3 : defined $2 && !defined $3)) { filters_set($1, $2, $3); said_noted() }    # [C27] [C4] Filters, from the cogwheel's menu: the lists, a list switched, a blocked request's host let through on its site, or that revoked
         elsif ($event =~ /^video (0|[1-9][0-9]?)$/ && $1 < $VIDEOS) { videoed($1) }    # [C22] you clicked the place of a video: the one moment a video is fetched
         elsif ($event =~ /^video at (0|[1-9][0-9]?) ((?:playing|paused|ended|off|gone) [0-9]{1,6}\.[0-9]{3} [0-9]{1,2}(?:\.[0-9]{1,3})? [0-9]{13})$/ && $1 < $VIDEOS) { video_sound_at($1, $2) }    # [C22] the picture's clock of a video whose sound you turned on: its sound plays in the sound process, in step
