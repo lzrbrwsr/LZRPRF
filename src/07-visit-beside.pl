@@ -109,7 +109,7 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
         $open = sysread($from_page, $wrote, 65536, length $wrote) // $!{EINTR};
         next unless $keep;
         while ($wrote =~ /\A=(?:fetch|permit|early|soon|wsopen|wssend|wsclose|store) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
-            $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0 };
+            $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0, kept_app => $app };
             @$early{qw(kept_app storage_epoch)} = ($app, $run->{storage_epoch}) if $app;
             $early->{held} = $wrote;
             my $asked = live_asked($early) or last;    # not all there yet

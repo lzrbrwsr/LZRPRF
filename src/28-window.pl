@@ -4056,10 +4056,11 @@ ObjC.registerSubclass({ name: 'LzrprfPanel', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('panel', function () { paintPanel(); }); } },
     'mouseDown:': { implementation: function (event) { } }
 } });
-
 ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowWillReturnFieldEditor:toObject:': { types: ['id', ['id', 'id']], implementation: function (sender, client) { return typingView(); } },    // every text field of the window is typed into through this one, which asks no language service
     'windowDidResize:': { types: ['void', ['id']], implementation: function (note) { place(); resting(); frameSaid(); } },
+    'windowDidBecomeKey:': { types: ['void', ['id']], implementation: function () { say('window focus 1'); } },
+    'windowDidResignKey:': { types: ['void', ['id']], implementation: function () { say('window focus 0'); } },
     'windowDidMove:': { types: ['void', ['id']], implementation: function (note) { frameSaid(); } },
     'shotEnded:': { types: ['void', ['id']], implementation: function () { shotEnded(); } },
     'framed:': { types: ['void', ['id']], implementation: function (sender) { framed(); } },
@@ -4072,8 +4073,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
     'unlaid:': { types: ['void', ['id']], implementation: function (sender) { unlaid(); page.string = $(''); listed([]); } },
-    // Return was pressed in the bar. What was typed goes to lzrprf as it is. A character that is not
-    // plain is sent as one that no address may hold, so lzrprf refuses the whole of it.
+    // Return sends the typed address; nonplain characters make the entire address invalid.
     'go:': { types: ['void', ['id']], implementation: function (sender) {
         var typed = bar.stringValue.js.replace(/[^\x20-\x7e]/g, '\x7f').slice(0, 2100);
         if (!typed.length || asking || !bar.enabled) return;

@@ -589,7 +589,8 @@ sub permit_scripted {                     # [C26] whether an attribute's value i
 sub live_permitted {                      # [C26] "=permit KIND ORIGIN SHA256 CAPS" of a page: answered at once, "=permitted always", "once" or "deny" (sub permit_decided), one answer for each in its order; what no rule allows is denied and kept to put to you once the page is drawn, so no question ever holds a page
     my ($live, $line) = @_;
     my ($kind, $origin, $sha, $caps) = $line =~ /\A=permit ($PERMIT_KIND) ($PERMIT_ORIGIN) ([0-9a-f]{64}) ($PERMIT_CAPS)\z/ or return live_end($live, 'it wrote a line of no form');
-    return live_end($live, "it asked more than $LIVE_PERMIT_MOST times whether a script may run") if ++$live->{permits} > $LIVE_PERMIT_MOST;
+    my $most = $live->{kept_app} ? $LIVE_PERMIT_KEPT_MOST : $LIVE_PERMIT_MOST;
+    return live_end($live, "it asked more than $most times whether a script may run") if ++$live->{permits} > $most;
     $origin = lc $origin;
     my $site = "https://$live->{host}";
     my ($rules) = permit_rules();

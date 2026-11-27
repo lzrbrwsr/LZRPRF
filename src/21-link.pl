@@ -334,7 +334,8 @@ sub link_command {                        # [C31] one command: checked, written 
     }
     if ($verb eq 'press') {                 # a press and release at X,Y of the page shown (its view's points, as the window sends them), handed straight to the page kept running: it tells a press the page drops from one the window never sent
         my ($x, $y) = split /,/, $arg;
-        live_input("down $x $y"); live_input("up $x $y");
+        if ($TABS[$TAB]{cht}) { live_input("click $x $y") }    # LZRCHT's tab takes the click the window sends, never a down or an up (sub cht_input)
+        else { live_input("down $x $y"); live_input("up $x $y") }
         noted("the live debug link pressed the page shown at $x,$y");
         return link_line('INFO', 'press', "a press and release were handed to the page at $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
     }

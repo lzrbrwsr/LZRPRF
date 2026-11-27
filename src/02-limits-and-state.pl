@@ -60,6 +60,7 @@ my $LIVE_MOST = 3;                        # DECLARED(the most pages kept running
 my $LIVE_INPUT = 1040;                      # DECLARED(LONGEST_INPUT of the application's scripted module, src/page/scripted.rs: the longest input line it reads, its line end not counted)
 my $LIVE_TEXT = 1024;                       # DECLARED(LONGEST_TEXT of the same module: the most bytes of the text of one "=text" line)
 my $LIVE_HELD = 65536;                     # DECLARED(the most input the keeper holds for a page that does not read it: bounded in the keeper; the parent retains at most 1 MiB more and resumes partial writes when the relay is writable)
+my $LIVE_FETCH_KEPT_MOST = 8192;        # MEASURED(LZRCHT's Discord, a kept app: 372 scripts at its first load, then its lazy chunks and API calls for the day its tab stays open; the application's MOST_KEPT_EXTERNAL, engine/bindings/loading.rs)
 my $LIVE_FETCH_MOST = 600;               # DECLARED([C19] the most addresses one page kept running may ask for in its life: one every three seconds for its half hour; a page that asks for more is answered "=fetched 0 0 0")
 my $LIVE_FETCH_UP = 65536;                # DECLARED([C19] LONGEST_BODY_UP of the application's scripted module, src/page/scripted.rs: the most bytes of a body a page's request carries up)
 my $LIVE_FETCH_LINE = 8300;               # DECLARED([C19] the longest "=fetch" line: its words, 65536, the longest type and an address of LONGEST_GO, 8192, as the application writes it)
@@ -235,6 +236,7 @@ my $PERMIT_FILE_BYTES = 256 * 1024;       # DECLARED(script-permissions contract
 my $PERMIT_RULES = 1000;                  # DECLARED(script-permissions contract 2026-11-22: a file of more rules is not read, and none is written)
 my $PERMIT_QUEUE = 32;                    # DECLARED(script-permissions contract 2026-11-22: the most scripts of one visit put to you in one question)
 my $PERMIT_ROUNDS = 1;                    # DECLARED(Henry 2026-11-24, yle.fi: one reload after your answers, never one per question; a later Allow holds for the page as it runs): the most reloads in a row that your Allow starts for one address
+my $LIVE_PERMIT_KEPT_MOST = 8192;        # MEASURED(a kept app's page, LZRCHT's Discord: 372 scripts at its first load and its chunks while it stays open; the application's MOST_KEPT_ASKS, src/page/permit.rs)
 my $LIVE_PERMIT_MOST = 2000;              # DECLARED(script-permissions contract 2026-11-22: the most =permit questions one page asks in its life; a page that asks more is ended)
 my $BEHIND_FAULTS = 100;                 # DECLARED(Henry 2026-11-24: a page must never take the browser down; past this many errors of its own in one window, lzrprf behind it ends after all, as one that comes back at every line would never let the window go on)
 my @PERMIT_HELD;                          # [C26] rules in this window's memory only: every rule of an incognito window, and a rule lzrprf could not write because the file is not read

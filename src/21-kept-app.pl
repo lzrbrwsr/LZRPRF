@@ -5,7 +5,8 @@ my @KEPT_APPS = ({
     start => 'https://discord.com/app',
     hosts => { map { $_ => 1 } qw(discord.com gateway.discord.gg cdn.discordapp.com media.discordapp.net discord.gg) },
     socket_host => 'gateway.discord.gg',
-    seconds => 86_400, requests => 120, bytes => 48 * 1024 * 1024, reply => 16 * 1024 * 1024, sockets => 2,
+    seconds => 86_400, requests => 1000, bytes => 128 * 1024 * 1024,    # MEASURED(Discord's /app asks for 372 scripts at once: 120 a minute refused its runtime, web.*.js, and drew a blank page, staging 2026-11-27)
+    reply => 16 * 1024 * 1024, sockets => 2,
 });
 
 sub kept_app_discord {

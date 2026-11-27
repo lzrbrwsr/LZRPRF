@@ -138,6 +138,7 @@ my $LIVE_MOST = 3;                        # DECLARED(the most pages kept running
 my $LIVE_INPUT = 1040;                      # DECLARED(LONGEST_INPUT of the application's scripted module, src/page/scripted.rs: the longest input line it reads, its line end not counted)
 my $LIVE_TEXT = 1024;                       # DECLARED(LONGEST_TEXT of the same module: the most bytes of the text of one "=text" line)
 my $LIVE_HELD = 65536;                     # DECLARED(the most input the keeper holds for a page that does not read it: bounded in the keeper; the parent retains at most 1 MiB more and resumes partial writes when the relay is writable)
+my $LIVE_FETCH_KEPT_MOST = 8192;        # MEASURED(LZRCHT's Discord, a kept app: 372 scripts at its first load, then its lazy chunks and API calls for the day its tab stays open; the application's MOST_KEPT_EXTERNAL, engine/bindings/loading.rs)
 my $LIVE_FETCH_MOST = 600;               # DECLARED([C19] the most addresses one page kept running may ask for in its life: one every three seconds for its half hour; a page that asks for more is answered "=fetched 0 0 0")
 my $LIVE_FETCH_UP = 65536;                # DECLARED([C19] LONGEST_BODY_UP of the application's scripted module, src/page/scripted.rs: the most bytes of a body a page's request carries up)
 my $LIVE_FETCH_LINE = 8300;               # DECLARED([C19] the longest "=fetch" line: its words, 65536, the longest type and an address of LONGEST_GO, 8192, as the application writes it)
@@ -313,6 +314,7 @@ my $PERMIT_FILE_BYTES = 256 * 1024;       # DECLARED(script-permissions contract
 my $PERMIT_RULES = 1000;                  # DECLARED(script-permissions contract 2026-11-22: a file of more rules is not read, and none is written)
 my $PERMIT_QUEUE = 32;                    # DECLARED(script-permissions contract 2026-11-22: the most scripts of one visit put to you in one question)
 my $PERMIT_ROUNDS = 1;                    # DECLARED(Henry 2026-11-24, yle.fi: one reload after your answers, never one per question; a later Allow holds for the page as it runs): the most reloads in a row that your Allow starts for one address
+my $LIVE_PERMIT_KEPT_MOST = 8192;        # MEASURED(a kept app's page, LZRCHT's Discord: 372 scripts at its first load and its chunks while it stays open; the application's MOST_KEPT_ASKS, src/page/permit.rs)
 my $LIVE_PERMIT_MOST = 2000;              # DECLARED(script-permissions contract 2026-11-22: the most =permit questions one page asks in its life; a page that asks more is ended)
 my $BEHIND_FAULTS = 100;                 # DECLARED(Henry 2026-11-24: a page must never take the browser down; past this many errors of its own in one window, lzrprf behind it ends after all, as one that comes back at every line would never let the window go on)
 my @PERMIT_HELD;                          # [C26] rules in this window's memory only: every rule of an incognito window, and a rule lzrprf could not write because the file is not read
@@ -2102,7 +2104,7 @@ sub run_read {                            # ($run, $keep, $sheets, $tool): the s
         $open = sysread($from_page, $wrote, 65536, length $wrote) // $!{EINTR};
         next unless $keep;
         while ($wrote =~ /\A=(?:fetch|permit|early|soon|wsopen|wssend|wsclose|store) /) {    # [C19] a request of the page while it is read (an external script), before its first list: answered as one after it, within the same $PAGE_SECONDS, and counted in the same $LIVE_FETCH_MOST of its life; [C26] or a question whether a script may run, answered at once
-            $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0 };
+            $early //= { page => $page, keeper => $feeder, relay => $relay, from => $from_page, hold => $hold, looked => 0, home => $local_home, url => $url, host => (address($url))[1] // '', fetches => 0, kept_app => $app };
             @$early{qw(kept_app storage_epoch)} = ($app, $run->{storage_epoch}) if $app;
             $early->{held} = $wrote;
             my $asked = live_asked($early) or last;    # not all there yet
@@ -8839,7 +8841,7 @@ sub prefetch_go {                         # ($first, $page): the page $page aske
 
 sub prefetch_soon {                       # [C19] ($live, $dest, $to): "=soon DEST URL", a GET the page's own script set going and makes in a later task (a script it made: yle.fi waited 205, 88 and 280 ms on three, one after another, 2026-11-25). Judged here as sub live_fetched will judge the request, begun with the two lines sub prefetch_pump writes first, and handed over only by sub prefetch_take when the page asks for exactly it. Whatever this refuses is simply not begun: the request says why when it comes
     my ($live, $dest, $to) = @_;
-    return if $live->{home} || $TOR_WANTED || listed($to) || ++$live->{soon} > $LIVE_FETCH_MOST;
+    return if $live->{home} || $TOR_WANTED || listed($to) || ++$live->{soon} > ($live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST);
     my ($url, $host) = address($to);
     return if !$url || $PREFETCH{$url};
     my ($rules) = permit_rules();
@@ -10180,6 +10182,7 @@ sub hear {                                # the next thing the window says; noth
             chomp $line;
             print STDERR "$line\n" if $TRY && $line =~ /^(?:test|fault) /;    # "lzrprf try" only: what a test's own text in the window reports
             if ($line =~ /^undrawn ([a-z]{1,20}) ([\x20-\x7e]{0,200})$/) { record("the window could not finish drawing its $1 view this once, and goes on: $2"); next }    # said by function viewDrawn in the window, the first fault of each view once: kept in the log wherever lzrprf listens, in the loop of sub behind, in a question or after an install
+            if ($line =~ /\Awindow focus ([01])\z/) { live_window_focus($1); next }
             return $line;
         }
         my ($ready, $writable, $wait) = ('', '', defined $until ? $until - now() : undef);
@@ -10260,7 +10263,8 @@ my @KEPT_APPS = ({
     start => 'https://discord.com/app',
     hosts => { map { $_ => 1 } qw(discord.com gateway.discord.gg cdn.discordapp.com media.discordapp.net discord.gg) },
     socket_host => 'gateway.discord.gg',
-    seconds => 86_400, requests => 120, bytes => 48 * 1024 * 1024, reply => 16 * 1024 * 1024, sockets => 2,
+    seconds => 86_400, requests => 1000, bytes => 128 * 1024 * 1024,    # MEASURED(Discord's /app asks for 372 scripts at once: 120 a minute refused its runtime, web.*.js, and drew a blank page, staging 2026-11-27)
+    reply => 16 * 1024 * 1024, sockets => 2,
 });
 
 sub kept_app_discord {
@@ -10775,7 +10779,8 @@ sub link_command {                        # [C31] one command: checked, written 
     }
     if ($verb eq 'press') {                 # a press and release at X,Y of the page shown (its view's points, as the window sends them), handed straight to the page kept running: it tells a press the page drops from one the window never sent
         my ($x, $y) = split /,/, $arg;
-        live_input("down $x $y"); live_input("up $x $y");
+        if ($TABS[$TAB]{cht}) { live_input("click $x $y") }    # LZRCHT's tab takes the click the window sends, never a down or an up (sub cht_input)
+        else { live_input("down $x $y"); live_input("up $x $y") }
         noted("the live debug link pressed the page shown at $x,$y");
         return link_line('INFO', 'press', "a press and release were handed to the page at $x,$y", nonce => $nonce, x => $x, y => $y, live => (live_of($TABS[$TAB]) ? 1 : 0));
     }
@@ -10838,6 +10843,7 @@ sub live_kept {
     @$live{qw(tab made paths host pictures shown videos)} = ($tab, \@made, [@$paths], $host, $decoded // {}, $shown, [@{ $videos // [] }]);
     $live->{laid} = ($lines->[scalar @made] // '') =~ /^(L[0-9]+x[0-9]+)$/ ? $1 : '';    # [C18] the size it was laid at, when it was laid: a drawing of another height has its end somewhere else (sub live_answered)
     push @LIVE, $live;
+    live_window_focus();
     live_end($LIVE[0], 'more pages were kept running than lzrprf keeps') while @LIVE > $LIVE_MOST;
 }
 
@@ -10847,8 +10853,24 @@ sub live_dropped {                        # a run that kept its page and is not 
     return defined $words ? idle($words) : undef;
 }
 
+my $window_focused;
+
+sub live_window_focus {
+    $window_focused = $_[0] if @_;
+    return unless defined $window_focused;
+    my $selected = live_of($TABS[$TAB]);
+    for my $live (@LIVE) {
+        next if $live->{ended} || $live->{starting};
+        my $focused = $window_focused && $selected && $live == $selected ? 1 : 0;
+        next if defined $live->{window_focused} && $live->{window_focused} == $focused;
+        $live->{window_focused} = $focused;
+        live_wrote($live, "window-focus $focused");
+    }
+}
+
 sub live_told {                           # the window is told whether the page shown is kept running, and whether a text field of it has the focus: "live on|off 1|0"
     my $live = live_of($TABS[$TAB]);
+    live_window_focus();
     my @now = $TABS[$TAB]{trmnl} ? ('on', 1, 'trmnl') : $TABS[$TAB]{cht} ? ('on', 0, 'cht') : $live ? ('on', $live->{focus} ? 1 : 0) : ('off', 0);    # [C29] a terminal's tab takes every key, and keys held with Control
     return if "@now" eq "@LIVE_TOLD";
     @LIVE_TOLD = @now;
@@ -11098,7 +11120,8 @@ sub live_fetched {                        # [C19]
         }
     }
     record($asked_for, $kept) or return live_replied($live, 0, '', '');    # [C5] before the name is even looked up
-    $why = "the page asked for more than $LIVE_FETCH_MOST addresses" if ++$live->{fetches} > $LIVE_FETCH_MOST;
+    my $fetch_most = $live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST;
+    $why = "the page asked for more than $fetch_most addresses" if ++$live->{fetches} > $fetch_most;
     if (!$why) { my $shield = shield_said($url); $why = shield_why($shield) if $shield ne 'allow' }    # [C28] before any DNS lookup, including requests while a page is still being read
     my $where;
     my $sent_ask = { method => $method, type => $type, body => $body, origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => scalar(sso_cookie($url, $live->{host})), top => $allowed eq 'sandbox' ? undef : $live->{url}, as => $as, dest => $dest, from => $live->{host} };
@@ -12392,7 +12415,8 @@ sub permit_scripted {                     # [C26] whether an attribute's value i
 sub live_permitted {                      # [C26] "=permit KIND ORIGIN SHA256 CAPS" of a page: answered at once, "=permitted always", "once" or "deny" (sub permit_decided), one answer for each in its order; what no rule allows is denied and kept to put to you once the page is drawn, so no question ever holds a page
     my ($live, $line) = @_;
     my ($kind, $origin, $sha, $caps) = $line =~ /\A=permit ($PERMIT_KIND) ($PERMIT_ORIGIN) ([0-9a-f]{64}) ($PERMIT_CAPS)\z/ or return live_end($live, 'it wrote a line of no form');
-    return live_end($live, "it asked more than $LIVE_PERMIT_MOST times whether a script may run") if ++$live->{permits} > $LIVE_PERMIT_MOST;
+    my $most = $live->{kept_app} ? $LIVE_PERMIT_KEPT_MOST : $LIVE_PERMIT_MOST;
+    return live_end($live, "it asked more than $most times whether a script may run") if ++$live->{permits} > $most;
     $origin = lc $origin;
     my $site = "https://$live->{host}";
     my ($rules) = permit_rules();
@@ -21127,10 +21151,11 @@ ObjC.registerSubclass({ name: 'LzrprfPanel', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('panel', function () { paintPanel(); }); } },
     'mouseDown:': { implementation: function (event) { } }
 } });
-
 ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowWillReturnFieldEditor:toObject:': { types: ['id', ['id', 'id']], implementation: function (sender, client) { return typingView(); } },    // every text field of the window is typed into through this one, which asks no language service
     'windowDidResize:': { types: ['void', ['id']], implementation: function (note) { place(); resting(); frameSaid(); } },
+    'windowDidBecomeKey:': { types: ['void', ['id']], implementation: function () { say('window focus 1'); } },
+    'windowDidResignKey:': { types: ['void', ['id']], implementation: function () { say('window focus 0'); } },
     'windowDidMove:': { types: ['void', ['id']], implementation: function (note) { frameSaid(); } },
     'shotEnded:': { types: ['void', ['id']], implementation: function () { shotEnded(); } },
     'framed:': { types: ['void', ['id']], implementation: function (sender) { framed(); } },
@@ -21143,8 +21168,7 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
     'unlaid:': { types: ['void', ['id']], implementation: function (sender) { unlaid(); page.string = $(''); listed([]); } },
-    // Return was pressed in the bar. What was typed goes to lzrprf as it is. A character that is not
-    // plain is sent as one that no address may hold, so lzrprf refuses the whole of it.
+    // Return sends the typed address; nonplain characters make the entire address invalid.
     'go:': { types: ['void', ['id']], implementation: function (sender) {
         var typed = bar.stringValue.js.replace(/[^\x20-\x7e]/g, '\x7f').slice(0, 2100);
         if (!typed.length || asking || !bar.enabled) return;
