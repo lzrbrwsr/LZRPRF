@@ -10465,7 +10465,7 @@ sub kept_app_visit {
     my $prior = live_of($tab);
     live_end($prior, 'its kept app went elsewhere', 1) if $prior;
     my $frame = "=sheets\n";
-    my ($lines, undef, $paths, $title, $named, $live) = laid_out($url, $got, $frame, 1, $app);
+    my ($lines, undef, $paths, $said, $named, $live) = laid_out($url, $got, $frame, 1, $app);    # $said: the page's compatibility statement, judged from Discord's static page; the kept app brings its own WebSocket, so it is not shown (ticket 1539: it was the tab's title, "Not supported yet: WebSocket, favicon.")
     return idle('Discord could not draw its page.') unless $lines && $live;
     if (@$named) {
         my @sheets = map {
@@ -10477,7 +10477,7 @@ sub kept_app_visit {
             my @next = laid_out($url, $got, $with, 1, $app);
             if ($next[0] && $next[5]) {
                 live_dropped($live);
-                ($lines, $paths, $title, $live) = @next[0, 2, 3, 5];
+                ($lines, $paths, $said, $live) = @next[0, 2, 3, 5];
                 $frame = $with;
             } else { live_dropped($next[5]) }
         }
@@ -10486,7 +10486,7 @@ sub kept_app_visit {
         cht_end($tab, 'Discord opened in this tab', 1);
         $tab->{kept_app} = $opening;
     }
-    @$tab{qw(url title says)} = ($url, $title || 'Discord', 'Discord in its kept-app tab.');
+    @$tab{qw(url title says)} = ($url, 'Discord', 'Discord in its kept-app tab.');
     if (($how // '') !~ /\Ayou (?:went (?:back|forward) to|reloaded)\z/) {
         splice @{ $tab->{visited} }, $tab->{at} + 1;
         push @{ $tab->{visited} }, $url;

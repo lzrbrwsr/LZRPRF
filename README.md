@@ -267,14 +267,14 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 175
+    release 176
+    new Discord in LZRCHT now opens titled Discord in its own tab, instead of a "not supported yet" notice.
     new Scrolling is smoother with a little more momentum, a page no longer jumps while it loads, and a minimized LZRDFNDR question waits in its icon with a count.
     new The menu bar says LZRBRWSR, questions open in the same box as everything else and never hold your tabs, and Discord connects from LZRCHT in its own tab.
     new Pages and files in 27 older encodings (Cyrillic, Greek, Central European, Hebrew and more) now read correctly.
     home local
     new A file you choose is read as text in the encoding the site names, and a page knows when its window is in front.
     new Sites can read a file you choose before they send it (FileReader), as Discord does with an attachment.
-    new LZRCHT's Discord may load all 372 of its scripts and its 13 MB main one, so it no longer stops half-loaded and blank. Sign in with your own account in its sealed tab.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
@@ -285,7 +285,7 @@ record:
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
     file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
     file lzrbrwsr-window 6472a7855c52851bd8db375b86a7f3b400b77353bcab70a663c39574497867c9
-    lzrprf b6387d19042933fc4c6492d23193e71addbf110f62c951259ecc5825bedd429c
+    lzrprf fe3c2d59f13422ddce9086e64dee8902ba7970a82a90e6a91844f5b29e774b8b
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.
