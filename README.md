@@ -267,20 +267,20 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 180
+    release 181
+    new Scrolling a long page like yle.fi redraws only the part around the view instead of the whole page: 50 times faster on our test page.
     new LZRDFNDR's panel has an on/off switch at the top of each tab: On Your Computer, and Scripts, Redirects and Sends each on their own; off lets that kind through without asking.
     new Stopping Tor from a tab asks first and Cancel keeps it on; short notices appear briefly at the top, and the black strip under the bar is gone.
     new Long pages draw to their end: every picture is fetched, not just the first 24, and pictures appear as they arrive.
     new LZRBRWSR no longer gets stuck at full CPU or stops answering: macOS AutoFill kept retrying inside its window.
     new Discord in LZRCHT now opens titled Discord in its own tab, instead of a "not supported yet" notice.
-    new Scrolling is smoother with a little more momentum, a page no longer jumps while it loads, and a minimized LZRDFNDR question waits in its icon with a count.
     home local
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin d6443f3cbabf7caf3cf1b44d2022c428e4f5ec9c3ef1261035ce341e6658b50f
+    file lzrbrwsr-bin 4bfbae9b2ecef6eae94da19bf6a7d5fbfc26fda097512e0a2a705395f5a717f7
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
     file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
