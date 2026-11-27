@@ -140,7 +140,7 @@ sub fault {
     my ($build) = mark() =~ /^macOS build (\w+)/;
     my $word = $which =~ /^un(?:started|contained)$/ ? 'container' : 'page';
     my ($url, $host) = $to && $build ? address("$to?fault=$word&release=$release&macos=$build") : ();
-    return idle($says) unless $url;
+    return alert($says) unless $url;
     return idle($says) unless ask("$says Send a report to its developer? It holds one of two words, the number of the release and this Mac's build of macOS, and nothing else. The server that receives it sees your internet address and the time, as every site does. This is all of it, and it is written in the log: $url", "Don't send", 'Send') == 2;    # [C4]
     idle("$says " . (fixed("you sent a report: $url", $url, $host) ? 'The report was sent.' : $UNSAID ? 'lzrprf tried to send the report. Whether it arrived is not shown: the line that says how it ended could not be written to the log.' : 'The report could not be sent.'));
 }

@@ -432,7 +432,7 @@ function heard(line) {
     if (word == 'tabs' || (word == 'page' && (/^\d{1,2}$/.test(rest) ? +rest : perlTab) == selected) || (word == 'live' && rest.slice(0, 3) != 'on ')) { layersClear(); pointerReset(); if (word == 'page') inspectClose(); }    // [C18] another tab, a new page shown, or no page kept running: the layers go, and the pointer's shape is the arrow again (the sound process lets every sound go too, told by lzrprf [C12])
     if (word == 'picture') pictureBegun(rest); else if (word == 'page' || word == 'relaid') { list = []; again = word == 'relaid'; listFor = /^\d{1,2}$/.test(rest) ? +rest : perlTab; perlTab = listFor; }
     else if (word == 'patch' || word == 'runs') { var p = (word == 'patch' ? /^(\d{1,2}) (\d{1,6}) (\d{1,6})$/ : /^(\d{1,2}) (\d{1,3})$/).exec(rest); if (p) { listFor = +p[1]; listPatch = word == 'patch' ? [+p[2], +p[3]] : [+p[2]]; list = []; again = true; } }    // runs: several stretches in one list (runsOf, 28-window-pointer.pl)
-    else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); }    // busy: a new page is coming, from its top
+    else if (word == 'busy' || word == 'idle') { if (word == 'busy') restoring = null; else logClosing = false; strip(rest.split('\t'), word == 'idle', false); toastSaid(briefShown || rest.split('\t')[0]); briefShown = null; }    // busy: a new page is coming, from its top
     else if (word == 'tabs') { tabsTold(rest); if (!inspectFits(inspectUI)) inspectClose(); }
     else if (word == 'title') { var gap = rest.indexOf(' '), which = +rest.slice(0, gap); if (tabs[which]) tabs[which].title = rest.slice(gap + 1); tabsView.needsDisplay = true; } else if (word == 'trmnlcopy' || word == 'trmnlmenu') trmnlTold(word, rest);    // [C29] the text you copied in a terminal's tab, a menu to show there
     else if (word == 'install') installTold(rest); else if (word == 'updateoffer') updateOfferTold(rest);
@@ -454,6 +454,7 @@ function heard(line) {
         else if (rest == 'new') { homeActionShot('new'); newTab(); }
     }
     else if (word == 'welcome') welcomeTold(rest);
+    else if (word == 'alert') modal('LZRBRWSR', rest, [['OK', function () { }]], 'small');    // ticket 1535: a fault or a refusal someone must read, in the standard modal
     else if (word == 'brief') briefNext = rest;    // the few words the strip shows in place of the next line's; the line in full is the strip's tip
     else if (word == 'log') logTold(rest);
     else if (word == 'ask') { if (!startupReady) { startupReady = true; if (startupRequested) shown(); } asked++; if (logClosing) { briefNext = null; say('button ' + asked + ' 1'); } else if (torAsking) torAsked(rest.split('\t')); else askModal(rest.split('\t')); }    // the log page was closed: what lzrprf still asks about the log is answered by the first button, which changes nothing; Stop Tor's question stands in the Tor modal
@@ -493,10 +494,31 @@ function heard(line) {
 // change here: the window is laid out again (place) only when the strip changes
 // its height, for a question, and the chrome is drawn again only when whether it
 // takes a press changed, so "busy" and "idle" cost the few views they change.
+// Ticket 1535: lzrprf's passing words (busy, idle) in a brief toast at the top of the page, under the bar, which never
+// covers the tabs and takes no press (a label, neither editable nor selectable, which takes no press of its own).
+var toast = null, briefShown = null, toastAt = 0, TOAST_MS = 2600;    // DECLARED(2.6 s: long enough to read a short line, short enough to stay out of the way)
+function toastSaid(text) {
+    text = String(text || '').trim();
+    if (!text || !root) return;
+    if (!toast) {
+        toast = $.NSTextField.alloc.initWithFrame($.NSMakeRect(0, 0, 10, 10));
+        toast.editable = false; toast.selectable = false; toast.bezeled = false; toast.drawsBackground = true;
+        toast.backgroundColor = $.NSColor.colorWithWhiteAlpha(0.12, 0.88); toast.textColor = $.NSColor.whiteColor;
+        toast.font = $.NSFont.systemFontOfSize(12); toast.alignment = 1; toast.wantsLayer = true; toast.layer.cornerRadius = 8;
+        root.addSubview(toast);
+    }
+    toast.stringValue = $(text.slice(0, 160));
+    var all = root.frame.size, wide = Math.min(all.width - 40, Math.max(120, text.slice(0, 160).length * 7 + 24));
+    toast.frame = $.NSMakeRect((all.width - wide) / 2, all.height - TOP - 34, wide, 24);    // under the tabs, the bar and the bookmarks
+    toast.hidden = false; toastAt = Date.now();
+    hand.performSelectorWithObjectAfterDelay('toastDue:', $(), TOAST_MS / 1000);
+}
+function toastDue() { if (toast && Date.now() - toastAt >= TOAST_MS - 50) toast.hidden = true; }
 function strip(parts, open, question) {
     var wasAsking = asking, wasFree = free;
     asking = question;
     free = !!open && !question;    // the tabs, the cogwheel and the bar take something only while lzrprf waits for it
+    briefShown = briefNext;
     words.stringValue = $(briefNext !== null ? briefNext : parts[0] || '');
     words.toolTip = $(briefNext !== null ? parts[0] || '' : '');
     briefNext = null;
@@ -544,7 +566,7 @@ function place() {
     glassPlaced();
     win.invalidateCursorRectsForView(frameView);    // the sides' pointers follow the new size (frameCursors)
     TOP = TABS_HIGH + BAR_ROW + (marksOn ? MARKS_ROW : 0);
-    var all = root.frame, wide = all.size.width, high = all.size.height, tall = asking ? 96 : 0;    // no footer: the strip stands only while lzrprf asks you something, and the page takes its place otherwise
+    var all = root.frame, wide = all.size.width, high = all.size.height, tall = 0;    // no footer: the strip stands only while lzrprf asks you something, and the page takes its place otherwise
     var row = high - TABS_HIGH - BAR_ROW, pillAt = 146, pillWide = Math.max(160, wide - pillAt - 64 - 64 - (profilesOn ? 34 : 0));    // LZRDFNDR and Tor take 64 points from the bar, and the Profiles icon, when there is one, 34
     PILL = $.NSMakeRect(pillAt, 10, pillWide, 36);    // in the bar's row
     tabsView.frame = $.NSMakeRect(0, high - TABS_HIGH, wide, TABS_HIGH);
@@ -556,8 +578,8 @@ function place() {
     if (faces) faces.frame = $.NSMakeRect(wide - 84, row + 13, 30, 30);
     marksView.frame = $.NSMakeRect(0, row - MARKS_ROW, wide, MARKS_ROW);
     stripBack.frame = $.NSMakeRect(0, 0, wide, tall);
-    stripBack.hidden = !asking;
-    words.hidden = !asking;    // what lzrprf says between questions is in the log and in the lock's panel (its first row), never in a footer
+    stripBack.hidden = true;    // ticket 1535 (Henry): no black strip at all; questions stand in the modal, words in the toast
+    words.hidden = true; first.hidden = true; second.hidden = true;    // what lzrprf says between questions is in the log and in the lock's panel (its first row), never in a footer
     words.frame = asking ? $.NSMakeRect(20, 10, wide - 340, tall - 18) : $.NSMakeRect(20, 6, wide - 168, 17);
     first.frame = $.NSMakeRect(wide - 304, (tall - 30) / 2, 132, 30);
     second.frame = $.NSMakeRect(wide - 162, (tall - 30) / 2, 138, 30);
@@ -1158,6 +1180,7 @@ function shareNow() { return sheet && sheet.high > 0 && scroll.documentView.isEq
 // press already showed it; a tab closed while lzrprf is free leaves the strip in this frame too, the next
 // shown with its kept drawing (tabClosed). Only an open question or modal takes the press instead.
 function tabSaid(line, closed, kept) {
+    torAskCancelled();    // a Tor question stands in its own modal, not in asking: answered by Cancel, its first button, before the modal steps aside
     if (asking && !askAnswered(1)) return;    // no box holds the tabs: a question standing is answered by its first button, the answer when nobody answers
     if (modalOpen && modalActions.length) closeModal();    // and a modal steps aside; the installer's while it runs (no button) still holds them
     if (modalOpen || asking) return;
@@ -2976,9 +2999,16 @@ function torTitle() { return { starting: 'Connecting to Tor', on: 'Tor is ready'
 function torChoices() { return torAsking || torState == 'stopping' ? [] : [['Stop Tor', torStopAsked], torState == 'on' ? ['OK', closeModal] : torState == 'failed' ? ['Try again', tnnlAgain] : ['Hide', closeModal]]; }    // no button while lzrprf is asked or the stop runs
 function torStarted() { torState = 'starting'; torStep = 0; torPct = 0; torWords = 'Starting the Tor client'; torLitAt = Date.now(); say('tor on'); torChanged(); }
 function torStopAsked() { torAsking = true; say('tor off'); torChanged(); }    // lzrprf asks first (sub tor_session_asked), and its question stands in this modal
+var torAskNumber = 0;
+function torAskCancelled() {    // ticket 1535: a tab pressed while lzrprf's "Stop Tor?" stands answers it with its first button, Cancel, so the question never holds the tabs
+    if (!torAsking || !torAskNumber) return false;
+    torAsking = false; say('button ' + torAskNumber + ' 1'); torAskNumber = 0;
+    return true;
+}
 function torAsked(parts) {    // [C17] lzrprf's question of Stop Tor, in the modal: its first button (Cancel) returns to the modal of Tor, its second (Stop Tor) shows the stop
-    var number = asked, answer = function (i) { return function () {
-        torAsking = false; say('button ' + number + ' ' + i);
+    var number = asked; torAskNumber = number;
+    var answer = function (i) { return function () {
+        torAsking = false; torAskNumber = 0; say('button ' + number + ' ' + i);
         if (i == 2) { torState = 'stopping'; torStep = 0; torHeld = false; torWords = TOR_STOP_WORDS[0]; torLitAt = Date.now(); }
         modal(torTitle(), '', torChoices(), 'tor'); torChanged(); }; };
     modal('Stop Tor?', parts[0], parts.slice(1).map(function (title, i) { return [title, answer(i + 1)]; }), 'small');
@@ -4163,6 +4193,7 @@ busyClass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },
     'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { framesMoved(); pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
+    'toastDue:': { types: ['void', ['id']], implementation: function (sender) { try { toastDue(); } catch (lost) { } } },    // OBSERVABILITY-EXEMPT(a toast left up a moment longer)
     'framesDue:': { types: ['void', ['id']], implementation: function (sender) { try { framesDue(); } catch (fault) { frames = null; } } },
     'unlaid:': { types: ['void', ['id']], implementation: function (sender) { unlaid(); page.string = $(''); listed([]); } },
     // Return sends the typed address; nonplain characters make the entire address invalid.

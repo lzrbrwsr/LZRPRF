@@ -733,13 +733,14 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 20-window-side.pl	14	window	C12
 20-window-side.pl	24	strip_back	-
 20-window-side.pl	28	busy	-
-20-window-side.pl	29	idle	-
-20-window-side.pl	36	aside	-
-20-window-side.pl	44	noted	C23
-20-window-side.pl	45	said_noted	-
-20-window-side.pl	57	stated	-
-20-window-side.pl	65	hear	C12 C29 C32 C19
-20-window-side.pl	121	window_changed	-
+20-window-side.pl	29	alert	-
+20-window-side.pl	30	idle	-
+20-window-side.pl	37	aside	-
+20-window-side.pl	45	noted	C23
+20-window-side.pl	46	said_noted	-
+20-window-side.pl	58	stated	-
+20-window-side.pl	66	hear	C12 C29 C32 C19
+20-window-side.pl	122	window_changed	-
 21-kept-app.pl	1	-	C32
 21-kept-app.pl	12	kept_app_discord	-
 21-kept-app.pl	20	kept_app_valid	-
