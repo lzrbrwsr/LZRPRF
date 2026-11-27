@@ -54,6 +54,7 @@ sub behind {
     window('home available') if $local_home;
     window('startup ready') unless $local_home && !length($pulled) && !home() && !$TOR_SESSION;
     sso_told();                           # the sign-ins of this profile, for the Profiles list's "Connect seamless SSO accounts"; in an incognito window, why there are none
+    defender_told();                      # Ticket #1546: LZRDFNDR's switches, for the top of each tab of its panel
     window('game helper ' . game_helper(), 'marksbar ' . (marks_bar() ? 'on' : 'off'), 'search ' . (engine() ? 'set' : 'none'), $PICTURES_SHOWN ? 'pictures ' . (pictures_elsewhere() ? 'allow' : 'block') : ());
     parts_told();                         # the parts installed: the window shows the icons and menus of those alone
     nav_told();
@@ -116,6 +117,7 @@ sub behind {
         elsif ($event eq 'menu debug-link') { link_menu(); said_noted() }    # [C31] the live debug link, switched on or off in the cogwheel's menu
         elsif ($event =~ /^link drew ([0-9]{1,6})$/) { link_drew($1) }    # [C31] how long the window took to draw a list, said only while the link is on
         elsif ($event =~ /^link shot ([0-9a-f]{16,32}) ([A-Za-z0-9+\/]+={0,2})$/) { link_shot($1, $2) }    # [C31] the window's picture of itself, for a signed command that asked for it
+        elsif ($event =~ /^defender (computer|scripts|redirects|sends) (on|off)$/) { defender_set($1, $2 eq 'on'); said_noted() }    # Ticket #1546: a switch at the top of a tab of LZRDFNDR's panel
         elsif ($event =~ /^game helper (on|off)$/) { game_helper_set($1 eq 'on'); said_noted() }    # H-0071: LZRDFNDR's satellite in the minigame, from the switch in the Other tab of its panel
         elsif ($event =~ /^mark open (0|[1-9][0-9]{0,2})$/) { $MARKS[$1] ? go($MARKS[$1][2], 'you opened a bookmark', $1) : idle('That bookmark is no longer there.') }    # [C4] an address kept from the bar or typed into the window's own modal
         elsif ($event =~ /^mark remove (0|[1-9][0-9]{0,2})$/) { mark_removed($1); said_noted() }

@@ -648,6 +648,7 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
     my $essential = grep { defined permit_essential_id($site, @$_, $ask->{url}) } @items;
     window('essential script') if $essential;
     my $state = { site => $site, url => $ask->{url}, items => \@items, allowed => $allowed, host => $host };
+    return permit_answered($state, 3) if defender_is_off('scripts');    # Ticket #1546: Scripts off asks nothing: they run as after Allow Once
     my @buttons = ('Deny Once', 'Deny Always', 'Allow Once', 'Always Allow', 'Forget');
     return permit_answered($state, asked("permit $site\t$words", @buttons)) unless $FROM;    # "lzrprf try": the test's answer at once
     $state->{n} = asked_later("permit $site\t$words", @buttons); $PERMIT_PENDING = $state;    # Henry 2026-11-25: the page goes on while the question stands; its answer comes as any other line (sub permit_button)

@@ -444,7 +444,7 @@ function heard(line) {
     else if (word == 'tor') torTold(rest);
     else if (word == 'torsession') { if (rest == 'made') tnnlShown(); else torSessionTold(rest); } else if (word == 'tnnl') tnnlTold(rest); else if (word == 'parts') partsTold(rest);    // LZRTNNL's modal, before Tor connects, and the modules installed (28-window2.pl)
     else if (word == 'tool') toolTold(rest);
-    else if (word == 'game' && /^helper [01]$/.test(rest)) { gameHelper = gameStaged = rest == 'helper 1'; toolItems = null; if (modalOpen && modalKind == 'tool' && toolTab == 'other') toolChanged(); else if (toolView) toolView.needsDisplay = true; }    // H-0071: LZRDFNDR's satellite in the minigame, as lzrprf keeps it (gamehelper)
+    else if (word == 'game' && /^helper [01]$/.test(rest)) { gameHelper = gameStaged = rest == 'helper 1'; toolItems = null; if (modalOpen && modalKind == 'tool' && toolTab == 'other') toolChanged(); else if (toolView) toolView.needsDisplay = true; } else if (word == 'defender') defenderTold(rest);    // H-0071: LZRDFNDR's satellite in the minigame, as lzrprf keeps it (gamehelper)
     else if (word == 'home' && rest == 'available') { homeAvailable = true; if (!current && free && !pageShown) homeAsked(false); }
     else if (word == 'home' && rest == 'ready') homeSceneReady();
     else if (word == 'startup' && rest == 'ready') { startupReady = true; if (startupRequested) shown(); }
@@ -2562,13 +2562,13 @@ function toolLaid() {    // what the list draws, from its top: each piece with w
         toolItems = { items: items, high: y + high + 10, wide: w }; return toolItems;
     }
     if (toolTab == 'websites' && !tool.confirm) {
-        y = webLaid(items, w, tall);
+        y = webLaid(items, w, tall, defendLaid(items, w, tall, 2));
         toolItems = { items: items, high: y + 2, wide: w };
         return toolItems;
     }
     if (tool.confirm) note('You are about to switch these off. Under each row lzrprf says, in its own words, what it will change and nothing else: a launchd job of your account is switched off and kept off until you switch it on again here, and a process is asked to end. An app that needs what you switch off may start it again or stop working until you switch it on again. Each change is written in the log first.', sans(13), WHITE, 14);
     else {
-        note(tool.words, sans(13), WHITE, 12);
+        y = defendLaid(items, w, tall, y); note(tool.words, sans(13), WHITE, 12);
         note(tool.said, sans(12.5), YELLOW, 12);
     }
     note(tool.busy, sans(12.5, true), GREEN, 12);
@@ -2615,7 +2615,7 @@ function paintTool() {
 }
 function toolClicked(event) {
     if (!tool || tool.confirm || tool.busy && toolTab != 'other') return;
-    var at = pointIn(toolView, event), items = toolLaid().items; if (toolTab == 'other') { items.forEach(function (one) { if (one.game && at.y >= one.y && at.y < one.y + one.h) { gameStaged = !gameStaged; toolChanged(); } }); return; }    // the sentry's box: staged, applied by Switch on or Switch off (gameApplied)
+    var at = pointIn(toolView, event), items = toolLaid().items; if (defendClicked(at, items)) return; if (toolTab == 'other') { items.forEach(function (one) { if (one.game && at.y >= one.y && at.y < one.y + one.h) { gameStaged = !gameStaged; toolChanged(); } }); return; }    // the sentry's box: staged, applied by Switch on or Switch off (gameApplied)
     if (toolTab == 'websites') { webClick(at, items, toolLaid().wide); return; }
     if (procClicked(at, items)) return;
     for (var k = 0; k < items.length; k++) {

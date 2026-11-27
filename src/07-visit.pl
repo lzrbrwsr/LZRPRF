@@ -743,6 +743,7 @@ sub laid_run {                            # the lines $first to $last of a laid 
 sub redirect_noted {                      # [C4] a redirect about to be put to you, kept as "pending"; returns 2 when your kept decision proceeds (and it can be followed), 1 when it cancels, 0 when you are asked
     my ($url, $to, $status, $fit) = @_;
     my $key = "$url\t" . ($to // '');
+    return $fit ? 2 : 1 if defender_is_off('redirects');    # Ticket #1546: Redirects off asks nothing; a redirect lzrprf may follow is followed
     my $one = $REDIRECTS{$key};
     return $one->{decision} eq 'proceed always' && $fit ? 2 : 1 if $one && $one->{decision} =~ /always\z/;
     if ($one && delete $one->{once}) { return $one->{decision} eq 'proceeded' && $fit ? 2 : 1 }
