@@ -267,20 +267,20 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 165
+    release 166
     home local
+    new Sites can read a file you choose before they send it (FileReader), as Discord does with an attachment.
     new LZRCHT has Discord: sign in once with your own account in a sealed tab; it loads in full, stays signed in, and you can send, edit and delete messages.
     new yle.fi works: its articles, the electricity price graph, link clicks and the Kirjaudu login window.
     new A window a site opens in a frame after a click now loads and runs, even when the page has spent its fuel.
     new When a newer release is out, LZRBRWSR offers it in a clear centred window: Install it or Later.
-    new LZRDFNDR's questions about scripts, redirects and sends no longer offer Forget; it stays in the site's settings.
     new Sites get four times more room to run their scripts, and building long text no longer runs them out of it.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin e5a24033c9ed7f603999f25889452bbd9ba09be3985aae1a0f68638522735909
+    file lzrbrwsr-bin 113c006a02f4bdf79b0c209c4fa397b0d666a01df59322fa4129afe5e3db7688
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
     file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
