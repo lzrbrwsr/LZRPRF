@@ -166,12 +166,12 @@ BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 # that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="4382339d34b09e5aee6d28da4f6c41c6210e6eceb74976b5475427eb5b444adb"
-RELEASE="159"
-LZRPRF_COMMIT="43d7f9d9b7807a8ea64cd7f392d08e90ee806240"
+SHA256="fa148624a71e616ed88bace9ebcce30d24769d96cbdf4ffdf611d5f3a3d142a5"
+RELEASE="165"
+LZRPRF_COMMIT="37aaed22a789ad648db231f12d87219249cead11"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="ae9b6e94cb486340656c74be43a635f2d936e939bff78938a8a1865cc0a782e1"
-SELFTEST_SHA256="7ec96d995a4e4d86c6528aa4bcb85b0a816ec1aa374825d1a622ceadc819528c"
+LZRPRF_SHA256="faf757b105e18e580b12c9c7ccc6dcd243a3eacf44f03659d2d1881cb135fc11"
+SELFTEST_SHA256="5213cb6dee3118dc36bc03898650f12090756726933042f7dcc387f7d45a0599"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
 BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
 # RELEASE_KEY: the public half of the release key; a release is installed only when its manifest is signed with it
@@ -689,15 +689,15 @@ rm -f "$tmp/second"
 step "LZRBRWSR downloaded from two places: both are the same file, and it matches its checksum"
 
 # What the icon will run is checked before anything is put in place. The
-# download must name these eight files, the four folders they are in, and
+# download must name these nine files, the four folders they are in, and
 # nothing else. It is unpacked into an empty folder of its own, so that nothing
 # in it can take the place of a file that was checked above.
 names="$(tar -tzf "$tmp/$FILE" | LC_ALL=C sort | tr '\n' ' ')"
-[ "$names" = "LZRBRWSR.app/ LZRBRWSR.app/Contents/ LZRBRWSR.app/Contents/Info.plist LZRBRWSR.app/Contents/MacOS/ LZRBRWSR.app/Contents/MacOS/arti LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl LZRBRWSR.app/Contents/MacOS/lzrbrwsr LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin LZRBRWSR.app/Contents/Resources/ LZRBRWSR.app/Contents/Resources/LICENSE.txt LZRBRWSR.app/Contents/Resources/lzrbrwsr.icns LZRBRWSR.app/Contents/Resources/release " ] || stop "the download holds files that do not belong in it."
+[ "$names" = "LZRBRWSR.app/ LZRBRWSR.app/Contents/ LZRBRWSR.app/Contents/Info.plist LZRBRWSR.app/Contents/MacOS/ LZRBRWSR.app/Contents/MacOS/arti LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-cht LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl LZRBRWSR.app/Contents/MacOS/lzrbrwsr LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin LZRBRWSR.app/Contents/Resources/ LZRBRWSR.app/Contents/Resources/LICENSE.txt LZRBRWSR.app/Contents/Resources/lzrbrwsr.icns LZRBRWSR.app/Contents/Resources/release " ] || stop "the download holds files that do not belong in it."
 [ -z "$(tar -tvzf "$tmp/$FILE" | grep -v '^[-d]')" ] || stop "the download holds a link."
 mkdir "$tmp/unpacked"
 tar -xzf "$tmp/$FILE" -C "$tmp/unpacked"
-[ "$(cd "$tmp/unpacked" && find . ! -type d | LC_ALL=C sort | tr '\n' ' ')" = "./LZRBRWSR.app/Contents/Info.plist ./LZRBRWSR.app/Contents/MacOS/arti ./LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl ./LZRBRWSR.app/Contents/MacOS/lzrbrwsr ./LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin ./LZRBRWSR.app/Contents/Resources/LICENSE.txt ./LZRBRWSR.app/Contents/Resources/lzrbrwsr.icns ./LZRBRWSR.app/Contents/Resources/release " ] || stop "the download holds files that do not belong in it."
+[ "$(cd "$tmp/unpacked" && find . ! -type d | LC_ALL=C sort | tr '\n' ' ')" = "./LZRBRWSR.app/Contents/Info.plist ./LZRBRWSR.app/Contents/MacOS/arti ./LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-cht ./LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl ./LZRBRWSR.app/Contents/MacOS/lzrbrwsr ./LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin ./LZRBRWSR.app/Contents/Resources/LICENSE.txt ./LZRBRWSR.app/Contents/Resources/lzrbrwsr.icns ./LZRBRWSR.app/Contents/Resources/release " ] || stop "the download holds files that do not belong in it."
 [ -z "$(find "$tmp/unpacked" ! -type d ! -type f)" ] || stop "the download holds a link."
 # The launcher is the file the icon runs. This is all of it: it starts lzrprf,
 # and lzrprf starts the program. The one in the download must be the same.
@@ -779,20 +779,20 @@ cat >"$tmp/plist" <<'PLIST'
 PLIST
 cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "the app's property list is not the one written out in the installer."
 # The release file is what lzrprf reads beside the program: the number of this release, four fixed
-# addresses, the SHA-256 of the launcher, of the program, of the Tor client and of LZRTRMNL's drawing (the four lines "file"), which lzrprf
-# compares with those four files at every start, and the SHA-256 of the lzrprf this app is installed
+# addresses, the SHA-256 of the launcher, of the program, of the Tor client, of LZRTRMNL's drawing and of LZRCHT (the five lines "file"), which lzrprf
+# compares with those five files at every start, and the SHA-256 of the lzrprf this app is installed
 # with, which lzrprf compares with itself at every start, and the SHA-256 of the list of addresses lzrprf never opens ("blocklist"),
 # which lzrprf compares with the list beside it before it opens any page. This is all of it. "newest" is the one address lzrprf fetches by itself, and only
 # after you said yes in its window. "installer" and "same" are the two places a newer release's
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 159
+release 165
 home local
+new LZRCHT has Discord: sign in once with your own account in a sealed tab; it loads in full, stays signed in, and you can send, edit and delete messages.
 new yle.fi works: its articles, the electricity price graph, link clicks and the Kirjaudu login window.
 new A window a site opens in a frame after a click now loads and runs, even when the page has spent its fuel.
 new When a newer release is out, LZRBRWSR offers it in a clear centred window: Install it or Later.
-new The installer shows where to compare its SHA-256: the signed release manifest it names.
 new LZRDFNDR's questions about scripts, redirects and sends no longer offer Forget; it stays in the site's settings.
 new Sites get four times more room to run their scripts, and building long text no longer runs them out of it.
 newest https://lzrbrwsr.com/latest
@@ -800,16 +800,17 @@ installer https://lzrbrwsr.com/install.sh
 same https://lzrbrwsr.vercel.app/install.sh
 report https://origin.lzrbrwsr.com/report
 file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-file lzrbrwsr-bin 070e9bb8c5305c18f7b255a2400803e7a932e1b0d34e060b1f3dc008ddf2495b
+file lzrbrwsr-bin e5a24033c9ed7f603999f25889452bbd9ba09be3985aae1a0f68638522735909
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
-lzrprf ae9b6e94cb486340656c74be43a635f2d936e939bff78938a8a1865cc0a782e1
+file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
+lzrprf faf757b105e18e580b12c9c7ccc6dcd243a3eacf44f03659d2d1881cb135fc11
 blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."
 grep -qx "lzrprf $LZRPRF_SHA256" "$tmp/release" || stop "the app's release file does not name the lzrprf this installer carries."
 grep -qx "blocklist $BLOCKLIST_SHA256" "$tmp/release" || stop "the app's release file does not name the list of addresses this installer carries."
-for name in lzrbrwsr-bin lzrbrwsr arti core-lzrbrwsr-trmnl; do
+for name in lzrbrwsr-bin lzrbrwsr arti core-lzrbrwsr-trmnl core-lzrbrwsr-cht; do
 	grep -qx "file $name $(sum "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/$name")" "$tmp/release" || stop "the app's release file does not name the file $name as it was unpacked."
 done
 step "the icon runs one thing: lzrprf, and inside it LZRBRWSR (release $RELEASE)"
@@ -964,7 +965,7 @@ fi
 # a file, the quarantine mark among them, stays where it is.
 find "$tmp/unpacked" -type d -exec chmod 755 {} +
 find "$tmp/unpacked" -type f -exec chmod 644 {} +
-chmod 755 "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/lzrbrwsr" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/arti" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl"; parts_unpacked "$tmp/unpacked/LZRBRWSR.app"
+chmod 755 "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/lzrbrwsr" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/arti" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl" "$tmp/unpacked/LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-cht"; parts_unpacked "$tmp/unpacked/LZRBRWSR.app"
 
 # Putting in place, as one change as far as files allow. First both new parts are written whole into
 # folders of their own beside where they go (the same disk, so that a name can be taken by a rename),
