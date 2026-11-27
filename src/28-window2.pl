@@ -263,7 +263,7 @@ function run(argv) {
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;
     app.setActivationPolicy(kind());
-    menuBarNamed(NAME);
+    if (argv[3] !== 'bundled') menuBarNamed(NAME);
     app.applicationIconImage = icon(256);
     hand = $.LzrprfHand.alloc.init;
     app.delegate = hand;

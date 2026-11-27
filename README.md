@@ -267,24 +267,25 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 172
+    release 174
+    new The menu bar says LZRBRWSR, questions open in the same box as everything else and never hold your tabs, and Discord connects from LZRCHT in its own tab.
+    new Pages and files in 27 older encodings (Cyrillic, Greek, Central European, Hebrew and more) now read correctly.
     home local
     new A file you choose is read as text in the encoding the site names, and a page knows when its window is in front.
     new Sites can read a file you choose before they send it (FileReader), as Discord does with an attachment.
     new LZRCHT's Discord may load all 372 of its scripts and its 13 MB main one, so it no longer stops half-loaded and blank. Sign in with your own account in its sealed tab.
     new yle.fi works: its articles, the electricity price graph, link clicks and the Kirjaudu login window.
-    new A window a site opens in a frame after a click now loads and runs, even when the page has spent its fuel.
-    new When a newer release is out, LZRBRWSR offers it in a clear centred window: Install it or Later.
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin 3287d30d3c3e08947440c98f454e139a9c442fae722e8c4d9e7d9235d221ee4d
+    file lzrbrwsr-bin f23cebc4359ac0c6ea0142c0e834f7a544d8548f92bbc041356ce846f22d8b8a
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
     file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
-    lzrprf fbcd668caee9b40db86581f27ee6c21a7f2bd30d0588f4ee123b681323c2ee23
+    file lzrbrwsr-window 6472a7855c52851bd8db375b86a7f3b400b77353bcab70a663c39574497867c9
+    lzrprf 0aa2263e9832bbc4faae2761a783577db63e004e235b05e99b11d89648b6851f
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

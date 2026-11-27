@@ -1154,7 +1154,36 @@ sub run {
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)
-    become($window_in, $window_out, $TRY ? \*STDERR : undef, '/usr/bin/sandbox-exec', '-D', "HOME=$HOME", '-p', $WINDOW_CONTAINER, $SCRIPT, '-l', 'JavaScript', '-e', window_text() . window_sound_text() . $more, $APP, ($TOR_WINDOW ? 'tor' : $INCOGNITO ? 'incognito' : 'window') . (defined $OPEN_FRAME ? '+' : ''), $OPEN_FRAME // frame_kept());    # T5: a window a tab was pulled out into is told so by a "+" after its kind, and runs without a Dock icon of its own    # the size and place the last window was left at (sub frame_kept), so it opens there and does not jump; a pulled tab's window opens where the tab was let go
+    my $window_source = window_text() . window_sound_text() . $more;
+    my $kind = ($TOR_WINDOW ? 'tor' : $INCOGNITO ? 'incognito' : 'window') . (defined $OPEN_FRAME ? '+' : '');
+    my $frame = $OPEN_FRAME // frame_kept();
+    my ($host, $profile) = window_host($program);
+    my @command = $host ? ($host, $window_source, $APP, $kind, $frame, 'bundled')
+        : ($SCRIPT, '-l', 'JavaScript', '-e', $window_source, $APP, $kind, $frame);
+    become($window_in, $window_out, $TRY ? \*STDERR : undef, '/usr/bin/sandbox-exec', '-D', "HOME=$HOME", '-p', $profile, @command);
+}
+
+# Only the named, hash-paired browser helper may replace the system script host.
+sub window_host {
+    my ($program) = @_;
+    my $fallback = [undef, $WINDOW_CONTAINER];
+    return @$fallback unless $program =~ m{\A(.*/LZRBRWSR(?:-Staging)?[.]app)/Contents/MacOS/lzrbrwsr-bin\z};
+    my $bundle = $1;
+    my $host = "$bundle/Contents/MacOS/lzrbrwsr-window";
+    return @$fallback unless -x $host && !-l $host;
+    my ($expected) = map { /\Afile lzrbrwsr-window ([0-9a-f]{64})\s*\z/ ? $1 : () } release_lines();
+    return @$fallback unless defined $expected && $expected eq (sum_of($host) // '');
+    die "lzrprf: the window host path holds a character lzrprf does not pass on\n" if $host =~ /["\\\n]/;
+    my $profile = $WINDOW_CONTAINER =~ s{[(]literal "/usr/bin/osascript"[)]}{(literal "$host")}r;
+    # The window's container names the program it may run; if the swap found nothing to replace, the helper
+    # would start under a container that does not allow it. Said, not fallen back from (lzr2's review, 2026-11-27).
+    die "lzrprf: the window container names no script host for the window host to replace\n" if $profile eq $WINDOW_CONTAINER;
+    # A home-folder install still needs its public bundle metadata. The
+    # exact entries let CoreFoundation identify the bundle without reading
+    # any sibling file, program or user folder.
+    $profile .= qq{(allow file-read* (literal "$host") (literal "$bundle/Contents/Info.plist")} . "\n"
+        . qq{  (literal "$bundle") (literal "$bundle/Contents") (literal "$bundle/Contents/MacOS"))} . "\n";
+    return ($host, $profile);
 }
 
 sub runs_swept {                          # what runs that have ended left in a folder: a request's socket, the folder of the tries at the start
@@ -8290,7 +8319,16 @@ sub fetch {
     my $exit = $how >> 8;
     return (undef, 'the system did not say that curl was in its container') if $loose;
     return (undef, 'you stopped it') if $stopped;
-    return (undef, 'the answer is larger than lzrprf takes') if $capped || length $got > $bytes || $exit == 63 || @links && $links[1][4] > $wire;
+    if ($capped || length $got > $bytes || $exit == 63 || @links && $links[1][4] > $wire) {
+        my $scope = $ask && $ask->{kept_app} ? 'kept-app' : 'page';
+        if (@links && $links[1][4] > $wire) {
+            page_cap_refused($scope, 'fetch-wire', $links[1][4], $wire, 'bytes', 'The incoming transfer exceeded its encrypted wire allowance.');
+        } else {
+            my $value = !$capped && length($got) > $bytes ? length($got) : 'unobserved';
+            page_cap_refused($scope, 'fetch-reply', $value, $bytes, 'bytes', 'The reply exceeded its transfer size allowance.');
+        }
+        return (undef, 'the answer is larger than lzrprf takes');
+    }
     return (undef, $none) if @links && $links[0][4] > $links[0][5];
     return (undef, 'could not connect') if $unreached;
     return (undef, 'the site did not answer in time') if $late || $exit == 28;
@@ -8841,7 +8879,10 @@ sub prefetch_go {                         # ($first, $page): the page $page aske
 
 sub prefetch_soon {                       # [C19] ($live, $dest, $to): "=soon DEST URL", a GET the page's own script set going and makes in a later task (a script it made: yle.fi waited 205, 88 and 280 ms on three, one after another, 2026-11-25). Judged here as sub live_fetched will judge the request, begun with the two lines sub prefetch_pump writes first, and handed over only by sub prefetch_take when the page asks for exactly it. Whatever this refuses is simply not begun: the request says why when it comes
     my ($live, $dest, $to) = @_;
-    return if $live->{home} || $TOR_WANTED || listed($to) || ++$live->{soon} > ($live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST);
+    return if $live->{home} || $TOR_WANTED || listed($to);
+    my $soon_most = $live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST;
+    return page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'prefetch-count', $live->{soon}, $soon_most, 'requests',
+        'The page exceeded its lifetime prefetch allowance.') if ++$live->{soon} > $soon_most;
     my ($url, $host) = address($to);
     return if !$url || $PREFETCH{$url};
     my ($rules) = permit_rules();
@@ -10286,10 +10327,15 @@ sub kept_app_valid {
 sub kept_app_budget {
     my ($app, $requests, $bytes) = @_;
     my $at = now();
-    return if $at >= $app->{until};
+    my $spec = $app->{spec};
+    return page_cap_refused($spec->{name}, 'lifetime', int($at - $app->{until} + $spec->{seconds}), $spec->{seconds}, 'seconds',
+        'The kept-app session expired, so its request was refused.') if $at >= $app->{until};
     my $minute = int($at / 60);
     if ($app->{minute} != $minute) { @$app{qw(minute requests bytes)} = ($minute, 0, 0) }
-    return if $app->{requests} + $requests > $app->{spec}{requests} || $app->{bytes} + $bytes > $app->{spec}{bytes};
+    return page_cap_refused($spec->{name}, 'requests-per-minute', $app->{requests} + $requests, $spec->{requests}, 'requests',
+        'The kept app would exceed its request allowance for this minute.') if $app->{requests} + $requests > $spec->{requests};
+    return page_cap_refused($spec->{name}, 'bytes-per-minute', $app->{bytes} + $bytes, $spec->{bytes}, 'bytes',
+        'The kept app would exceed its transfer allowance for this minute.') if $app->{bytes} + $bytes > $spec->{bytes};
     $app->{requests} += $requests;
     $app->{bytes} += $bytes;
     return 1;
@@ -10326,7 +10372,11 @@ sub kept_app_request {
     my ($line) = @_;
     my ($method, $size, $type, $dest, $auth_bytes, $to) = $line =~
         m{\A=fetch (GET|HEAD|POST|PUT|PATCH|DELETE) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (data|script|module|worker|frame|image) (?:auth ([1-9][0-9]{0,3}) )?([\x21-\x7e]{1,8192})\z};
-    return unless $method && $size <= $LIVE_FETCH_UP && ($auth_bytes // 0) <= 4096;
+    return unless $method;
+    return page_cap_refused('kept-app', 'fetch-upload', $size, $LIVE_FETCH_UP, 'bytes',
+        'The kept-app upload exceeded the relay limit.') if $size > $LIVE_FETCH_UP;
+    return page_cap_refused('kept-app', 'fetch-authorization', $auth_bytes, 4096, 'bytes',
+        'The kept-app authorization field exceeded the relay limit.') if ($auth_bytes // 0) > 4096;
     return if $method =~ /\A(?:GET|HEAD)\z/ && ($size || $type ne '-');
     return ($method, $size, $type, $dest, $auth_bytes // 0, $to);
 }
@@ -10353,7 +10403,11 @@ sub kept_app_response {
         defined filter_said($url, $FILTER_DEST{$dest // 'data'} // $dest, 'discord.com') || shield_said($url) ne 'allow';
     return (undef, 403) unless kept_app_budget($app, 1, 0);
     my $remaining = $app->{spec}{bytes} - $app->{bytes};
-    return (undef, 403) unless $remaining > 0;
+    if ($remaining <= 0) {
+        page_cap_refused($app->{spec}{name}, 'bytes-per-minute', $app->{bytes}, $app->{spec}{bytes}, 'bytes',
+            'The kept app exhausted its transfer allowance for this minute.');
+        return (undef, 403);
+    }
     return (undef, 403) unless record("the kept app asked for $host ($method)");
     my ($where) = find($host);
     return (undef, 403) unless $where && !grep { $_->{own} } @$where;
@@ -10364,6 +10418,8 @@ sub kept_app_response {
     my ($got, $why, $peer, $certs) = @{ kept_app_jar($app, sub {
         return [fetch($url, $where, $ask, $nav, [$reserved, $FETCH_SECONDS])];
     }) };
+    page_cap_refused($app->{spec}{name}, 'fetch-reply', length($got), $reserved, 'bytes',
+        'The kept-app reply exceeded its reserved transfer size.') if defined $got && length($got) > $reserved;
     return (undef, 0) if $why || !defined $got || length($got) > $reserved;    # a failed transfer can still consume its reservation
     $app->{bytes} -= $reserved - length($got);
     my $parts = live_parts($got, $method);
@@ -10382,21 +10438,15 @@ sub kept_app_open_tab {
         tabbed('select', $i);
         return;
     }
-    return idle("A window holds $TABS_MOST tabs at most: close one to open Discord.") if @TABS >= $TABS_MOST;
     my $app = kept_app_discord() or return idle('Discord could not open its private kept-app store.');
-    $source->{shown} = $SHOWN;
-    my $tab = fresh_tab();
-    $tab->{kept_app} = $app;
-    push @TABS, $tab;
-    $TAB = $#TABS;
-    undef $SHOWN;
-    tab_shown('Opening Discord in its kept-app tab.');
-    return go($app->{spec}{start}, 'you opened Discord from LZRCHT');
+    @WAY = ();
+    $WENT = now();
+    return kept_app_visit($source, $app->{spec}{start}, 'you opened Discord from LZRCHT', $app);
 }
 
 sub kept_app_visit {
-    my ($tab, $typed, $how) = @_;
-    my $app = $tab->{kept_app};
+    my ($tab, $typed, $how, $opening) = @_;
+    my $app = $opening // $tab->{kept_app};
     my ($url, $host) = address($typed);
     return idle('This Discord tab opens Discord addresses only.') unless $url && kept_app_valid($app, $url) && $host =~ /\A(?:discord\.com|discord\.gg)\z/;
     my ($got, $status);
@@ -10428,6 +10478,10 @@ sub kept_app_visit {
                 $frame = $with;
             } else { live_dropped($next[5]) }
         }
+    }
+    if ($opening) {
+        cht_end($tab, 'Discord opened in this tab', 1);
+        $tab->{kept_app} = $opening;
     }
     @$tab{qw(url title says)} = ($url, $title || 'Discord', 'Discord in its kept-app tab.');
     if (($how // '') !~ /\Ayou (?:went (?:back|forward) to|reloaded)\z/) {
@@ -10991,6 +11045,31 @@ sub live_turn {
 # the body is the answer's, its chunks joined, at most $PAGE_BYTES; a HEAD has
 # none. A request refused, failed, or answered in another form is told
 # "=fetched 0 0 0". A request line of no form ends the page.
+sub page_cap_refused {
+    my ($scope, $cap, $value, $limit, $unit, $why) = @_;
+    use feature 'state';
+    state $minute;
+    state %seen;
+    state %last_minute;
+    my $this_minute = int(now() / 60);
+    if (!defined $minute || $minute != $this_minute) {
+        %last_minute = defined $minute && $this_minute == $minute + 1 ? %seen : ();
+        $minute = $this_minute;
+        %seen = ();
+    }
+    my $key = "$scope $cap";
+    if (exists $seen{$key}) {
+        $seen{$key}++;
+        return;
+    }
+    $seen{$key} = 0;
+    my $suppressed = delete $last_minute{$key} // 0;
+    $why .= " $suppressed more refused last minute." if $suppressed;
+    link_line('WARN', 'page-cap', $why, scope => $scope, cap => $cap, value => $value, limit => $limit, unit => $unit)
+        or noted("scope=$scope cap=$cap value=$value limit=$limit unit=$unit | $why");
+    return;
+}
+
 sub live_asked {                          # [C19] the request at the front of what the page wrote: nothing when there is none, 0 while it is not all there, else [its line, its body, the bytes it takes], or [its line] when it is of no form
     my ($live) = @_;
     return kept_storage_asked($live->{held}) if substr($live->{held}, 0, 7) eq '=store ';
@@ -11007,7 +11086,12 @@ sub live_asked {                          # [C19] the request at the front of wh
     my $soon = substr($live->{held}, 0, 6) eq '=soon ';    # [C19] a request the page's script set going, told ahead: one line, no body, answered with nothing (sub prefetch_soon)
     return unless $permit || $soon || substr($live->{held}, 0, 7) eq '=fetch ';
     my $end = index $live->{held}, "\n";
-    if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
+    if ($end < 0 || $end > $LIVE_FETCH_LINE) {
+        return 0 if $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE;
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'relay-line',
+            $end < 0 ? length($live->{held}) : $end, $LIVE_FETCH_LINE, 'bytes', 'The page exceeded the relay command length limit.');
+        return [''];
+    }
     my $line = substr($live->{held}, 0, $end);
     return [$line, '', $end + 1] if $permit || $soon;
     if ($live->{kept_app}) {
@@ -11018,7 +11102,10 @@ sub live_asked {                          # [C19] the request at the front of wh
         return [$line, substr($live->{held}, $end + 1 + $auth_bytes, $size), $end + 1 + $auth_bytes + $size, $auth];
     }
     my ($size) = $line =~ /^=fetch [A-Z]{1,8} (0|[1-9][0-9]{0,5}) / or return [$line];
-    return [$line] if $size > $LIVE_FETCH_UP;
+    if ($size > $LIVE_FETCH_UP) {
+        page_cap_refused('page', 'fetch-upload', $size, $LIVE_FETCH_UP, 'bytes', 'The fetch upload exceeded the page relay limit.');
+        return [$line];
+    }
     return 0 if length($live->{held}) < $end + 1 + $size;
     return [$line, substr($live->{held}, $end + 1, $size), $end + 1 + $size];
 }
@@ -11121,7 +11208,10 @@ sub live_fetched {                        # [C19]
     }
     record($asked_for, $kept) or return live_replied($live, 0, '', '');    # [C5] before the name is even looked up
     my $fetch_most = $live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST;
-    $why = "the page asked for more than $fetch_most addresses" if ++$live->{fetches} > $fetch_most;
+    if (++$live->{fetches} > $fetch_most) {
+        $why = "the page asked for more than $fetch_most addresses";
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'fetch-count', $live->{fetches}, $fetch_most, 'requests', 'The page exceeded its lifetime fetch allowance.');
+    }
     if (!$why) { my $shield = shield_said($url); $why = shield_why($shield) if $shield ne 'allow' }    # [C28] before any DNS lookup, including requests while a page is still being read
     my $where;
     my $sent_ask = { method => $method, type => $type, body => $body, origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => scalar(sso_cookie($url, $live->{host})), top => $allowed eq 'sandbox' ? undef : $live->{url}, as => $as, dest => $dest, from => $live->{host} };
@@ -11454,7 +11544,10 @@ sub ws_open {
     my ($live, $id, $url, $offered) = @_;
     my $app = $live->{kept_app} or return;
     return if $INCOGNITO || $TOR_WANTED || $TOR_WINDOW || $TOR_SESSION || !$live->{until};
-    return if exists $app->{sockets}{$id} || keys(%{ $app->{sockets} }) >= $app->{spec}{sockets};
+    return if exists $app->{sockets}{$id};
+    my $count = keys %{ $app->{sockets} };
+    return page_cap_refused($app->{spec}{name}, 'open-sockets', $count + 1, $app->{spec}{sockets}, 'sockets',
+        'The kept app would exceed its concurrent WebSocket allowance.') if $count >= $app->{spec}{sockets};
     my ($host, $path, $protocols) = ws_endpoint($app, $url, $offered);
     return unless $host && kept_app_budget($app, 1, 0);
     my $address = "https://$host$path";
@@ -11620,7 +11713,13 @@ sub ws_step {
     return ws_close_socket($live, $id, $ws->{close_code}, $ws->{close_reason}) if defined $ws->{close_code} && !length $ws->{out};
     my $got = $socket->sysread(my $part, 65536);
     if ($got) {
-        return ws_close_socket($live, $id) if !kept_app_budget($live->{kept_app}, 0, $got) || length($ws->{in}) + $got > $WS_DOWN + 65546;
+        return ws_close_socket($live, $id) unless kept_app_budget($live->{kept_app}, 0, $got);
+        my $queued = length($ws->{in}) + $got;
+        if ($queued > $WS_DOWN + 65546) {
+            page_cap_refused($live->{kept_app}{spec}{name}, 'socket-read-buffer', $queued, $WS_DOWN + 65546, 'bytes',
+                'The WebSocket was closed because its incoming buffer would exceed the limit.');
+            return ws_close_socket($live, $id);
+        }
         $ws->{in} .= $part;
     } elsif (defined $got || !($socket->want_read || $socket->want_write || $!{EAGAIN} || $!{EINTR})) {
         return ws_close_socket($live, $id);
@@ -12416,7 +12515,11 @@ sub live_permitted {                      # [C26] "=permit KIND ORIGIN SHA256 CA
     my ($live, $line) = @_;
     my ($kind, $origin, $sha, $caps) = $line =~ /\A=permit ($PERMIT_KIND) ($PERMIT_ORIGIN) ([0-9a-f]{64}) ($PERMIT_CAPS)\z/ or return live_end($live, 'it wrote a line of no form');
     my $most = $live->{kept_app} ? $LIVE_PERMIT_KEPT_MOST : $LIVE_PERMIT_MOST;
-    return live_end($live, "it asked more than $most times whether a script may run") if ++$live->{permits} > $most;
+    if (++$live->{permits} > $most) {
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'script-permits', $live->{permits}, $most, 'requests',
+            'The page exceeded its lifetime script permission allowance.');
+        return live_end($live, "it asked more than $most times whether a script may run");
+    }
     $origin = lc $origin;
     my $site = "https://$live->{host}";
     my ($rules) = permit_rules();
@@ -15711,12 +15814,12 @@ sub cht_unlinked {                        # a connector ended: its connection wi
 }
 
 sub cht_end {                             # LZRCHT ended: every role and every connection
-    my ($tab, $why) = @_;
+    my ($tab, $why, $replacing) = @_;
     my $c = delete $tab->{cht} or return;
     cht_box_end($_) for cht_boxes($c);
     noted("LZRCHT ended: $why");
     $tab->{says} = "LZRCHT ended: $why.";
-    return unless $tab == $TABS[$TAB];
+    return if $replacing || $tab != $TABS[$TAB];
     window("page $TAB", @{ $c->{sent} // [] }, '.');
     live_told();
     idle($tab->{says});
@@ -17501,7 +17604,7 @@ function heard(line) {
     else if (word == 'welcome') welcomeTold(rest);
     else if (word == 'brief') briefNext = rest;    // the few words the strip shows in place of the next line's; the line in full is the strip's tip
     else if (word == 'log') logTold(rest);
-    else if (word == 'ask') { if (!startupReady) { startupReady = true; if (startupRequested) shown(); } asked++; if (logClosing) { briefNext = null; say('button ' + asked + ' 1'); } else if (torAsking) torAsked(rest.split('\t')); else strip(rest.split('\t'), false, true); }    // the log page was closed: what lzrprf still asks about the log is answered by the first button, which changes nothing; Stop Tor's question stands in the Tor modal
+    else if (word == 'ask') { if (!startupReady) { startupReady = true; if (startupRequested) shown(); } asked++; if (logClosing) { briefNext = null; say('button ' + asked + ' 1'); } else if (torAsking) torAsked(rest.split('\t')); else askModal(rest.split('\t')); }    // the log page was closed: what lzrprf still asks about the log is answered by the first button, which changes nothing; Stop Tor's question stands in the Tor modal
     else if (word == 'address' && aside) { if (drawings[perlTab]) drawings[perlTab].address = rest; }
     else if (word == 'address') { bar.stringValue = $(rest); current = rest; listing = null; suggestHidden(); pieces(); redrawn(); }
     else if (word == 'nav' && aside) { }
@@ -18198,6 +18301,8 @@ function shareNow() { return sheet && sheet.high > 0 && scroll.documentView.isEq
 // press already showed it; a tab closed while lzrprf is free leaves the strip in this frame too, the next
 // shown with its kept drawing (tabClosed). Only an open question or modal takes the press instead.
 function tabSaid(line, closed, kept) {
+    if (asking && !askAnswered(1)) return;    // no box holds the tabs: a question standing is answered by its first button, the answer when nobody answers
+    if (modalOpen && modalActions.length) closeModal();    // and a modal steps aside; the installer's while it runs (no button) still holds them
     if (modalOpen || asking) return;
     if (closed !== undefined && tabs.length < 2 && /^tab close /.test(line)) { win.performClose($()); return; }    // T6 (Henry, 2026-11-26): closing the last tab closes the window, as the red dot does, and no empty tab is opened in its place
     var chose = /^tab select (\d+)$/.exec(line), to = chose ? +chose[1] : undefined;
@@ -20021,6 +20126,28 @@ function torAsked(parts) {    // [C17] lzrprf's question of Stop Tor, in the mod
         modal(torTitle(), '', torChoices(), 'tor'); torChanged(); }; };
     modal('Stop Tor?', parts[0], parts.slice(1).map(function (title, i) { return [title, answer(i + 1)]; }), 'small');
 }
+// lzrprf's own questions (the report of a page the window could not draw, and every other ask) stand in the modal
+// every other box of the window uses, not in the black strip at the bottom (Henry, 2026-11-27, ticket 1535). The
+// title is the words up to their first question mark, the rest the words under it. A press answers as the strip's
+// buttons did; a tab closed or a page asked for while it stands answers it with its first button, the answer when
+// nobody answers, so no box holds the window (askAnswered, from the tab strip and the bar).
+var askNumber = 0;
+function askModal(parts) {
+    var words = parts[0] || '', q = words.indexOf('?'), number = asked;
+    var title = q > 0 && q < 160 ? words.slice(0, q + 1) : 'LZRBRWSR', about = q > 0 && q < 160 ? words.slice(q + 1).trim() : words;
+    askNumber = number;
+    asking = true; free = false; bar.enabled = false;
+    var answer = function (i) { return function () { askAnswered(i); }; };
+    modal(title, about, parts.slice(1).filter(function (t) { return t; }).map(function (t, i) { return [t, answer(i + 1)]; }), 'ask');
+}
+function askAnswered(i) {    // true when a question stood and is answered now
+    if (!askNumber || askNumber != asked) { askNumber = 0; return false; }
+    askNumber = 0; asking = false;
+    if (modalOpen && modalKind == 'ask') closeModal();
+    strip(['']); say('button ' + asked + ' ' + (i || 1));
+    return true;
+}
+
 function torTold(rest) {
     var parts = rest.split(' '), word = parts[0];
     if (torState == 'stopping') return;    // the stop is lit by the steps of the window's end alone (torSessionTold)
@@ -20278,7 +20405,7 @@ function placeModal() {
     if (!veil) return;
     var all = root.frame, wide = all.size.width, high = all.size.height, M = 18, big = modalKind == 'big';    // M: the room around the panel its glow is drawn in
     var wizard = modalKind == 'wizard', tech = modalKind == 'tech', tor = modalKind == 'tor', w = Math.min(big || modalKind == 'permit' ? 780 : wizard ? 660 : tech ? TECH_WIDE : tor ? 640 : modalKind == 'tool' ? TOOL_WIDE : modalKind == 'support' ? 640 : 580, wide - 48), h = big ? Math.min(welcoming ? 820 : 560, high - 48) : modalKind == 'permit' ? Math.min(620, high - 48) : tech ? Math.min(TECH_HIGH, high - 48) : wizard ? Math.min(470, high - 48) : modalKind == 'form' ? 330 : modalKind == 'tall' ? 310 : modalKind == 'flag' ? 340 : modalKind == 'engine' || modalKind == 'licence' || modalKind == 'profile' ? 330 : modalKind == 'support' ? Math.min(620, high - 48) : tor ? 320 : modalKind == 'tool' ? Math.min(TOOL_HIGH, high - 48) : modalKind == 'modules' ? Math.min(400, high - 48) : modalKind == 'tnnl' ? Math.min(tnnlVpn ? 420 : 250, high - 48) : 230;
-    veil.frame = $.NSMakeRect(0, 0, wide, high);
+    veil.frame = $.NSMakeRect(0, 0, wide, high - TABS_HIGH);    // the tab strip stays free under every modal: a tab can always be chosen or closed (Henry, 2026-11-27, ticket 1535)
     panel.frame = $.NSMakeRect(Math.round((wide - w) / 2) - M, Math.round((high - h) / 2) - M, w + 2 * M, h + 2 * M);
     panel.needsDisplay = true;
     panelTitle.frame = $.NSMakeRect(M + 26, M + h - 52, w - 52, 28);
@@ -21813,7 +21940,7 @@ function run(argv) {
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;
     app.setActivationPolicy(kind());
-    menuBarNamed(NAME);
+    if (argv[3] !== 'bundled') menuBarNamed(NAME);
     app.applicationIconImage = icon(256);
     hand = $.LzrprfHand.alloc.init;
     app.delegate = hand;

@@ -37,7 +37,36 @@ sub run {
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)
-    become($window_in, $window_out, $TRY ? \*STDERR : undef, '/usr/bin/sandbox-exec', '-D', "HOME=$HOME", '-p', $WINDOW_CONTAINER, $SCRIPT, '-l', 'JavaScript', '-e', window_text() . window_sound_text() . $more, $APP, ($TOR_WINDOW ? 'tor' : $INCOGNITO ? 'incognito' : 'window') . (defined $OPEN_FRAME ? '+' : ''), $OPEN_FRAME // frame_kept());    # T5: a window a tab was pulled out into is told so by a "+" after its kind, and runs without a Dock icon of its own    # the size and place the last window was left at (sub frame_kept), so it opens there and does not jump; a pulled tab's window opens where the tab was let go
+    my $window_source = window_text() . window_sound_text() . $more;
+    my $kind = ($TOR_WINDOW ? 'tor' : $INCOGNITO ? 'incognito' : 'window') . (defined $OPEN_FRAME ? '+' : '');
+    my $frame = $OPEN_FRAME // frame_kept();
+    my ($host, $profile) = window_host($program);
+    my @command = $host ? ($host, $window_source, $APP, $kind, $frame, 'bundled')
+        : ($SCRIPT, '-l', 'JavaScript', '-e', $window_source, $APP, $kind, $frame);
+    become($window_in, $window_out, $TRY ? \*STDERR : undef, '/usr/bin/sandbox-exec', '-D', "HOME=$HOME", '-p', $profile, @command);
+}
+
+# Only the named, hash-paired browser helper may replace the system script host.
+sub window_host {
+    my ($program) = @_;
+    my $fallback = [undef, $WINDOW_CONTAINER];
+    return @$fallback unless $program =~ m{\A(.*/LZRBRWSR(?:-Staging)?[.]app)/Contents/MacOS/lzrbrwsr-bin\z};
+    my $bundle = $1;
+    my $host = "$bundle/Contents/MacOS/lzrbrwsr-window";
+    return @$fallback unless -x $host && !-l $host;
+    my ($expected) = map { /\Afile lzrbrwsr-window ([0-9a-f]{64})\s*\z/ ? $1 : () } release_lines();
+    return @$fallback unless defined $expected && $expected eq (sum_of($host) // '');
+    die "lzrprf: the window host path holds a character lzrprf does not pass on\n" if $host =~ /["\\\n]/;
+    my $profile = $WINDOW_CONTAINER =~ s{[(]literal "/usr/bin/osascript"[)]}{(literal "$host")}r;
+    # The window's container names the program it may run; if the swap found nothing to replace, the helper
+    # would start under a container that does not allow it. Said, not fallen back from (lzr2's review, 2026-11-27).
+    die "lzrprf: the window container names no script host for the window host to replace\n" if $profile eq $WINDOW_CONTAINER;
+    # A home-folder install still needs its public bundle metadata. The
+    # exact entries let CoreFoundation identify the bundle without reading
+    # any sibling file, program or user folder.
+    $profile .= qq{(allow file-read* (literal "$host") (literal "$bundle/Contents/Info.plist")} . "\n"
+        . qq{  (literal "$bundle") (literal "$bundle/Contents") (literal "$bundle/Contents/MacOS"))} . "\n";
+    return ($host, $profile);
 }
 
 sub runs_swept {                          # what runs that have ended left in a folder: a request's socket, the folder of the tries at the start

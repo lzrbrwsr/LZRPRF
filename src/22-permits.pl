@@ -590,7 +590,11 @@ sub live_permitted {                      # [C26] "=permit KIND ORIGIN SHA256 CA
     my ($live, $line) = @_;
     my ($kind, $origin, $sha, $caps) = $line =~ /\A=permit ($PERMIT_KIND) ($PERMIT_ORIGIN) ([0-9a-f]{64}) ($PERMIT_CAPS)\z/ or return live_end($live, 'it wrote a line of no form');
     my $most = $live->{kept_app} ? $LIVE_PERMIT_KEPT_MOST : $LIVE_PERMIT_MOST;
-    return live_end($live, "it asked more than $most times whether a script may run") if ++$live->{permits} > $most;
+    if (++$live->{permits} > $most) {
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'script-permits', $live->{permits}, $most, 'requests',
+            'The page exceeded its lifetime script permission allowance.');
+        return live_end($live, "it asked more than $most times whether a script may run");
+    }
     $origin = lc $origin;
     my $site = "https://$live->{host}";
     my ($rules) = permit_rules();

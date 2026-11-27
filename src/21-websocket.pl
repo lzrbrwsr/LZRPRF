@@ -95,7 +95,10 @@ sub ws_open {
     my ($live, $id, $url, $offered) = @_;
     my $app = $live->{kept_app} or return;
     return if $INCOGNITO || $TOR_WANTED || $TOR_WINDOW || $TOR_SESSION || !$live->{until};
-    return if exists $app->{sockets}{$id} || keys(%{ $app->{sockets} }) >= $app->{spec}{sockets};
+    return if exists $app->{sockets}{$id};
+    my $count = keys %{ $app->{sockets} };
+    return page_cap_refused($app->{spec}{name}, 'open-sockets', $count + 1, $app->{spec}{sockets}, 'sockets',
+        'The kept app would exceed its concurrent WebSocket allowance.') if $count >= $app->{spec}{sockets};
     my ($host, $path, $protocols) = ws_endpoint($app, $url, $offered);
     return unless $host && kept_app_budget($app, 1, 0);
     my $address = "https://$host$path";
@@ -261,7 +264,13 @@ sub ws_step {
     return ws_close_socket($live, $id, $ws->{close_code}, $ws->{close_reason}) if defined $ws->{close_code} && !length $ws->{out};
     my $got = $socket->sysread(my $part, 65536);
     if ($got) {
-        return ws_close_socket($live, $id) if !kept_app_budget($live->{kept_app}, 0, $got) || length($ws->{in}) + $got > $WS_DOWN + 65546;
+        return ws_close_socket($live, $id) unless kept_app_budget($live->{kept_app}, 0, $got);
+        my $queued = length($ws->{in}) + $got;
+        if ($queued > $WS_DOWN + 65546) {
+            page_cap_refused($live->{kept_app}{spec}{name}, 'socket-read-buffer', $queued, $WS_DOWN + 65546, 'bytes',
+                'The WebSocket was closed because its incoming buffer would exceed the limit.');
+            return ws_close_socket($live, $id);
+        }
         $ws->{in} .= $part;
     } elsif (defined $got || !($socket->want_read || $socket->want_write || $!{EAGAIN} || $!{EINTR})) {
         return ws_close_socket($live, $id);

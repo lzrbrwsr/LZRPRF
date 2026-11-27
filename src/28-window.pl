@@ -406,7 +406,7 @@ function heard(line) {
     else if (word == 'welcome') welcomeTold(rest);
     else if (word == 'brief') briefNext = rest;    // the few words the strip shows in place of the next line's; the line in full is the strip's tip
     else if (word == 'log') logTold(rest);
-    else if (word == 'ask') { if (!startupReady) { startupReady = true; if (startupRequested) shown(); } asked++; if (logClosing) { briefNext = null; say('button ' + asked + ' 1'); } else if (torAsking) torAsked(rest.split('\t')); else strip(rest.split('\t'), false, true); }    // the log page was closed: what lzrprf still asks about the log is answered by the first button, which changes nothing; Stop Tor's question stands in the Tor modal
+    else if (word == 'ask') { if (!startupReady) { startupReady = true; if (startupRequested) shown(); } asked++; if (logClosing) { briefNext = null; say('button ' + asked + ' 1'); } else if (torAsking) torAsked(rest.split('\t')); else askModal(rest.split('\t')); }    // the log page was closed: what lzrprf still asks about the log is answered by the first button, which changes nothing; Stop Tor's question stands in the Tor modal
     else if (word == 'address' && aside) { if (drawings[perlTab]) drawings[perlTab].address = rest; }
     else if (word == 'address') { bar.stringValue = $(rest); current = rest; listing = null; suggestHidden(); pieces(); redrawn(); }
     else if (word == 'nav' && aside) { }
@@ -1103,6 +1103,8 @@ function shareNow() { return sheet && sheet.high > 0 && scroll.documentView.isEq
 // press already showed it; a tab closed while lzrprf is free leaves the strip in this frame too, the next
 // shown with its kept drawing (tabClosed). Only an open question or modal takes the press instead.
 function tabSaid(line, closed, kept) {
+    if (asking && !askAnswered(1)) return;    // no box holds the tabs: a question standing is answered by its first button, the answer when nobody answers
+    if (modalOpen && modalActions.length) closeModal();    // and a modal steps aside; the installer's while it runs (no button) still holds them
     if (modalOpen || asking) return;
     if (closed !== undefined && tabs.length < 2 && /^tab close /.test(line)) { win.performClose($()); return; }    // T6 (Henry, 2026-11-26): closing the last tab closes the window, as the red dot does, and no empty tab is opened in its place
     var chose = /^tab select (\d+)$/.exec(line), to = chose ? +chose[1] : undefined;
@@ -2926,6 +2928,28 @@ function torAsked(parts) {    // [C17] lzrprf's question of Stop Tor, in the mod
         modal(torTitle(), '', torChoices(), 'tor'); torChanged(); }; };
     modal('Stop Tor?', parts[0], parts.slice(1).map(function (title, i) { return [title, answer(i + 1)]; }), 'small');
 }
+// lzrprf's own questions (the report of a page the window could not draw, and every other ask) stand in the modal
+// every other box of the window uses, not in the black strip at the bottom (Henry, 2026-11-27, ticket 1535). The
+// title is the words up to their first question mark, the rest the words under it. A press answers as the strip's
+// buttons did; a tab closed or a page asked for while it stands answers it with its first button, the answer when
+// nobody answers, so no box holds the window (askAnswered, from the tab strip and the bar).
+var askNumber = 0;
+function askModal(parts) {
+    var words = parts[0] || '', q = words.indexOf('?'), number = asked;
+    var title = q > 0 && q < 160 ? words.slice(0, q + 1) : 'LZRBRWSR', about = q > 0 && q < 160 ? words.slice(q + 1).trim() : words;
+    askNumber = number;
+    asking = true; free = false; bar.enabled = false;
+    var answer = function (i) { return function () { askAnswered(i); }; };
+    modal(title, about, parts.slice(1).filter(function (t) { return t; }).map(function (t, i) { return [t, answer(i + 1)]; }), 'ask');
+}
+function askAnswered(i) {    // true when a question stood and is answered now
+    if (!askNumber || askNumber != asked) { askNumber = 0; return false; }
+    askNumber = 0; asking = false;
+    if (modalOpen && modalKind == 'ask') closeModal();
+    strip(['']); say('button ' + asked + ' ' + (i || 1));
+    return true;
+}
+
 function torTold(rest) {
     var parts = rest.split(' '), word = parts[0];
     if (torState == 'stopping') return;    // the stop is lit by the steps of the window's end alone (torSessionTold)
@@ -3183,7 +3207,7 @@ function placeModal() {
     if (!veil) return;
     var all = root.frame, wide = all.size.width, high = all.size.height, M = 18, big = modalKind == 'big';    // M: the room around the panel its glow is drawn in
     var wizard = modalKind == 'wizard', tech = modalKind == 'tech', tor = modalKind == 'tor', w = Math.min(big || modalKind == 'permit' ? 780 : wizard ? 660 : tech ? TECH_WIDE : tor ? 640 : modalKind == 'tool' ? TOOL_WIDE : modalKind == 'support' ? 640 : 580, wide - 48), h = big ? Math.min(welcoming ? 820 : 560, high - 48) : modalKind == 'permit' ? Math.min(620, high - 48) : tech ? Math.min(TECH_HIGH, high - 48) : wizard ? Math.min(470, high - 48) : modalKind == 'form' ? 330 : modalKind == 'tall' ? 310 : modalKind == 'flag' ? 340 : modalKind == 'engine' || modalKind == 'licence' || modalKind == 'profile' ? 330 : modalKind == 'support' ? Math.min(620, high - 48) : tor ? 320 : modalKind == 'tool' ? Math.min(TOOL_HIGH, high - 48) : modalKind == 'modules' ? Math.min(400, high - 48) : modalKind == 'tnnl' ? Math.min(tnnlVpn ? 420 : 250, high - 48) : 230;
-    veil.frame = $.NSMakeRect(0, 0, wide, high);
+    veil.frame = $.NSMakeRect(0, 0, wide, high - TABS_HIGH);    // the tab strip stays free under every modal: a tab can always be chosen or closed (Henry, 2026-11-27, ticket 1535)
     panel.frame = $.NSMakeRect(Math.round((wide - w) / 2) - M, Math.round((high - h) / 2) - M, w + 2 * M, h + 2 * M);
     panel.needsDisplay = true;
     panelTitle.frame = $.NSMakeRect(M + 26, M + h - 52, w - 52, 28);

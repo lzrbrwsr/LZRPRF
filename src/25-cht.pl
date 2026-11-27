@@ -371,12 +371,12 @@ sub cht_unlinked {                        # a connector ended: its connection wi
 }
 
 sub cht_end {                             # LZRCHT ended: every role and every connection
-    my ($tab, $why) = @_;
+    my ($tab, $why, $replacing) = @_;
     my $c = delete $tab->{cht} or return;
     cht_box_end($_) for cht_boxes($c);
     noted("LZRCHT ended: $why");
     $tab->{says} = "LZRCHT ended: $why.";
-    return unless $tab == $TABS[$TAB];
+    return if $replacing || $tab != $TABS[$TAB];
     window("page $TAB", @{ $c->{sent} // [] }, '.');
     live_told();
     idle($tab->{says});
