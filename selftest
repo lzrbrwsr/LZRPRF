@@ -5024,7 +5024,7 @@ check(!words('picturesoff', 'pictures') && !-e "$base.picturesoff/pictures" && !
     'in a copy of lzrprf whose $PICTURES_SHOWN is 0, the one switch that hides the choice, pictures from other sites are not a choice: the window is told nothing of them, so the cogwheel has no row for them, and "menu pictures" writes nothing and says so', join(' | ', words('picturesoff', 'idle')));
 check(join(',', words('gamehelper', 'game')) eq 'helper 0,helper 1,helper 0,helper 1' && slurp("$base.gamehelper/gamehelper") eq "on\n" && !-e "$base.gamehelper/gamehelper.new"
         && idle_said('gamehelper', "LZRDFNDR's satellite fights in the home page's minigame.") == 2 && idle_said('gamehelper', "LZRDFNDR's satellite stays out of the home page's minigame.") == 1
-        && $text_of_lzrprf =~ /LZRPRF_HOME => \(\$INCOGNITO \? 'private' : 'home'\) \. \(game_helper\(\) \? ' satellite' : ''\)/ && $text_of_lzrprf =~ /game_helper_set\(1, 1\) if \$live->\{home\}; window\('tool show' \. \(\$go =~ \/-other\\z\/ \? ' other' : ''\)\)/,
+        && $text_of_lzrprf =~ /LZRPRF_HOME => home_word\(\)/ && $text_of_lzrprf =~ /sub home_word \{ return \(\$INCOGNITO \? 'private' : 'home'\) \. \(game_helper\(\) \? ' satellite' : ''\)/ && $text_of_lzrprf =~ /game_helper_set\(1, 1\) if \$live->\{home\}; window\('tool show' \. \(\$go =~ \/-other\\z\/ \? ' other' : ''\)\)/,
     'H-0071: LZRDFNDR\'s satellite is off until you switch it on in the Other tab of its panel: the window is told "game helper 0" at the start, each switch is written to the plain file gamehelper ("on", removed when off) and told back, a choice of no form is passed over, the home page is started with it (LZRPRF_HOME "home satellite"), and the game page\'s Activate LZRDFNDR switches it on too', join(',', words('gamehelper', 'game')) . ' / ' . join(' | ', words('gamehelper', 'idle')));
 check(defined $sums_before{gamehelperincognito} && tree_sums("$base.gamehelperincognito") eq $sums_before{gamehelperincognito} && join(',', words('gamehelperincognito', 'game')) eq 'helper 0,helper 1',
     'an incognito window holds LZRDFNDR\'s satellite chosen in it in its memory while it is open and writes nothing [C16]', join(',', words('gamehelperincognito', 'game')));
@@ -6790,7 +6790,7 @@ sub later_heard {                         # "sub asked" and "sub hear" of lzrprf
     my ($asked) = $text_of_lzrprf =~ /^(sub asked \{.*?^\}\n)/ms;
     my ($hear) = $text_of_lzrprf =~ /^(sub hear \{.*?^\}\n)/ms;
     defined $asked && defined $hear or return 'not found in lzrprf';
-    my $vars = 'package Later; no warnings; our ($FROM, $FROM_HELD, $IDLE_WORK, $SPARE_WANTED, $CURL_WANTED, $ASKED, $ANSWER, $ANSWER_SECONDS, $TRY, $TRY_QUIET, $SOUND, @LATER, @HELD, @EVENTS, @LIVE, @said, @seen, @script);';
+    my $vars = 'package Later; no warnings; our ($FROM, $FROM_HELD, $IDLE_WORK, $SPARE_WANTED, $HOME_SPARE_WANTED, $CURL_WANTED, $ASKED, $ANSWER, $ANSWER_SECONDS, $TRY, $TRY_QUIET, $SOUND, @LATER, @HELD, @EVENTS, @LIVE, @said, @seen, @script);';
     my $press = eval "$vars \$FROM = 1; \$ASKED = 0; \$ANSWER_SECONDS = 5; \@said = \@seen = \@LATER = \@HELD = (); \@script = ('tor on', 'view 900 700', 'tor off', 'button 1 2'); sub window { push \@said, \$_[0] } sub viewing { push \@seen, \$_[0] } sub now { Time::HiRes::time() } sub leave { die qq{left\\n} } sub hear { shift \@script } $asked asked('ask Keep a log?', 'No', 'Yes')" // 'x';    # the window's answer comes after three other lines
     no warnings 'once';
     my @kept = @Later::LATER;
@@ -6909,7 +6909,7 @@ sub parts_copy {                          # a copy of the parts in src/ at $to, 
 sub hears {                               # "sub hear" of lzrprf, taken out and run here against a pipe: what it returns when nothing is said in time, then when the other end is gone
     my ($text) = $text_of_lzrprf =~ /^(sub hear \{.*?^\})/ms;
     defined $text && pipe(my $from, my $to) or return ('x', 'x');
-    my @got = eval "package Heard; no warnings; my \$FROM = \$from; my \$FROM_HELD = ''; my \$IDLE_WORK; my \$SPARE_WANTED; my \$CURL_WANTED; my \@EVENTS; my \@HELD; my \@LATER; my \@LIVE; my \$TRY = 0; my \$TRY_QUIET = 2; my \$SOUND; sub trmnl_select { } sub trmnl_heard { } sub prefetch_select { } sub prefetch_heard { } sub cht_select { } sub cht_heard { } sub now { require Time::HiRes; Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) } $text; my \$quiet = hear(0.2); close \$to; (\$quiet, scalar hear(0.2))";    # with no page kept running, which it also hears
+    my @got = eval "package Heard; no warnings; my \$FROM = \$from; my \$FROM_HELD = ''; my \$IDLE_WORK; my \$SPARE_WANTED; my \$HOME_SPARE_WANTED; my \$CURL_WANTED; my \@EVENTS; my \@HELD; my \@LATER; my \@LIVE; my \$TRY = 0; my \$TRY_QUIET = 2; my \$SOUND; sub trmnl_select { } sub trmnl_heard { } sub prefetch_select { } sub prefetch_heard { } sub cht_select { } sub cht_heard { } sub now { require Time::HiRes; Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) } $text; my \$quiet = hear(0.2); close \$to; (\$quiet, scalar hear(0.2))";    # with no page kept running, which it also hears
     return @got == 2 ? @got : ('x', 'x');
 }
 

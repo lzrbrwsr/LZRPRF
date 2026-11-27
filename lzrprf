@@ -259,7 +259,7 @@ my ($FROM, @EVENTS);                      # what the window says; or, without a 
 my $WELCOMING;                            # the release whose welcome card is shown, until its Got it (sub welcome, sub welcomed)
 my $FROM_HELD = '';                       # what the window said that is not a whole line yet (sub hear)
 my $IDLE_WORK;                            # a sub run once, the first moment the window and every page are quiet (sub hear), set by sub behind: the identity question, asked before the first address is typed
-my ($SPARE, $SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)
+my ($SPARE, $SPARE_WANTED, $HOME_SPARE, $HOME_SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)
 my ($CURL_SPARE, $CURL_WANTED) = (undef, 1);    # curl started before its request (sub curl_for); whether the next quiet moment starts one
 my @LIVE;                                 # the pages kept running with their tabs, the oldest first (sub live_kept)
 my $LAID_TALLY;                           # what the last laid list checked holds: its counts, text, pixels and tiles (sub laid), kept by a page kept running for a splice of it (sub live_patched)
@@ -1837,6 +1837,7 @@ sub behind {
         my $event = eval { hear(scalar(link_due(scalar tnnl_due(scalar tool_due()))), 1) };    # what a page kept running wrote is read here too: an error of lzrprf's own in it ends that page, never the window
         if (!defined $event) { last unless $@; unheard('', $@, $behind, ++$faults); next }
         timed('heard ' . ($event =~ /^(\S+)/ ? $1 : '')) if $TIMED;    # "lzrprf try" with "times": the moment each line of the window was taken up, so a test reads how long lzrprf took to answer it (scripts/snappy.pl)
+        $HOME_SPARE_WANTED = 1 if length $event && !$HOME_SPARE;    # Ticket #1447: a new tab's home process ready by the next quiet moment (sub home_spare_for)
         eval { link_watch() } if length $event;    # [C31] a window that is never quiet still sends the link's lines when they are due (a cheap look, read once in two seconds)
         eval {    # each line taken up below; an error of lzrprf's own in it is caught after the last elsif (sub unheard)
         if ($event =~ /^go ([\x20-\x7f]{1,2100})$/) { typed($1) }    # [C4] the one place an address comes from: the bar of lzrprf's own window; a size said while it was fetched and laid out is the size it is laid out again at
@@ -2013,7 +2014,7 @@ sub leave {
     trmnl_end($_, 'its window closed') for grep { $_->{trmnl} } @TABS;    # [C29] nor a terminal: its shell is hung up
     cht_end($_, 'its window closed') for grep { $_->{cht} } @TABS;    # [C32] nor LZRCHT: its roles and connections
     kill 'KILL', $witness if $witness;
-    spare_dropped();                      # a page run's process started before its run, never handed anything
+    spare_dropped(); home_spare_dropped();    # a page run's process started before its run, and a home's, never handed anything
     curl_ended($CURL_SPARE);              # and curl started before its request
     sound_ended();                       # [C12] the sound process ends with its window
     removed($DIR) if $TOR_SESSION;        # [C17] a Tor window whose end was held: its folder goes before Tor does
@@ -2520,7 +2521,7 @@ sub contained {
         return (undef, 'unstarted');
     }
     if (!$feeder) {                       # the keeper of this page
-        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), cht_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
+        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), cht_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $HOME_SPARE ? @$HOME_SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
         keeper($held, $answer_in, "=seal $seal\n" . $frame . $got, $page, $input);
         POSIX::_exit(0);                  # the keeper never returns; were it ever to, it ends here and does not go on as a second lzrprf
     }
@@ -2559,7 +2560,7 @@ sub page_started {
     my $seal = run_seal() // return;      # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
     my $page = fork // return;
     if (!$page) {
-        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$app && !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
+        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => home_word()) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$app && !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
         chdir '/';
         the_program($answer_out, $to_lzrprf);    # [C1]
     }
@@ -2586,7 +2587,8 @@ sub spare_for {
 
 sub spare_taken {                         # the process started for this run, when it is the one for its address and is still waiting; else nothing, and one for another run is ended
     my ($url, $sheets, $tool, $local_home) = @_;
-    return unless $SPARE && defined $sheets && !$tool && !$local_home;
+    return home_spare_taken() if $local_home && defined $sheets && !$tool;    # Ticket #1447: a new tab's home, from the process made for it at a quiet moment (10-tabs.pl)
+    return unless $SPARE && defined $sheets && !$tool;
     my $one = $SPARE;
     return spare_dropped() if $one->{of} != $$ || $one->{key} ne "$url\t" . ($TOR_WANTED ? 1 : 0);
     undef $SPARE;
@@ -2595,8 +2597,8 @@ sub spare_taken {                         # the process started for this run, wh
     return;
 }
 
-sub spare_dropped {                       # the process started before its run, ended unused; a copy of lzrprf only forgets it
-    my $one = $SPARE or return;
+sub spare_dropped {                       # the process started before its run, ended unused; a copy of lzrprf only forgets it, the home's too
+    home_spare_dropped() if $HOME_SPARE && $HOME_SPARE->{of} != $$; my $one = $SPARE or return;
     undef $SPARE;
     if ($one->{of} == $$) { kill 'KILL', $one->{page}; waitpid $one->{page}, 0 }
     close $_ for @$one{qw(in from)};
@@ -2604,10 +2606,10 @@ sub spare_dropped {                       # the process started before its run, 
 }
 
 sub spare_work {                          # what the next quiet moment does (sub hear): the process for the next run of the page shown, for a new width, and curl for the next request
-    my ($url, $curl) = ($SPARE_WANTED, $CURL_WANTED);
-    return unless defined $url || $curl;
-    ($SPARE_WANTED, $CURL_WANTED) = ();
-    return sub { spare_for($url) if defined $url; curl_for() if $curl };
+    my ($url, $curl, $home) = ($SPARE_WANTED, $CURL_WANTED, $HOME_SPARE_WANTED);
+    return unless defined $url || $curl || $home;
+    ($SPARE_WANTED, $CURL_WANTED, $HOME_SPARE_WANTED) = ();
+    return sub { spare_for($url) if defined $url; home_spare_for() if $home; curl_for() if $curl };
 }
 
 sub idle_taken {                          # the work of a quiet moment, once: sub behind's first ($IDLE_WORK), then a spare's
@@ -4439,6 +4441,34 @@ sub home_shown {
     return window('startup ready'), idle('The local home could not be drawn.') unless $live;
     $live->{starting} = { tab => $TABS[$TAB], high => $high, game => $game };
     push @LIVE, $live;
+}
+
+# A new tab's home is made in a process started for it at a quiet moment (Ticket #1447): the 20 to 40 ms the
+# system takes to start a process and put it in its container are spent then, not after the press. One at a
+# time, made by this process alone with the variables a home is run with now ($HOME_SPARE->{key}); one made
+# for another setting (private, the satellite, a part, Tor) is ended unused, as a page's spare is.
+sub home_word { return ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl') }
+sub home_spare_key { return home_word() . "\t" . ($TOR_WANTED ? 1 : 0) }
+sub home_spare_for {
+    return if $HOME_SPARE && $HOME_SPARE->{of} == $$ && $HOME_SPARE->{key} eq home_spare_key() && waitpid($HOME_SPARE->{page}, POSIX::WNOHANG()) == 0;
+    home_spare_dropped();
+    return unless $$ == $FRESH && program_same();
+    $HOME_SPARE = page_started('https://lzrbrwsr.invalid/_home', "=sheets\n", undef, 1) or return;
+    $HOME_SPARE->{key} = home_spare_key(); timed('home-spare');
+}
+sub home_spare_taken {                    # the home's process, when it was made for the home as it is run now and still waits; else nothing
+    my $one = $HOME_SPARE or return;
+    undef $HOME_SPARE;
+    return timed('home-spare-taken'), $one if $one->{of} == $$ && $one->{key} eq home_spare_key() && waitpid($one->{page}, POSIX::WNOHANG()) == 0;
+    $HOME_SPARE = $one; home_spare_dropped();
+    return;
+}
+sub home_spare_dropped {                  # ended unused; a copy of lzrprf only forgets it
+    my $one = $HOME_SPARE or return;
+    undef $HOME_SPARE;
+    if ($one->{of} == $$) { kill 'KILL', $one->{page}; waitpid $one->{page}, 0 }
+    close $_ for @$one{qw(in from)};
+    return;
 }
 
 sub home_arrived {                        # the first list of a home being made (sub home_shown), read in the loop of sub behind: drawn when its tab is still at home
@@ -10270,7 +10300,7 @@ sub hear {                                # the next thing the window says; noth
         }
         trmnl_select(\$ready, \$writable);    # [C29] each terminal's shell and container, heard as the window is
         cht_select(\$ready, \$writable);    # [C32] each LZRCHT's roles and connections
-        if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
+        if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $HOME_SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
         prefetch_select(\$ready);         # [C19] the scripts begun ahead are read as they come (17-prefetch.pl)
         select($ready, $writable, undef, $wait) > 0 or next;
         prefetch_heard($ready);

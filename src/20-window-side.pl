@@ -103,7 +103,7 @@ sub hear {                                # the next thing the window says; noth
         }
         trmnl_select(\$ready, \$writable);    # [C29] each terminal's shell and container, heard as the window is
         cht_select(\$ready, \$writable);    # [C32] each LZRCHT's roles and connections
-        if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
+        if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $HOME_SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
         prefetch_select(\$ready);         # [C19] the scripts begun ahead are read as they come (17-prefetch.pl)
         select($ready, $writable, undef, $wait) > 0 or next;
         prefetch_heard($ready);

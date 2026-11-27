@@ -75,6 +75,7 @@ sub behind {
         my $event = eval { hear(scalar(link_due(scalar tnnl_due(scalar tool_due()))), 1) };    # what a page kept running wrote is read here too: an error of lzrprf's own in it ends that page, never the window
         if (!defined $event) { last unless $@; unheard('', $@, $behind, ++$faults); next }
         timed('heard ' . ($event =~ /^(\S+)/ ? $1 : '')) if $TIMED;    # "lzrprf try" with "times": the moment each line of the window was taken up, so a test reads how long lzrprf took to answer it (scripts/snappy.pl)
+        $HOME_SPARE_WANTED = 1 if length $event && !$HOME_SPARE;    # Ticket #1447: a new tab's home process ready by the next quiet moment (sub home_spare_for)
         eval { link_watch() } if length $event;    # [C31] a window that is never quiet still sends the link's lines when they are due (a cheap look, read once in two seconds)
         eval {    # each line taken up below; an error of lzrprf's own in it is caught after the last elsif (sub unheard)
         if ($event =~ /^go ([\x20-\x7f]{1,2100})$/) { typed($1) }    # [C4] the one place an address comes from: the bar of lzrprf's own window; a size said while it was fetched and laid out is the size it is laid out again at
@@ -251,7 +252,7 @@ sub leave {
     trmnl_end($_, 'its window closed') for grep { $_->{trmnl} } @TABS;    # [C29] nor a terminal: its shell is hung up
     cht_end($_, 'its window closed') for grep { $_->{cht} } @TABS;    # [C32] nor LZRCHT: its roles and connections
     kill 'KILL', $witness if $witness;
-    spare_dropped();                      # a page run's process started before its run, never handed anything
+    spare_dropped(); home_spare_dropped();    # a page run's process started before its run, and a home's, never handed anything
     curl_ended($CURL_SPARE);              # and curl started before its request
     sound_ended();                       # [C12] the sound process ends with its window
     removed($DIR) if $TOR_SESSION;        # [C17] a Tor window whose end was held: its folder goes before Tor does
