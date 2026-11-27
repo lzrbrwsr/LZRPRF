@@ -164,6 +164,31 @@ sub live_turn {
 # the body is the answer's, its chunks joined, at most $PAGE_BYTES; a HEAD has
 # none. A request refused, failed, or answered in another form is told
 # "=fetched 0 0 0". A request line of no form ends the page.
+sub page_cap_refused {
+    my ($scope, $cap, $value, $limit, $unit, $why) = @_;
+    use feature 'state';
+    state $minute;
+    state %seen;
+    state %last_minute;
+    my $this_minute = int(now() / 60);
+    if (!defined $minute || $minute != $this_minute) {
+        %last_minute = defined $minute && $this_minute == $minute + 1 ? %seen : ();
+        $minute = $this_minute;
+        %seen = ();
+    }
+    my $key = "$scope $cap";
+    if (exists $seen{$key}) {
+        $seen{$key}++;
+        return;
+    }
+    $seen{$key} = 0;
+    my $suppressed = delete $last_minute{$key} // 0;
+    $why .= " $suppressed more refused last minute." if $suppressed;
+    link_line('WARN', 'page-cap', $why, scope => $scope, cap => $cap, value => $value, limit => $limit, unit => $unit)
+        or noted("scope=$scope cap=$cap value=$value limit=$limit unit=$unit | $why");
+    return;
+}
+
 sub live_asked {                          # [C19] the request at the front of what the page wrote: nothing when there is none, 0 while it is not all there, else [its line, its body, the bytes it takes], or [its line] when it is of no form
     my ($live) = @_;
     return kept_storage_asked($live->{held}) if substr($live->{held}, 0, 7) eq '=store ';
@@ -180,7 +205,12 @@ sub live_asked {                          # [C19] the request at the front of wh
     my $soon = substr($live->{held}, 0, 6) eq '=soon ';    # [C19] a request the page's script set going, told ahead: one line, no body, answered with nothing (sub prefetch_soon)
     return unless $permit || $soon || substr($live->{held}, 0, 7) eq '=fetch ';
     my $end = index $live->{held}, "\n";
-    if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
+    if ($end < 0 || $end > $LIVE_FETCH_LINE) {
+        return 0 if $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE;
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'relay-line',
+            $end < 0 ? length($live->{held}) : $end, $LIVE_FETCH_LINE, 'bytes', 'The page exceeded the relay command length limit.');
+        return [''];
+    }
     my $line = substr($live->{held}, 0, $end);
     return [$line, '', $end + 1] if $permit || $soon;
     if ($live->{kept_app}) {
@@ -191,7 +221,10 @@ sub live_asked {                          # [C19] the request at the front of wh
         return [$line, substr($live->{held}, $end + 1 + $auth_bytes, $size), $end + 1 + $auth_bytes + $size, $auth];
     }
     my ($size) = $line =~ /^=fetch [A-Z]{1,8} (0|[1-9][0-9]{0,5}) / or return [$line];
-    return [$line] if $size > $LIVE_FETCH_UP;
+    if ($size > $LIVE_FETCH_UP) {
+        page_cap_refused('page', 'fetch-upload', $size, $LIVE_FETCH_UP, 'bytes', 'The fetch upload exceeded the page relay limit.');
+        return [$line];
+    }
     return 0 if length($live->{held}) < $end + 1 + $size;
     return [$line, substr($live->{held}, $end + 1, $size), $end + 1 + $size];
 }
@@ -294,7 +327,10 @@ sub live_fetched {                        # [C19]
     }
     record($asked_for, $kept) or return live_replied($live, 0, '', '');    # [C5] before the name is even looked up
     my $fetch_most = $live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST;
-    $why = "the page asked for more than $fetch_most addresses" if ++$live->{fetches} > $fetch_most;
+    if (++$live->{fetches} > $fetch_most) {
+        $why = "the page asked for more than $fetch_most addresses";
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'fetch-count', $live->{fetches}, $fetch_most, 'requests', 'The page exceeded its lifetime fetch allowance.');
+    }
     if (!$why) { my $shield = shield_said($url); $why = shield_why($shield) if $shield ne 'allow' }    # [C28] before any DNS lookup, including requests while a page is still being read
     my $where;
     my $sent_ask = { method => $method, type => $type, body => $body, origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => scalar(sso_cookie($url, $live->{host})), top => $allowed eq 'sandbox' ? undef : $live->{url}, as => $as, dest => $dest, from => $live->{host} };

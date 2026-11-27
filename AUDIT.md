@@ -243,18 +243,19 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 03-containers.pl	684	named_asked	C21
 04-start.pl	1	-	-
 04-start.pl	4	run	C16 C17 C29
-04-start.pl	43	runs_swept	C16
-04-start.pl	61	temp_folder	-
-04-start.pl	70	swept	C16
-04-start.pl	81	removed	-
-04-start.pl	87	incognito_begun	-
-04-start.pl	113	incognito_opened	-
-04-start.pl	120	window_opened	-
-04-start.pl	128	help_opened	-
-04-start.pl	137	apart	-
-04-start.pl	168	tab_out	C29 C32
-04-start.pl	187	pulled_command	-
-04-start.pl	193	opened_with	-
+04-start.pl	50	window_host	-
+04-start.pl	72	runs_swept	C16
+04-start.pl	90	temp_folder	-
+04-start.pl	99	swept	C16
+04-start.pl	110	removed	-
+04-start.pl	116	incognito_begun	-
+04-start.pl	142	incognito_opened	-
+04-start.pl	149	window_opened	-
+04-start.pl	157	help_opened	-
+04-start.pl	166	apart	-
+04-start.pl	197	tab_out	C29 C32
+04-start.pl	216	pulled_command	-
+04-start.pl	222	opened_with	-
 05-profiles.pl	1	-	-
 05-profiles.pl	35	profiles_root	-
 05-profiles.pl	36	profiles_folder	-
@@ -294,11 +295,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
 06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C18 C15
-06-behind.pl	173	unheard	-
-06-behind.pl	217	paired	-
-06-behind.pl	232	unnamed	-
-06-behind.pl	239	leave	C17 C7 C29 C32 C12 C16
-06-behind.pl	257	closed	-
+06-behind.pl	176	unheard	-
+06-behind.pl	220	paired	-
+06-behind.pl	235	unnamed	-
+06-behind.pl	242	leave	C17 C7 C29 C32 C12 C16
+06-behind.pl	260	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-
@@ -623,15 +624,15 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 17-fetch.pl	65	identity_site	-
 17-fetch.pl	75	identity_headers	C7 C19
 17-fetch.pl	102	fetch	C7 C23 C28 C19 C3
-17-fetch.pl	232	curl_body_config	-
-17-fetch.pl	250	curl_started	C3
-17-fetch.pl	276	curl_for	-
-17-fetch.pl	289	curl_taken	-
-17-fetch.pl	298	curl_ended	-
-17-fetch.pl	306	alive	-
-17-fetch.pl	308	public	-
-17-fetch.pl	321	public4	C4
-17-fetch.pl	339	fixed	C23 C5
+17-fetch.pl	241	curl_body_config	-
+17-fetch.pl	259	curl_started	C3
+17-fetch.pl	285	curl_for	-
+17-fetch.pl	298	curl_taken	-
+17-fetch.pl	307	curl_ended	-
+17-fetch.pl	315	alive	-
+17-fetch.pl	317	public	-
+17-fetch.pl	330	public4	C4
+17-fetch.pl	348	fixed	C23 C5
 17-jar.pl	1	-	C7 C12 C16 C17 C26
 17-jar.pl	40	jar_kept	C16 C17
 17-jar.pl	41	jar_directory	-
@@ -662,26 +663,26 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 17-prefetch.pl	86	prefetch_later	C27 C28
 17-prefetch.pl	98	prefetch_go	C26 C7 C28 C27 C8
 17-prefetch.pl	126	prefetch_soon	C19 C26 C27 C28 C7 C8
-17-prefetch.pl	153	prefetch_pump	C5 C7
-17-prefetch.pl	173	prefetch_select	-
-17-prefetch.pl	182	prefetch_heard	-
-17-prefetch.pl	202	prefetch_made	C28 C6 C7
-17-prefetch.pl	246	prefetch_numbers	-
-17-prefetch.pl	262	prefetch_ended	-
-17-prefetch.pl	269	prefetch_asked	C19
-17-prefetch.pl	271	prefetch_keep	C17 C7
-17-prefetch.pl	281	prefetch_take	C7
-17-prefetch.pl	322	together_said	C6 C7
-17-prefetch.pl	330	together_started	-
-17-prefetch.pl	348	together_read	-
-17-prefetch.pl	357	fetched_together	-
-17-prefetch.pl	393	fetchers_for	-
-17-prefetch.pl	425	fetcher_taken	-
-17-prefetch.pl	439	fetchers_dropped	C14 C30 C5
-17-prefetch.pl	454	ahead_key	-
-17-prefetch.pl	456	ahead_begin	C5
-17-prefetch.pl	473	ahead_sheets	C14 C23 C27
-17-prefetch.pl	496	ahead_fonts	C30 C23 C27
+17-prefetch.pl	156	prefetch_pump	C5 C7
+17-prefetch.pl	176	prefetch_select	-
+17-prefetch.pl	185	prefetch_heard	-
+17-prefetch.pl	205	prefetch_made	C28 C6 C7
+17-prefetch.pl	249	prefetch_numbers	-
+17-prefetch.pl	265	prefetch_ended	-
+17-prefetch.pl	272	prefetch_asked	C19
+17-prefetch.pl	274	prefetch_keep	C17 C7
+17-prefetch.pl	284	prefetch_take	C7
+17-prefetch.pl	325	together_said	C6 C7
+17-prefetch.pl	333	together_started	-
+17-prefetch.pl	351	together_read	-
+17-prefetch.pl	360	fetched_together	-
+17-prefetch.pl	396	fetchers_for	-
+17-prefetch.pl	428	fetcher_taken	-
+17-prefetch.pl	442	fetchers_dropped	C14 C30 C5
+17-prefetch.pl	457	ahead_key	-
+17-prefetch.pl	459	ahead_begin	C5
+17-prefetch.pl	476	ahead_sheets	C14 C23 C27
+17-prefetch.pl	499	ahead_fonts	C30 C23 C27
 18-licence-and-support.pl	1	-	C16
 18-licence-and-support.pl	19	licence_key	-
 18-licence-and-support.pl	27	licence_read	-
@@ -743,13 +744,13 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-kept-app.pl	12	kept_app_discord	-
 21-kept-app.pl	20	kept_app_valid	-
 21-kept-app.pl	28	kept_app_budget	-
-21-kept-app.pl	41	kept_app_folder	-
-21-kept-app.pl	56	kept_app_jar	-
-21-kept-app.pl	67	kept_app_request	-
-21-kept-app.pl	76	kept_app_fetched	-
-21-kept-app.pl	87	kept_app_response	-
-21-kept-app.pl	119	kept_app_open_tab	-
-21-kept-app.pl	139	kept_app_visit	-
+21-kept-app.pl	46	kept_app_folder	-
+21-kept-app.pl	61	kept_app_jar	-
+21-kept-app.pl	72	kept_app_request	-
+21-kept-app.pl	85	kept_app_fetched	-
+21-kept-app.pl	96	kept_app_response	-
+21-kept-app.pl	134	kept_app_open_tab	-
+21-kept-app.pl	148	kept_app_visit	-
 21-link.pl	1	-	C31
 21-link.pl	49	link_folder	-
 21-link.pl	50	link_state	C31
@@ -785,13 +786,14 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-live.pl	84	live_read	-
 21-live.pl	97	live_due	C19
 21-live.pl	109	live_turn	C18 C19 C26 C5 C17 C6 C7
-21-live.pl	167	live_asked	C19 C26
-21-live.pl	209	live_early	C19
-21-live.pl	229	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	336	live_parts	C19
-21-live.pl	355	unchunked	-
-21-live.pl	370	live_replied	C19
-21-live.pl	375	live_sent	C19
+21-live.pl	167	page_cap_refused	-
+21-live.pl	192	live_asked	C19 C26
+21-live.pl	242	live_early	C19
+21-live.pl	262	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
+21-live.pl	372	live_parts	C19
+21-live.pl	391	unchunked	-
+21-live.pl	406	live_replied	C19
+21-live.pl	411	live_sent	C19
 21-web-storage.pl	1	-	-
 21-web-storage.pl	7	kept_storage_file	-
 21-web-storage.pl	14	kept_storage_locked	-
@@ -812,15 +814,15 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-websocket.pl	75	ws_valid_text	-
 21-websocket.pl	81	ws_endpoint	-
 21-websocket.pl	94	ws_open	-
-21-websocket.pl	129	ws_upgrade	-
-21-websocket.pl	152	ws_reply	-
-21-websocket.pl	162	ws_close_socket	-
-21-websocket.pl	174	ws_queue_frame	-
-21-websocket.pl	183	ws_page_frame	-
-21-websocket.pl	199	ws_frames_heard	-
-21-websocket.pl	235	ws_pump	-
-21-websocket.pl	245	ws_step	-
-21-websocket.pl	281	ws_end	-
+21-websocket.pl	132	ws_upgrade	-
+21-websocket.pl	155	ws_reply	-
+21-websocket.pl	165	ws_close_socket	-
+21-websocket.pl	177	ws_queue_frame	-
+21-websocket.pl	186	ws_page_frame	-
+21-websocket.pl	202	ws_frames_heard	-
+21-websocket.pl	238	ws_pump	-
+21-websocket.pl	248	ws_step	-
+21-websocket.pl	290	ws_end	-
 22-essential-web.pl	1	-	-
 22-essential-web.pl	17	essential_web_count	-
 22-essential-web.pl	18	essential_web_clear	-
@@ -871,14 +873,14 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 22-permits.pl	565	permit_tag	C26
 22-permits.pl	579	permit_scripted	C26
 22-permits.pl	589	live_permitted	C26
-22-permits.pl	606	permit_visited	C26
-22-permits.pl	617	permits_asked	C26
-22-permits.pl	652	permit_button	C26
-22-permits.pl	660	permit_answered	C26
-22-permits.pl	717	permits_later	C26
-22-permits.pl	722	scripts_set	C26 C4
-22-permits.pl	746	scripts_layer	C26 C4
-22-permits.pl	764	scripts_told	C26
+22-permits.pl	610	permit_visited	C26
+22-permits.pl	622	permits_asked	C26
+22-permits.pl	657	permit_button	C26
+22-permits.pl	665	permit_answered	C26
+22-permits.pl	722	permits_later	C26
+22-permits.pl	727	scripts_set	C26 C4
+22-permits.pl	751	scripts_layer	C26 C4
+22-permits.pl	769	scripts_told	C26
 22-sends.pl	1	-	-
 22-sends.pl	7	send_keys	-
 22-sends.pl	11	sends_told	-

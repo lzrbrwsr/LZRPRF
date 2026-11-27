@@ -1154,7 +1154,36 @@ sub run {
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)
-    become($window_in, $window_out, $TRY ? \*STDERR : undef, '/usr/bin/sandbox-exec', '-D', "HOME=$HOME", '-p', $WINDOW_CONTAINER, $SCRIPT, '-l', 'JavaScript', '-e', window_text() . window_sound_text() . $more, $APP, ($TOR_WINDOW ? 'tor' : $INCOGNITO ? 'incognito' : 'window') . (defined $OPEN_FRAME ? '+' : ''), $OPEN_FRAME // frame_kept());    # T5: a window a tab was pulled out into is told so by a "+" after its kind, and runs without a Dock icon of its own    # the size and place the last window was left at (sub frame_kept), so it opens there and does not jump; a pulled tab's window opens where the tab was let go
+    my $window_source = window_text() . window_sound_text() . $more;
+    my $kind = ($TOR_WINDOW ? 'tor' : $INCOGNITO ? 'incognito' : 'window') . (defined $OPEN_FRAME ? '+' : '');
+    my $frame = $OPEN_FRAME // frame_kept();
+    my ($host, $profile) = window_host($program);
+    my @command = $host ? ($host, $window_source, $APP, $kind, $frame, 'bundled')
+        : ($SCRIPT, '-l', 'JavaScript', '-e', $window_source, $APP, $kind, $frame);
+    become($window_in, $window_out, $TRY ? \*STDERR : undef, '/usr/bin/sandbox-exec', '-D', "HOME=$HOME", '-p', $profile, @command);
+}
+
+# Only the named, hash-paired browser helper may replace the system script host.
+sub window_host {
+    my ($program) = @_;
+    my $fallback = [undef, $WINDOW_CONTAINER];
+    return @$fallback unless $program =~ m{\A(.*/LZRBRWSR(?:-Staging)?[.]app)/Contents/MacOS/lzrbrwsr-bin\z};
+    my $bundle = $1;
+    my $host = "$bundle/Contents/MacOS/lzrbrwsr-window";
+    return @$fallback unless -x $host && !-l $host;
+    my ($expected) = map { /\Afile lzrbrwsr-window ([0-9a-f]{64})\s*\z/ ? $1 : () } release_lines();
+    return @$fallback unless defined $expected && $expected eq (sum_of($host) // '');
+    die "lzrprf: the window host path holds a character lzrprf does not pass on\n" if $host =~ /["\\\n]/;
+    my $profile = $WINDOW_CONTAINER =~ s{[(]literal "/usr/bin/osascript"[)]}{(literal "$host")}r;
+    # The window's container names the program it may run; if the swap found nothing to replace, the helper
+    # would start under a container that does not allow it. Said, not fallen back from (lzr2's review, 2026-11-27).
+    die "lzrprf: the window container names no script host for the window host to replace\n" if $profile eq $WINDOW_CONTAINER;
+    # A home-folder install still needs its public bundle metadata. The
+    # exact entries let CoreFoundation identify the bundle without reading
+    # any sibling file, program or user folder.
+    $profile .= qq{(allow file-read* (literal "$host") (literal "$bundle/Contents/Info.plist")} . "\n"
+        . qq{  (literal "$bundle") (literal "$bundle/Contents") (literal "$bundle/Contents/MacOS"))} . "\n";
+    return ($host, $profile);
 }
 
 sub runs_swept {                          # what runs that have ended left in a folder: a request's socket, the folder of the tries at the start
@@ -1896,6 +1925,9 @@ sub behind {
         elsif ($event =~ m{^import allowed (chrome|edge|brave|vivaldi|firefox|safari) (/[\x20-\x7f]{0,1000})$}) { import_allowed($1, $2); said_noted() }    # [C15] Allow in the Open panel, and the folder chosen in it; a character past ASCII comes as \x7f, and the comparison refuses it
         elsif ($event =~ /^import denied (chrome|edge|brave|vivaldi|firefox|safari)(?: (failed|at-once))?$/) { import_unshown($1, $2) if $2; import_allowed($1, undef); said_noted() }    # Cancel in the Open panel, or a panel the window could not show
         elsif ($event eq 'import cancel') { import_cancelled() }    # the wizard closed: an Open panel asked for and not answered is dropped, so an answer that comes late is not taken
+        elsif ($event =~ /^frames scroll ([0-9]{1,5}) ([0-9]{1,4}) ([0-9]{1,6}) ([0-9]{1,6}) ([0-9]{1,6}) ([0-9]{1,5})$/) {    # ticket 1530: a burst of scrolling as the window measured it
+            link_line('INFO', 'scroll-frames', "A scroll of $1 moves drew $2 times: half the draws took under $3 us, 95 in 100 under $4 us, the slowest $5 us; $6 gaps were over a frame and a half.",
+                moves => $1, draws => $2, draw_p50_us => $3, draw_p95_us => $4, draw_max_us => $5, late_gaps => $6) }
         elsif ($event =~ /^fault / && $DRAWN) { $DRAWN = 0; fault('undrawn') }    # the window could not draw a list that "checked" let through: it shows nothing of it. Taken once for a page that was handed over, and never without one: the window's process cannot open the question about a report whenever it likes
         1 } or unheard($event, $@, $behind, ++$faults);    # Henry 2026-11-24: a page took the whole browser down. An error of lzrprf's own stays in the tab it met
     }
@@ -8290,7 +8322,16 @@ sub fetch {
     my $exit = $how >> 8;
     return (undef, 'the system did not say that curl was in its container') if $loose;
     return (undef, 'you stopped it') if $stopped;
-    return (undef, 'the answer is larger than lzrprf takes') if $capped || length $got > $bytes || $exit == 63 || @links && $links[1][4] > $wire;
+    if ($capped || length $got > $bytes || $exit == 63 || @links && $links[1][4] > $wire) {
+        my $scope = $ask && $ask->{kept_app} ? 'kept-app' : 'page';
+        if (@links && $links[1][4] > $wire) {
+            page_cap_refused($scope, 'fetch-wire', $links[1][4], $wire, 'bytes', 'The incoming transfer exceeded its encrypted wire allowance.');
+        } else {
+            my $value = !$capped && length($got) > $bytes ? length($got) : 'unobserved';
+            page_cap_refused($scope, 'fetch-reply', $value, $bytes, 'bytes', 'The reply exceeded its transfer size allowance.');
+        }
+        return (undef, 'the answer is larger than lzrprf takes');
+    }
     return (undef, $none) if @links && $links[0][4] > $links[0][5];
     return (undef, 'could not connect') if $unreached;
     return (undef, 'the site did not answer in time') if $late || $exit == 28;
@@ -8841,7 +8882,10 @@ sub prefetch_go {                         # ($first, $page): the page $page aske
 
 sub prefetch_soon {                       # [C19] ($live, $dest, $to): "=soon DEST URL", a GET the page's own script set going and makes in a later task (a script it made: yle.fi waited 205, 88 and 280 ms on three, one after another, 2026-11-25). Judged here as sub live_fetched will judge the request, begun with the two lines sub prefetch_pump writes first, and handed over only by sub prefetch_take when the page asks for exactly it. Whatever this refuses is simply not begun: the request says why when it comes
     my ($live, $dest, $to) = @_;
-    return if $live->{home} || $TOR_WANTED || listed($to) || ++$live->{soon} > ($live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST);
+    return if $live->{home} || $TOR_WANTED || listed($to);
+    my $soon_most = $live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST;
+    return page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'prefetch-count', $live->{soon}, $soon_most, 'requests',
+        'The page exceeded its lifetime prefetch allowance.') if ++$live->{soon} > $soon_most;
     my ($url, $host) = address($to);
     return if !$url || $PREFETCH{$url};
     my ($rules) = permit_rules();
@@ -10286,10 +10330,15 @@ sub kept_app_valid {
 sub kept_app_budget {
     my ($app, $requests, $bytes) = @_;
     my $at = now();
-    return if $at >= $app->{until};
+    my $spec = $app->{spec};
+    return page_cap_refused($spec->{name}, 'lifetime', int($at - $app->{until} + $spec->{seconds}), $spec->{seconds}, 'seconds',
+        'The kept-app session expired, so its request was refused.') if $at >= $app->{until};
     my $minute = int($at / 60);
     if ($app->{minute} != $minute) { @$app{qw(minute requests bytes)} = ($minute, 0, 0) }
-    return if $app->{requests} + $requests > $app->{spec}{requests} || $app->{bytes} + $bytes > $app->{spec}{bytes};
+    return page_cap_refused($spec->{name}, 'requests-per-minute', $app->{requests} + $requests, $spec->{requests}, 'requests',
+        'The kept app would exceed its request allowance for this minute.') if $app->{requests} + $requests > $spec->{requests};
+    return page_cap_refused($spec->{name}, 'bytes-per-minute', $app->{bytes} + $bytes, $spec->{bytes}, 'bytes',
+        'The kept app would exceed its transfer allowance for this minute.') if $app->{bytes} + $bytes > $spec->{bytes};
     $app->{requests} += $requests;
     $app->{bytes} += $bytes;
     return 1;
@@ -10326,7 +10375,11 @@ sub kept_app_request {
     my ($line) = @_;
     my ($method, $size, $type, $dest, $auth_bytes, $to) = $line =~
         m{\A=fetch (GET|HEAD|POST|PUT|PATCH|DELETE) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (data|script|module|worker|frame|image) (?:auth ([1-9][0-9]{0,3}) )?([\x21-\x7e]{1,8192})\z};
-    return unless $method && $size <= $LIVE_FETCH_UP && ($auth_bytes // 0) <= 4096;
+    return unless $method;
+    return page_cap_refused('kept-app', 'fetch-upload', $size, $LIVE_FETCH_UP, 'bytes',
+        'The kept-app upload exceeded the relay limit.') if $size > $LIVE_FETCH_UP;
+    return page_cap_refused('kept-app', 'fetch-authorization', $auth_bytes, 4096, 'bytes',
+        'The kept-app authorization field exceeded the relay limit.') if ($auth_bytes // 0) > 4096;
     return if $method =~ /\A(?:GET|HEAD)\z/ && ($size || $type ne '-');
     return ($method, $size, $type, $dest, $auth_bytes // 0, $to);
 }
@@ -10353,7 +10406,11 @@ sub kept_app_response {
         defined filter_said($url, $FILTER_DEST{$dest // 'data'} // $dest, 'discord.com') || shield_said($url) ne 'allow';
     return (undef, 403) unless kept_app_budget($app, 1, 0);
     my $remaining = $app->{spec}{bytes} - $app->{bytes};
-    return (undef, 403) unless $remaining > 0;
+    if ($remaining <= 0) {
+        page_cap_refused($app->{spec}{name}, 'bytes-per-minute', $app->{bytes}, $app->{spec}{bytes}, 'bytes',
+            'The kept app exhausted its transfer allowance for this minute.');
+        return (undef, 403);
+    }
     return (undef, 403) unless record("the kept app asked for $host ($method)");
     my ($where) = find($host);
     return (undef, 403) unless $where && !grep { $_->{own} } @$where;
@@ -10364,6 +10421,8 @@ sub kept_app_response {
     my ($got, $why, $peer, $certs) = @{ kept_app_jar($app, sub {
         return [fetch($url, $where, $ask, $nav, [$reserved, $FETCH_SECONDS])];
     }) };
+    page_cap_refused($app->{spec}{name}, 'fetch-reply', length($got), $reserved, 'bytes',
+        'The kept-app reply exceeded its reserved transfer size.') if defined $got && length($got) > $reserved;
     return (undef, 0) if $why || !defined $got || length($got) > $reserved;    # a failed transfer can still consume its reservation
     $app->{bytes} -= $reserved - length($got);
     my $parts = live_parts($got, $method);
@@ -10382,21 +10441,15 @@ sub kept_app_open_tab {
         tabbed('select', $i);
         return;
     }
-    return idle("A window holds $TABS_MOST tabs at most: close one to open Discord.") if @TABS >= $TABS_MOST;
     my $app = kept_app_discord() or return idle('Discord could not open its private kept-app store.');
-    $source->{shown} = $SHOWN;
-    my $tab = fresh_tab();
-    $tab->{kept_app} = $app;
-    push @TABS, $tab;
-    $TAB = $#TABS;
-    undef $SHOWN;
-    tab_shown('Opening Discord in its kept-app tab.');
-    return go($app->{spec}{start}, 'you opened Discord from LZRCHT');
+    @WAY = ();
+    $WENT = now();
+    return kept_app_visit($source, $app->{spec}{start}, 'you opened Discord from LZRCHT', $app);
 }
 
 sub kept_app_visit {
-    my ($tab, $typed, $how) = @_;
-    my $app = $tab->{kept_app};
+    my ($tab, $typed, $how, $opening) = @_;
+    my $app = $opening // $tab->{kept_app};
     my ($url, $host) = address($typed);
     return idle('This Discord tab opens Discord addresses only.') unless $url && kept_app_valid($app, $url) && $host =~ /\A(?:discord\.com|discord\.gg)\z/;
     my ($got, $status);
@@ -10412,7 +10465,7 @@ sub kept_app_visit {
     my $prior = live_of($tab);
     live_end($prior, 'its kept app went elsewhere', 1) if $prior;
     my $frame = "=sheets\n";
-    my ($lines, undef, $paths, $title, $named, $live) = laid_out($url, $got, $frame, 1, $app);
+    my ($lines, undef, $paths, $said, $named, $live) = laid_out($url, $got, $frame, 1, $app);    # $said: the page's compatibility statement, judged from Discord's static page; the kept app brings its own WebSocket, so it is not shown (ticket 1539: it was the tab's title, "Not supported yet: WebSocket, favicon.")
     return idle('Discord could not draw its page.') unless $lines && $live;
     if (@$named) {
         my @sheets = map {
@@ -10424,12 +10477,16 @@ sub kept_app_visit {
             my @next = laid_out($url, $got, $with, 1, $app);
             if ($next[0] && $next[5]) {
                 live_dropped($live);
-                ($lines, $paths, $title, $live) = @next[0, 2, 3, 5];
+                ($lines, $paths, $said, $live) = @next[0, 2, 3, 5];
                 $frame = $with;
             } else { live_dropped($next[5]) }
         }
     }
-    @$tab{qw(url title says)} = ($url, $title || 'Discord', 'Discord in its kept-app tab.');
+    if ($opening) {
+        cht_end($tab, 'Discord opened in this tab', 1);
+        $tab->{kept_app} = $opening;
+    }
+    @$tab{qw(url title says)} = ($url, 'Discord', 'Discord in its kept-app tab.');
     if (($how // '') !~ /\Ayou (?:went (?:back|forward) to|reloaded)\z/) {
         splice @{ $tab->{visited} }, $tab->{at} + 1;
         push @{ $tab->{visited} }, $url;
@@ -10991,6 +11048,31 @@ sub live_turn {
 # the body is the answer's, its chunks joined, at most $PAGE_BYTES; a HEAD has
 # none. A request refused, failed, or answered in another form is told
 # "=fetched 0 0 0". A request line of no form ends the page.
+sub page_cap_refused {
+    my ($scope, $cap, $value, $limit, $unit, $why) = @_;
+    use feature 'state';
+    state $minute;
+    state %seen;
+    state %last_minute;
+    my $this_minute = int(now() / 60);
+    if (!defined $minute || $minute != $this_minute) {
+        %last_minute = defined $minute && $this_minute == $minute + 1 ? %seen : ();
+        $minute = $this_minute;
+        %seen = ();
+    }
+    my $key = "$scope $cap";
+    if (exists $seen{$key}) {
+        $seen{$key}++;
+        return;
+    }
+    $seen{$key} = 0;
+    my $suppressed = delete $last_minute{$key} // 0;
+    $why .= " $suppressed more refused last minute." if $suppressed;
+    link_line('WARN', 'page-cap', $why, scope => $scope, cap => $cap, value => $value, limit => $limit, unit => $unit)
+        or noted("scope=$scope cap=$cap value=$value limit=$limit unit=$unit | $why");
+    return;
+}
+
 sub live_asked {                          # [C19] the request at the front of what the page wrote: nothing when there is none, 0 while it is not all there, else [its line, its body, the bytes it takes], or [its line] when it is of no form
     my ($live) = @_;
     return kept_storage_asked($live->{held}) if substr($live->{held}, 0, 7) eq '=store ';
@@ -11007,7 +11089,12 @@ sub live_asked {                          # [C19] the request at the front of wh
     my $soon = substr($live->{held}, 0, 6) eq '=soon ';    # [C19] a request the page's script set going, told ahead: one line, no body, answered with nothing (sub prefetch_soon)
     return unless $permit || $soon || substr($live->{held}, 0, 7) eq '=fetch ';
     my $end = index $live->{held}, "\n";
-    if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
+    if ($end < 0 || $end > $LIVE_FETCH_LINE) {
+        return 0 if $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE;
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'relay-line',
+            $end < 0 ? length($live->{held}) : $end, $LIVE_FETCH_LINE, 'bytes', 'The page exceeded the relay command length limit.');
+        return [''];
+    }
     my $line = substr($live->{held}, 0, $end);
     return [$line, '', $end + 1] if $permit || $soon;
     if ($live->{kept_app}) {
@@ -11018,7 +11105,10 @@ sub live_asked {                          # [C19] the request at the front of wh
         return [$line, substr($live->{held}, $end + 1 + $auth_bytes, $size), $end + 1 + $auth_bytes + $size, $auth];
     }
     my ($size) = $line =~ /^=fetch [A-Z]{1,8} (0|[1-9][0-9]{0,5}) / or return [$line];
-    return [$line] if $size > $LIVE_FETCH_UP;
+    if ($size > $LIVE_FETCH_UP) {
+        page_cap_refused('page', 'fetch-upload', $size, $LIVE_FETCH_UP, 'bytes', 'The fetch upload exceeded the page relay limit.');
+        return [$line];
+    }
     return 0 if length($live->{held}) < $end + 1 + $size;
     return [$line, substr($live->{held}, $end + 1, $size), $end + 1 + $size];
 }
@@ -11121,7 +11211,10 @@ sub live_fetched {                        # [C19]
     }
     record($asked_for, $kept) or return live_replied($live, 0, '', '');    # [C5] before the name is even looked up
     my $fetch_most = $live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST;
-    $why = "the page asked for more than $fetch_most addresses" if ++$live->{fetches} > $fetch_most;
+    if (++$live->{fetches} > $fetch_most) {
+        $why = "the page asked for more than $fetch_most addresses";
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'fetch-count', $live->{fetches}, $fetch_most, 'requests', 'The page exceeded its lifetime fetch allowance.');
+    }
     if (!$why) { my $shield = shield_said($url); $why = shield_why($shield) if $shield ne 'allow' }    # [C28] before any DNS lookup, including requests while a page is still being read
     my $where;
     my $sent_ask = { method => $method, type => $type, body => $body, origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => scalar(sso_cookie($url, $live->{host})), top => $allowed eq 'sandbox' ? undef : $live->{url}, as => $as, dest => $dest, from => $live->{host} };
@@ -11454,7 +11547,10 @@ sub ws_open {
     my ($live, $id, $url, $offered) = @_;
     my $app = $live->{kept_app} or return;
     return if $INCOGNITO || $TOR_WANTED || $TOR_WINDOW || $TOR_SESSION || !$live->{until};
-    return if exists $app->{sockets}{$id} || keys(%{ $app->{sockets} }) >= $app->{spec}{sockets};
+    return if exists $app->{sockets}{$id};
+    my $count = keys %{ $app->{sockets} };
+    return page_cap_refused($app->{spec}{name}, 'open-sockets', $count + 1, $app->{spec}{sockets}, 'sockets',
+        'The kept app would exceed its concurrent WebSocket allowance.') if $count >= $app->{spec}{sockets};
     my ($host, $path, $protocols) = ws_endpoint($app, $url, $offered);
     return unless $host && kept_app_budget($app, 1, 0);
     my $address = "https://$host$path";
@@ -11620,7 +11716,13 @@ sub ws_step {
     return ws_close_socket($live, $id, $ws->{close_code}, $ws->{close_reason}) if defined $ws->{close_code} && !length $ws->{out};
     my $got = $socket->sysread(my $part, 65536);
     if ($got) {
-        return ws_close_socket($live, $id) if !kept_app_budget($live->{kept_app}, 0, $got) || length($ws->{in}) + $got > $WS_DOWN + 65546;
+        return ws_close_socket($live, $id) unless kept_app_budget($live->{kept_app}, 0, $got);
+        my $queued = length($ws->{in}) + $got;
+        if ($queued > $WS_DOWN + 65546) {
+            page_cap_refused($live->{kept_app}{spec}{name}, 'socket-read-buffer', $queued, $WS_DOWN + 65546, 'bytes',
+                'The WebSocket was closed because its incoming buffer would exceed the limit.');
+            return ws_close_socket($live, $id);
+        }
         $ws->{in} .= $part;
     } elsif (defined $got || !($socket->want_read || $socket->want_write || $!{EAGAIN} || $!{EINTR})) {
         return ws_close_socket($live, $id);
@@ -12416,7 +12518,11 @@ sub live_permitted {                      # [C26] "=permit KIND ORIGIN SHA256 CA
     my ($live, $line) = @_;
     my ($kind, $origin, $sha, $caps) = $line =~ /\A=permit ($PERMIT_KIND) ($PERMIT_ORIGIN) ([0-9a-f]{64}) ($PERMIT_CAPS)\z/ or return live_end($live, 'it wrote a line of no form');
     my $most = $live->{kept_app} ? $LIVE_PERMIT_KEPT_MOST : $LIVE_PERMIT_MOST;
-    return live_end($live, "it asked more than $most times whether a script may run") if ++$live->{permits} > $most;
+    if (++$live->{permits} > $most) {
+        page_cap_refused($live->{kept_app} ? $live->{kept_app}{spec}{name} : 'page', 'script-permits', $live->{permits}, $most, 'requests',
+            'The page exceeded its lifetime script permission allowance.');
+        return live_end($live, "it asked more than $most times whether a script may run");
+    }
     $origin = lc $origin;
     my $site = "https://$live->{host}";
     my ($rules) = permit_rules();
@@ -12437,7 +12543,8 @@ sub permit_visited {                      # [C26] a visit begins: what you allow
     $PERMIT_ROUND = defined $PERMIT_RELOAD && $PERMIT_RELOAD eq $url ? $PERMIT_ROUND + 1 : 0;
     undef $PERMIT_RELOAD;
     $PERMIT_ASK = { site => $site, url => $url, items => {}, stripped => 0, refused => 0, boxed => 0 };
-    undef $PERMIT_PENDING;                # a question of the page before that you left unanswered is Deny Once, as it always was; a late answer to it is not taken
+    window("permit answered $PERMIT_PENDING->{n}") if $PERMIT_PENDING;
+    undef $PERMIT_PENDING;                # an unanswered question from the previous page is Deny Once
 }
 
 sub permits_asked {                       # [C26] once the page is drawn: its scripts no rule allows, and what was taken out of it or refused, put to you, each by its name and with its source: Deny Once, Deny Always, Allow Once, Always Allow. Deny Once is the first button and the answer when nobody answers; Deny Always keeps a deny rule, and a script a deny rule names is never put to you again. Returns true when the page is to be loaded again with what you allowed
@@ -14659,7 +14766,7 @@ var TRMNL_SHORTCUTS = { 'c \\': 'split-right', 'cs d': 'split-down', 'cs w': 'cl
 var TRMNL_NAMED_KEYS = { 123: 'left', 124: 'right', 125: 'down', 126: 'up', 116: 'pageup', 121: 'pagedown' }, TRMNL_KEY_GLYPHS = { left: 0xF702, right: 0xF703, down: 0xF701, up: 0xF700, pageup: 0xF72C, pagedown: 0xF72D };
 var trmnlOffered = [], trmnlHand = null;
 function trmnlMethods(methods) {    // the methods of LzrprfLaid, with the terminal's own added
-    methods['scrollWheel:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlWheeled(event)) canvas.nextResponder.scrollWheel(event); } };    // on any other page the wheel goes where it always went
+    methods['scrollWheel:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlWheeled(event)) { canvas.nextResponder.scrollWheel(event); try { momentumMore(event); } catch (lost) { } } } };    // OBSERVABILITY-EXEMPT(the extra of a momentum move left out is the system's own move alone)    // on any other page the wheel goes where it always went
     var pressed = methods['mouseDown:'].implementation, typed = methods['keyDown:'].implementation;
     methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; trmnlPressAt = Date.now(); pressed(event); } };    // a press starts a selection afresh, and is the press a copy of LZRCHT's answers [C32]
     methods['mouseDragged:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragged(event); } };
@@ -15711,12 +15818,12 @@ sub cht_unlinked {                        # a connector ended: its connection wi
 }
 
 sub cht_end {                             # LZRCHT ended: every role and every connection
-    my ($tab, $why) = @_;
+    my ($tab, $why, $replacing) = @_;
     my $c = delete $tab->{cht} or return;
     cht_box_end($_) for cht_boxes($c);
     noted("LZRCHT ended: $why");
     $tab->{says} = "LZRCHT ended: $why.";
-    return unless $tab == $TABS[$TAB];
+    return if $replacing || $tab != $TABS[$TAB];
     window("page $TAB", @{ $c->{sent} // [] }, '.');
     live_told();
     idle($tab->{says});
@@ -17088,7 +17195,7 @@ function webReviewOpened() {
 function webReviewEnded(resolved) {
     var again = webReturn;
     webReturn = null;
-    if (resolved) { permitLater = null; closeModal(); }
+    if (resolved) { permitLaterSet(null); closeModal(); }
     else if (again) again();
 }
 END
@@ -17377,6 +17484,27 @@ function layersTold(rest) {    // "layers T ITEMS" for the tab shown, onto the l
 // elsewhere. A line for a tab not shown is passed over. Nothing is said while no page is kept running, or the
 // page shown is not a laid one.
 var scrollSaid = null, scrollDue = false, scrollGen = 0, scrollDueGen = 0, scrollWanted = null, SCROLL_FRAME = 1 / 60;    // DECLARED(one frame of the screen: the most often a page is told it moved)
+// Ticket 1530: the frames of a scroll, measured where they are made. Each burst of scrolling (moves with less than
+// FRAMES_QUIET_MS between them) keeps the time each drawRect of the page took and the gaps between the moves; when it
+// ends, one line "frames scroll MOVES DRAWS P50_US P95_US MAX_US LATE" goes to lzrprf, which writes it to the link's log.
+// LATE counts the gaps over FRAMES_LATE_MS: a frame the screen showed twice. Nothing is kept past the line.
+var frames = null, FRAMES_QUIET_MS = 400, FRAMES_LATE_MS = 25, FRAMES_MOST = 2048;    // DECLARED(400 ms: past a momentum's last move; 25 ms: one and a half frames at 60 Hz; 2048 draws: past a 30 s burst)
+function framesNow() { return $.NSDate.timeIntervalSinceReferenceDate * 1000; }
+function framesMoved() {
+    var t = framesNow();
+    if (!frames) { frames = { moves: 0, draws: [], late: 0, last: t }; hand.performSelectorWithObjectAfterDelay('framesDue:', $(), FRAMES_QUIET_MS / 1000); }
+    else if (t - frames.last > FRAMES_LATE_MS) frames.late++;
+    frames.moves++; frames.last = t;
+}
+function framesDrawn(ms) { if (frames && frames.draws.length < FRAMES_MOST) frames.draws.push(ms); }
+function framesDue() {
+    if (!frames) return;
+    var idle = framesNow() - frames.last;
+    if (idle < FRAMES_QUIET_MS) return hand.performSelectorWithObjectAfterDelay('framesDue:', $(), (FRAMES_QUIET_MS - idle) / 1000 + 0.01);
+    var d = frames.draws.slice().sort(function (a, b) { return a - b; }), us = function (q) { return d.length ? Math.round(d[Math.min(d.length - 1, Math.floor(q * d.length))] * 1000) : 0; };
+    say('frames scroll ' + Math.min(frames.moves, 99999) + ' ' + d.length + ' ' + Math.min(us(0.5), 999999) + ' ' + Math.min(us(0.95), 999999) + ' ' + Math.min(us(1), 999999) + ' ' + Math.min(frames.late, 99999));
+    frames = null;
+}
 function pageScrollNow() {
     if (!sheet || !canvas || !scroll.documentView.isEqual(canvas)) return null;
     var at = canvas.visibleRect.origin;
@@ -17501,7 +17629,7 @@ function heard(line) {
     else if (word == 'welcome') welcomeTold(rest);
     else if (word == 'brief') briefNext = rest;    // the few words the strip shows in place of the next line's; the line in full is the strip's tip
     else if (word == 'log') logTold(rest);
-    else if (word == 'ask') { if (!startupReady) { startupReady = true; if (startupRequested) shown(); } asked++; if (logClosing) { briefNext = null; say('button ' + asked + ' 1'); } else if (torAsking) torAsked(rest.split('\t')); else strip(rest.split('\t'), false, true); }    // the log page was closed: what lzrprf still asks about the log is answered by the first button, which changes nothing; Stop Tor's question stands in the Tor modal
+    else if (word == 'ask') { if (!startupReady) { startupReady = true; if (startupRequested) shown(); } asked++; if (logClosing) { briefNext = null; say('button ' + asked + ' 1'); } else if (torAsking) torAsked(rest.split('\t')); else askModal(rest.split('\t')); }    // the log page was closed: what lzrprf still asks about the log is answered by the first button, which changes nothing; Stop Tor's question stands in the Tor modal
     else if (word == 'address' && aside) { if (drawings[perlTab]) drawings[perlTab].address = rest; }
     else if (word == 'address') { bar.stringValue = $(rest); current = rest; listing = null; suggestHidden(); pieces(); redrawn(); }
     else if (word == 'nav' && aside) { }
@@ -17516,7 +17644,7 @@ function heard(line) {
     else if (word == 'pictures') { picturesRow = true; picturesBlocked = rest == 'block'; if (cogOpen) cogPlaced(); }
     else if (word == 'marksbar') { marksOn = rest == 'on'; marksView.hidden = !marksOn; if (barMenuItem) barMenuItem.title = $(barToggleWords(marksOn, true)); place(); }
     else if (word == 'flagged' || word == 'flagreport') flagTold(word, rest);    // [C28] LZRDFNDR's red page, and the report of a wrong block before it is sent
-    else if (word == 'permit') { if (/^answered [0-9]+$/.test(rest)) { if (rest == 'answered ' + asked) { permitLater = null; if (modalKind == 'permit') closeModal(); if (toolIcon) toolIcon.needsDisplay = true; } } else permitTold(rest); }    // [C26] lzrprf's question about the scripts of the page shown
+    else if (word == 'permit') { if (/^answered [0-9]+$/.test(rest)) { if (permitLater && rest == 'answered ' + permitLater.number) permitLaterSet(null); if (rest == 'answered ' + asked && permitAsked == asked && (modalKind == 'permit' || modalKind == 'tall')) closeModal(); } else permitTold(rest); }    // [C26] lzrprf's question about the scripts of the page shown
     else if (word == 'permitscript') permitScriptTold(rest);    // [C26] one script of that question, with its source
     else if (word == 'scripts') scriptsTold(rest);    // [C26] the list of LZRDFNDR scripts
     else if (word == 'webquestion') webQuestionTold(rest);
@@ -17721,7 +17849,7 @@ function laid(lines, first) {
         for (var b = Math.floor(op[0] / 256); b <= Math.floor((op[0] + op[1]) / 256); b++) (next.buckets[b] || (next.buckets[b] = [])).push(i);
     });
     var kept = restoring === null ? reloadPlaced() : (reloadPlace = null), share = restoring !== null ? restoring : again && sheet && sheet.high > 0 ? Math.min(1, Math.max(0, canvas.visibleRect.origin.y / sheet.high)) : 0;    // a tab chosen again is shown where it was read in it; a page laid out again at a new width where it was read, as a share of its height; a new page from its top
-    restoring = null;
+    var restoringWas = restoring; restoring = null;
     sheet = next; pageBack(false);
     if (again) videosPlaced(); else videosEnded();    // [C22] the same page at another width, or drawn again by its scripts, keeps its videos playing
     if (!scroll.documentView.isEqual(canvas)) scroll.documentView = canvas;
@@ -17733,7 +17861,12 @@ function laid(lines, first) {
             if (next.ops[i]) touched.push(next.ops[i]);
         }
         touched.forEach(function (op) { canvas.setNeedsDisplayInRect($.NSMakeRect(0, op[0] - 2, next.wide, op[1] + 4)); });
-    } else { fit(); canvas.scrollPoint($.NSMakePoint(0, kept ? kept.y : Math.round(share * sheet.high))); }
+    } else {
+        // Ticket 1536: a page drawn again at the same width while it loads keeps the place read, in points, not its share of the
+        // height: a page growing under the view moved what was read down by share x the growth at every drawing (the jerk).
+        var held = again && previous && previous.wide == next.wide && !kept && restoringWas === null ? Math.round(canvas.visibleRect.origin.y) : null;
+        fit(); canvas.scrollPoint($.NSMakePoint(0, kept ? kept.y : held !== null ? held : Math.round(share * sheet.high)));
+    }
     if (kept) kept.last = Math.round(canvas.visibleRect.origin.y); listed(lines.slice(0, first));    // where the view stands now: a shorter drawing stops short, and the next one is put at the place again
     if (findOpen) findRun(); namedSettled();
     drawn(lines.length, characters);
@@ -18198,6 +18331,8 @@ function shareNow() { return sheet && sheet.high > 0 && scroll.documentView.isEq
 // press already showed it; a tab closed while lzrprf is free leaves the strip in this frame too, the next
 // shown with its kept drawing (tabClosed). Only an open question or modal takes the press instead.
 function tabSaid(line, closed, kept) {
+    if (asking && !askAnswered(1)) return;    // no box holds the tabs: a question standing is answered by its first button, the answer when nobody answers
+    if (modalOpen && modalActions.length) closeModal();    // and a modal steps aside; the installer's while it runs (no button) still holds them
     if (modalOpen || asking) return;
     if (closed !== undefined && tabs.length < 2 && /^tab close /.test(line)) { win.performClose($()); return; }    // T6 (Henry, 2026-11-26): closing the last tab closes the window, as the red dot does, and no empty tab is opened in its place
     var chose = /^tab select (\d+)$/.exec(line), to = chose ? +chose[1] : undefined;
@@ -19116,7 +19251,7 @@ var shot = null, shotView = null, shotParts = null, SHOT_FLY = 0.11, SHOT_FLASH 
 function homeActionShot(action) {
     if (!homePress || Date.now() - homePress.at > 1000 || !flightAllowed()) return;
     var target = action == 'search' ? bar : tabsView, k = layersKit(), now = $.NSProcessInfo.processInfo.systemUptime;    // Core Animation's clock
-    var to = action == 'search' ? $.NSMakePoint(PILL.origin.x + PILL.size.width / 2 - bar.frame.origin.x, bar.frame.size.height / 2)    // T4 (Henry, 2026-11-26): the horizontal middle of the search box, the pill the bar is drawn in (both in the bar's row)
+    var to = action == 'search' ? searchPlaceholderCenter(bar)
         : $.NSMakePoint(TABS_X + (tabs.length + 0.5) * Math.max(1, Math.min(260, Math.floor((tabsView.frame.size.width - TABS_X - 48) / (tabs.length + 1)))), tabsView.frame.size.height / 2);
     if (!shotView) { shotView = $.LzrprfLayers.alloc.initWithFrame(root.bounds); shotView.layer = k.layer.layer; shotView.wantsLayer = true; root.addSubview(shotView); shotParts = [k.shape.layer, k.shape.layer]; shotParts.forEach(function (one) { shotView.layer.addSublayer(one); }); }
     shotView.frame = root.bounds; shotView.hidden = false;
@@ -19662,9 +19797,9 @@ function toolIconDrawn(view) {
     var size = view.frame.size, cx = size.width / 2, cy = size.height / 2, hot = hover.toolIcon && !modalOpen, lit = modalOpen && modalKind == 'tool', parts = toolParts(cx, cy);
     if (hot) glass($.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1, 1, size.width - 2, size.height - 2), 7, 7), true);
     stroked(parts[0], lit ? GREEN : hot ? WHITE : ICON, 1.2, lit || hot ? GREEN : null, 7);
-    stroked(parts[1], toolBack ? YELLOW : GREEN, 1.3, toolBack ? YELLOW : GREEN, 5);    // the beam is always lit; yellow once something you switched off came back
+    stroked(parts[1], toolBack ? YELLOW : GREEN, 1.3, toolBack ? YELLOW : GREEN, 5);
+    permitLaterBadge(size);
 }
-
 // What the page is made of, in the modal every other panel uses (centred, over the veil), larger
 // than the others: the application's list as lzrprf checked it, and lzrprf's sentence that it
 // checked the form of the list and not its truth. The last row of the lock's panel opens it, flying out of
@@ -20021,6 +20156,28 @@ function torAsked(parts) {    // [C17] lzrprf's question of Stop Tor, in the mod
         modal(torTitle(), '', torChoices(), 'tor'); torChanged(); }; };
     modal('Stop Tor?', parts[0], parts.slice(1).map(function (title, i) { return [title, answer(i + 1)]; }), 'small');
 }
+// lzrprf's own questions (the report of a page the window could not draw, and every other ask) stand in the modal
+// every other box of the window uses, not in the black strip at the bottom (Henry, 2026-11-27, ticket 1535). The
+// title is the words up to their first question mark, the rest the words under it. A press answers as the strip's
+// buttons did; a tab closed or a page asked for while it stands answers it with its first button, the answer when
+// nobody answers, so no box holds the window (askAnswered, from the tab strip and the bar).
+var askNumber = 0;
+function askModal(parts) {
+    var words = parts[0] || '', q = words.indexOf('?'), number = asked;
+    var title = q > 0 && q < 160 ? words.slice(0, q + 1) : 'LZRBRWSR', about = q > 0 && q < 160 ? words.slice(q + 1).trim() : words;
+    askNumber = number;
+    asking = true; free = false; bar.enabled = false;
+    var answer = function (i) { return function () { askAnswered(i); }; };
+    modal(title, about, parts.slice(1).filter(function (t) { return t; }).map(function (t, i) { return [t, answer(i + 1)]; }), 'ask');
+}
+function askAnswered(i) {    // true when a question stood and is answered now
+    if (!askNumber || askNumber != asked) { askNumber = 0; return false; }
+    askNumber = 0; asking = false;
+    if (modalOpen && modalKind == 'ask') closeModal();
+    strip(['']); say('button ' + asked + ' ' + (i || 1));
+    return true;
+}
+
 function torTold(rest) {
     var parts = rest.split(' '), word = parts[0];
     if (torState == 'stopping') return;    // the stop is lit by the steps of the window's end alone (torSessionTold)
@@ -20278,7 +20435,7 @@ function placeModal() {
     if (!veil) return;
     var all = root.frame, wide = all.size.width, high = all.size.height, M = 18, big = modalKind == 'big';    // M: the room around the panel its glow is drawn in
     var wizard = modalKind == 'wizard', tech = modalKind == 'tech', tor = modalKind == 'tor', w = Math.min(big || modalKind == 'permit' ? 780 : wizard ? 660 : tech ? TECH_WIDE : tor ? 640 : modalKind == 'tool' ? TOOL_WIDE : modalKind == 'support' ? 640 : 580, wide - 48), h = big ? Math.min(welcoming ? 820 : 560, high - 48) : modalKind == 'permit' ? Math.min(620, high - 48) : tech ? Math.min(TECH_HIGH, high - 48) : wizard ? Math.min(470, high - 48) : modalKind == 'form' ? 330 : modalKind == 'tall' ? 310 : modalKind == 'flag' ? 340 : modalKind == 'engine' || modalKind == 'licence' || modalKind == 'profile' ? 330 : modalKind == 'support' ? Math.min(620, high - 48) : tor ? 320 : modalKind == 'tool' ? Math.min(TOOL_HIGH, high - 48) : modalKind == 'modules' ? Math.min(400, high - 48) : modalKind == 'tnnl' ? Math.min(tnnlVpn ? 420 : 250, high - 48) : 230;
-    veil.frame = $.NSMakeRect(0, 0, wide, high);
+    veil.frame = $.NSMakeRect(0, 0, wide, high - TABS_HIGH);    // the tab strip stays free under every modal: a tab can always be chosen or closed (Henry, 2026-11-27, ticket 1535)
     panel.frame = $.NSMakeRect(Math.round((wide - w) / 2) - M, Math.round((high - h) / 2) - M, w + 2 * M, h + 2 * M);
     panel.needsDisplay = true;
     panelTitle.frame = $.NSMakeRect(M + 26, M + h - 52, w - 52, 28);
@@ -20379,7 +20536,7 @@ function permitCodeText(scripts) {    // the code block: each script under a lin
 }
 function permitTold(rest) {
     asked++;
-    var parts = rest.split('\t'); parts.essential = essentialScriptPrompt; essentialScriptPrompt = false;
+    permitLaterSet(null); var parts = rest.split('\t'); parts.essential = essentialScriptPrompt; essentialScriptPrompt = false;
     permitShow(parts, permitAsked = asked, permitShown = permitScripts);    // drawn by permitShow (28-window1-tabs.pl), which also minimizes it
     permitScripts = [];
 }
@@ -20974,10 +21131,22 @@ ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: c
     'menuForEvent:': { types: ['id', ['id']], implementation: function (event) { return inspectMenu(true); } }
 }) });
 
+// Ticket 1530 part 2 (Henry: "momentum a bit faster"): after the scroll view took a momentum move of a fling (the page's
+// wheel hands it on, 24-trmnl-window.pl), the page goes MOMENTUM_EXTRA further, clamped to the page. No class calls
+// ObjC.super for it: the move is added on the clip view the scroll view has just moved.
+var MOMENTUM_EXTRA = 0.25;    // DECLARED(Henry asked for a bit faster: a quarter more distance per momentum move)
+function momentumMore(event) {
+    if (!event.momentumPhase || !event.hasPreciseScrollingDeltas || !scroll.documentView.isEqual(canvas)) return;
+    var clip = scroll.contentView, at = clip.bounds.origin, room = Math.max(0, canvas.frame.size.height - clip.bounds.size.height);
+    var y = Math.max(0, Math.min(room, at.y - event.scrollingDeltaY * MOMENTUM_EXTRA));
+    if (y == at.y) return;
+    clip.scrollToPoint($.NSMakePoint(at.x, y)); scroll.reflectScrolledClipView(clip);
+}
 ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
     // A laid page is measured from its top, as the application laid it out. It has no menu of its own.
     'isFlipped': { implementation: function () { return true; } },
-    'drawRect:': { implementation: function (dirty) { viewDrawn('laid', function () { paint(dirty); }); } },
+    'isOpaque': { implementation: function () { return true; } },    // paint() fills white under everything: the compositor blends nothing under it
+    'drawRect:': { implementation: function (dirty) { viewDrawn('laid', function () { var began = framesNow(); paint(dirty); framesDrawn(framesNow() - began); }); } },
     'acceptsFirstResponder': { implementation: function () { return liveOn; } },    // the keyboard only for a page kept running
     'mouseDown:': { implementation: function (event) { pageClicked(event); } },
     'acceptsFirstMouse:': { types: ['bool', ['id']], implementation: function (event) { return true; } },    // H-0074, and Henry 2026-11-24: the press that brings the window forward is the page's too, a site's page as the home (clickThrough, 28-window1-tabs.pl); an incognito window is a process of its own that macOS does not bring forward, so a first press there was lost
@@ -21165,8 +21334,9 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowDidEnterFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
     'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },    // full screen keeps the system's own options, which hide the menu bar and show it at the top: options of its own (auto-hide toolbar on a window with no toolbar) hung a window that opened in full screen (release 131, 2026-11-26)
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },
-    'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { pageScrollMoved(); } },
+    'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { framesMoved(); pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
+    'framesDue:': { types: ['void', ['id']], implementation: function (sender) { try { framesDue(); } catch (fault) { frames = null; } } },
     'unlaid:': { types: ['void', ['id']], implementation: function (sender) { unlaid(); page.string = $(''); listed([]); } },
     // Return sends the typed address; nonplain characters make the entire address invalid.
     'go:': { types: ['void', ['id']], implementation: function (sender) {
@@ -21525,14 +21695,29 @@ function veilPressed(event) {
 // [C26] The question about scripts can be minimized (ticket 1230): Minimize closes it unanswered, so the page and the window go
 // on as with Deny Once, the answer when nobody answers, and the LZRDFNDR icon brings it back while it is still the newest
 // question. A newer question, or the page going on to another, ends it: lzrprf takes no late answer (sub permit_visited).
-var permitLater = null;    // { parts, number, scripts } of the question minimized, or null
+var permitLater = null;    // lzrprf sends only one unanswered script question at a time
+function permitLaterSet(question) {
+    permitLater = question;
+    if (toolIcon) toolIcon.needsDisplay = true;
+}
+function permitLaterBadge(size) {
+    if (!permitLater || permitLater.number != asked) return;
+    var bubble = $.NSMakeRect(size.width - 12, size.height - 12, 11, 11);
+    GREEN.setFill;
+    $.NSBezierPath.bezierPathWithOvalInRect(bubble).fill;
+    centred(styled('1', inked(sans(8, true), DARK)), bubble.origin.x + 5.5, bubble.origin.y, 0);
+}
 function permitShow(parts, number, scripts) {
     // Forget is a choice of the site's LZRDFNDR settings, not of the question (Henry, 2026-11-26).
     var answerByPosition = [4, 3, 2, 1];
     var choices = ASK_PILLS.map(function (choice, i) {
-        return [choice[0], function () { permitLater = null; closeModal(); say('button ' + number + ' ' + answerByPosition[i]); }];
+        return [choice[0], function () { permitLaterSet(null); closeModal(); say('button ' + number + ' ' + answerByPosition[i]); }];
     });
-    choices.push(['Minimize', function () { permitLater = { parts: parts, number: number, scripts: scripts }; closeModal(); if (toolIcon) toolIcon.needsDisplay = true; }]);
+    choices.push(['Minimize', function () {
+        permitLaterSet({ parts: parts, number: number, scripts: scripts });
+        modalFrom = toolIcon;
+        closeModal();
+    }]);
     modal('LZRDFNDR scripts', parts[1] || '', choices, scripts.length ? 'permit' : 'tall');
     if (parts.essential) webWarning('script', function () { permitShow(parts, number, scripts); });
     if (!scripts.length) return;
@@ -21542,10 +21727,12 @@ function permitShow(parts, number, scripts) {
     panelText.scrollRangeToVisible($.NSMakeRange(0, 0));
 }
 function permitReopened() {    // true when the LZRDFNDR icon brought a minimized question back
-    if (!permitLater || permitLater.number != asked) { permitLater = null; return false; }
-    var later = permitLater; permitLater = null;
+    if (!permitLater || permitLater.number != asked) { permitLaterSet(null); return false; }
+    var later = permitLater; permitLaterSet(null);
+    flyNext = { icon: toolIcon, at: Date.now() };
     permitShown = later.scripts; permitAsked = later.number;
     permitShow(later.parts, later.number, later.scripts);
+    firstFlown();
     return true;
 }
 // The window, continued from 28-window.pl (split there at 800+ lines, HC-0843): LZRDFNDR's Show all
@@ -21803,6 +21990,13 @@ function partsMade() {    // the boxes of the two modals, made once with the pan
     tnnlTick = tick('Use also VPN: your own WireGuard VPN under Tor', 0, 'vpn:');
 }
 
+// Aim at the visible placeholder text inside the field, even when it is clipped.
+function searchPlaceholderCenter(field) {
+    var text = field.cell.drawingRectForBounds(field.bounds);
+    var width = Math.max(0, Math.min(text.size.width, field.placeholderAttributedString.size.width));
+    return $.NSMakePoint(text.origin.x + width / 2, text.origin.y + text.size.height / 2);
+}
+
 function run(argv) {
     NAME = (argv[0] || NAME).replace(/-Staging$/, ' - Staging');    // the staging application, LZRBRWSR-Staging.app, is named "LZRBRWSR - Staging" in the menu bar (Henry, 2026-11-26)
     PULLED = /\+$/.test(argv[1] || '');    // T5: "+" after the kind, said by lzrprf for a window a tab was pulled out into (sub pulled_command, --open)
@@ -21813,7 +22007,7 @@ function run(argv) {
     $.NSProcessInfo.processInfo.processName = $(NAME);
     app = $.NSApplication.sharedApplication;
     app.setActivationPolicy(kind());
-    menuBarNamed(NAME);
+    if (argv[3] !== 'bundled') menuBarNamed(NAME);
     app.applicationIconImage = icon(256);
     hand = $.LzrprfHand.alloc.init;
     app.delegate = hand;
@@ -21893,6 +22087,9 @@ function run(argv) {
     second.hidden = true;
     scroll = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640));
     scroll.hasVerticalScroller = true;
+    // Ticket 1530: the page scrolls on Core Animation. Layer-backed, the scroll view moves what is drawn already on the
+    // compositor and asks the page to draw only the strip a move uncovers, where it drew the whole view each frame.
+    scroll.wantsLayer = true; canvas.wantsLayer = true;
     scroll.autoresizingMask = 2 | 16;
     page = unchecked($.LzrprfPage.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640)));
     page.editable = false;

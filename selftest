@@ -1273,6 +1273,7 @@ function kind() { return 2; }                // no place in the Dock, no menu ba
 function shown() { }                         // and the window is never put on the screen
 var step = 0, pictures = 0;
 function plain(text) { return String(text).replace(/[^\x20-\x7e]/g, '?'); }
+function askButton(i) { return modalOpen && modalKind == 'ask' && panelButtons[i] ? panelButtons[i].title.js : ''; }    // lzrprf's question stands in the modal now, not in the strip (ticket 1535)
 function links() {
     var store = page.textStorage, found = 0;
     for (var at = 0; at < store.length; at++) if (!store.attributeAtIndexEffectiveRange($.NSLinkAttributeName, at, null).isNil()) found++;
@@ -1906,14 +1907,14 @@ function menuBarTried() {    // the menus in the bar, File's and Help's items, a
 }
 function told(word, rest) {
     if (step == 0 && word == 'idle') { step = 1; say('test homeprivate ' + homeRequestTried()); say('test menubar ' + menuBarTried()); say('test start title=' + win.title.js + ' visible=' + win.visible + ' policy=' + app.activationPolicy + ' bar=' + bar.stringValue.js + ' enabled=' + bar.enabled + ' menu=' + app.mainMenu.itemAtIndex(0).submenu.title.js); bar.stringValue = $(GO); bar.performClick(null); }
-    else if (step == 1 && word == 'ask') { step = 2; say('test asked ' + first.title.js + '|' + second.title.js + '|bar=' + bar.enabled + '|' + plain(words.stringValue.js).slice(0, 60)); second.performClick(null); }
+    else if (step == 1 && word == 'ask') { step = 2; say('test asked ' + askButton(0) + '|' + askButton(1) + '|bar=' + bar.enabled + '|' + plain(panelTitle.stringValue.js + ' ' + panelSub.stringValue.js).slice(0, 60)); modalActions[1](); }
     else if (step == 2 && word == 'idle') { step = 3; if (typeof inspectWindowTried == 'function') say('test inspector ' + inspectWindowTried()); say('test pagepress ' + pagePressTried()); say('test layers ' + layersTried()); say('test layerorientation ' + layersOrientationTried()); say('test homeactions ' + homeActionsTried()); say('test page title=' + win.title.js + ' visible=' + win.visible + ' drawn=' + pictures + ' links=' + links() + ' editable=' + page.editable + ' menu=' + page.menuForEvent(null).numberOfItems + ' bar=' + bar.stringValue.js + ' strip=' + plain(words.stringValue.js) + ' words=' + plain(words.toolTip.js) + ' text=' + plain(page.string.js)); say('test made ' + plain(made.string.js)); say('test hover ' + hovers()); say('test winmove ' + windowMoves()); say('test secure ' + (secureLines ? secureLines.length + ' ' + secureLines.filter(function (one) { return one.charAt(0) == '#'; }).join('|') : 'none')); say('test nav ' + navState.join(' ')); say('test suggest ' + suggested('site.t').map(function (one) { return one.kind + ' ' + one.url; }).join('|') + ' none=' + suggested('nowhere-at-all').length); secureToggled(); secureTech.performClick(null); say('test tech open=' + techOpen + ' shown=' + (!veil.hidden && modalKind == 'tech' && !under.hidden && panel.frame.size.width > 700) + ' list=' + under.superview.isEqual(panel) + ' tips=' + secureTech.title.js + ' flies=' + (flightAllowed() ? !!flight && flight.opening && flight.from.w == secureTech.frame.size.width : 'still')); techToggled(); say('test techclosed ' + techOpen + ' back=' + (flightAllowed() ? (flight && !flight.opening ? 'flew' : 'none') : 'still')); logPressed(); }
-    else if (step == 3 && word == 'ask') { step = 5; say('test log a question came: ' + first.title.js + '|' + second.title.js); app.terminate(null); }    // with nothing kept and no log, the Log button has no question
+    else if (step == 3 && word == 'ask') { step = 5; say('test log a question came: ' + askButton(0) + '|' + askButton(1)); app.terminate(null); }    // with nothing kept and no log, the Log button has no question
     else if (step == 3 && word == 'idle') { step = 5; say('test log ' + plain(words.toolTip.js).slice(0, 600) + '|' + listing + ' strip=' + plain(words.stringValue.js) + '|' + plain(logRows.map(function (row) { return row.heading || row.what; }).join('|')).slice(0, 2000)); say('test logmade ' + plain(made.string.js)); logs.performClick(null); say('test logshut ' + listing + ' page=' + !scroll.hidden); say('test find ' + findTried()); say('test toolpanel ' + toolTried()); say('test toolcopy ' + toolCopyTried()); say('test toolall ' + toolAllTried()); say('test permitcode ' + permitCodeTried()); say('test sitestab ' + sitesTabTried()); say('test redirectstab ' + redirectsTabTried()); say('test toolshow ' + toolShowTried()); say('test toolsatellite ' + satelliteTried()); say('test footer ' + footerTried()); say('test note ' + noteTried()); say('test licencepanel ' + licenceTried()); say('test supportpanel ' + supportTried()); say('test profilespanel ' + profilesTried()); say('test ssopicker ' + ssoPickerTried()); say('test logpaths ' + logTried()); say('test importkept ' + importKeptTried()); say('test flight ' + flightTried()); say('test tries ' + tries(PORT, FILE, SECRET, KEEP, TEMP, NUMBERED, OUTSIDE, SETTINGS)); more(); }
     else if (step == 6 && word == 'idle') { step = 7; say('test idlehome ' + idleCost(2)); bar.stringValue = $(GO2); bar.performClick(null); }
-    else if (step == 7 && word == 'ask') second.performClick(null);
+    else if (step == 7 && word == 'ask') modalActions[1]();
     else if (step == 7 && word == 'busy' && /^Fetching (?!picture|style)/.test(rest) && !modalOpen && !asking) { step = 8; tabSaid('tab select 0'); drawnBefore = pictures; say('test pressed selected=' + selected + ' pending=' + (pendingTab ? pendingTab.line : 'none') + ' text=' + plain(page.string.js).slice(0, 40)); }
-    else if (step == 8 && word == 'ask') second.performClick(null);
+    else if (step == 8 && word == 'ask') modalActions[1]();
     else if (step == 8 && word == 'idle' && pendingTab === null && !free) step = 9;    // the press waited for this idle, and has just been said to lzrprf
     else if (step == 9 && word == 'idle') { step = 10; say('test kept selected=' + selected + ' tabs=' + tabs.length + ' drawn=' + (pictures - drawnBefore) + ' pending=' + (pendingTab === null) + ' kept1=' + !!drawings[1] + ' text=' + plain(page.string.js).slice(0, 40)); say('test idlepage ' + idleCost(2)); app.terminate(null); }
 }
@@ -3576,11 +3577,11 @@ function told(word, rest) {
     }
     else if (clickStep == 'log' && (word == 'idle' || word == 'ask')) {
         say('test logpress heard=' + heardOf.log + ' word=' + word + ' listing=' + listing);
-        var c = centre(first);    // the log page asks its question in the strip; its first button closes the page, and changes nothing
+        var shut = modalOpen && modalKind == 'ask' && panelButtons[0] ? panelButtons[0] : first, c = centre(shut);    // the log page asks its question in the modal now (ticket 1535); its first button closes the page, and changes nothing
         armed(8, 'logshut');
-        posted(first, c[0], c[1]);
+        posted(shut, c[0], c[1]);
     }
-    else if (clickStep == 'page' && word == 'ask') second.performClick(null);    // yes, this once, to a site that is not on the public internet
+    else if (clickStep == 'page' && word == 'ask') modalActions[1]();    // yes, this once, to a site that is not on the public internet
     else if (clickStep == 'page' && word == 'idle') {
         say('test page drawn=' + pictures + ' home=' + !homeView.hidden); var f0 = win.frame, sized = typeof sizing == 'function', drew = viewDrawn, spent = {}; viewDrawn = function (name, paintIt) { var a = Date.now(); try { return drew(name, paintIt); } finally { spent[name] = (spent[name] || 0) + Date.now() - a; } }; var t0 = Date.now(); if (sized) sizing(true); for (var i = 1; i <= 10; i++) win.setFrameDisplay($.NSMakeRect(f0.origin.x, f0.origin.y, f0.size.width + 37 * i, f0.size.height + 23 * i), true), win.displayIfNeeded; var t1 = Date.now(), grown = Math.round(win.frame.size.width - f0.size.width); for (var held = Date.now() + 3000; Date.now() < held;) $.NSRunLoop.currentRunLoop.runModeBeforeDate($('NSEventTrackingRunLoopMode'), $.NSDate.dateWithTimeIntervalSinceNow(0.05)); var t2 = Date.now(), drawnWas = drawn; drawn = function (lines, characters) { var r = drawnWas(lines, characters); if (again) { drawn = drawnWas; win.displayIfNeeded; say('test release ms=' + (Date.now() - t2) + ' view=' + Math.round(scroll.contentSize.width)); } return r; }; if (sized) sizing(false); else viewNow(); win.displayIfNeeded; viewDrawn = drew; say('test resize step=' + Math.round((t1 - t0) / 10) + ' settle=' + (Date.now() - t2) + ' grown=' + grown + ' drawing=' + (sized ? sizing() : '-') + ' views=' + Object.keys(spent).sort(function (a, b) { return spent[b] - spent[a]; }).slice(0, 6).map(function (n) { return n + ':' + spent[n]; }).join(','));    // a drag of the frame's edge, ten steps out, then held still 3 s as AppKit holds a drag (only what runs in every mode runs), then let go: release is from there until the page laid at the new width is drawn
         secureToggled(); secureTech.performClick(null);    // the lock panel's last row
@@ -3961,7 +3962,7 @@ function drawn(lines, characters) {
     }
 }
 function told(word, rest) {
-    if (word == 'ask' && !last) return second.performClick(null);    // the test site is on this computer: yes, this once
+    if (word == 'ask' && !last) return modalActions[1]();    // the test site is on this computer: yes, this once
     if (word != 'idle' && word != 'ask') return;
     if (last) { say('test heavylog ' + (Date.now() - began) + ' ms ' + plain(words.toolTip.js).slice(0, 60)); return app.terminate(null); }
     if (at >= 0) say('test heavy' + at + ' ' + (got || 'not drawn: ' + plain(rest).slice(0, 160)));
@@ -4863,7 +4864,7 @@ my $pulled_words = pulled_words();
 check($pulled_words eq 'run --open 10 20 900 700 /app x | incognito --open 1 2 30 40 /app | https://site.test/b,5 6 700 500,/app,y | -,5 6 700 500,/app | -,5 6 700 500,/app | died died died died | none https://site.test/c refused refused refused',
     'the window of a pulled tab: lzrprf starts a second lzrprf as it was started itself, in incognito from an incognito window, with only the frame as an argument ("--open FRAME" before the program); it reads one line on its standard input and no more, an address it fetches or nothing, and ends on anything else; behind hears that address from lzrprf as its first line ("start"), never from the window: "sub pulled_command", "sub opened_with" and "sub started", read from lzrprf and run here', $pulled_words);
 my $pulled_argv = pulled_argv();
-check($pulled_argv eq 'perl in=the address argv=7 holding it=0 | perl in=the address argv=7 holding it=0 | perl argv=12 holding it=0 | sandbox-exec argv=13 holding it=0' && $text_of_lzrprf !~ /argv\[3\]/,
+check($pulled_argv eq 'perl in=the address argv=7 holding it=0 | perl in=the address argv=7 holding it=0 | perl argv=12 holding it=0 | sandbox-exec argv=13 holding it=0 | sandbox-exec argv=11 holding it=0',
     'the address of a pulled tab is in no command line, which every user of the computer can read in the list of processes: lzrprf hands it to the second lzrprf on its standard input, and that one to behind on the pipe it reads, while no argument of the second lzrprf, of behind or of the window holds it, and the window reads no address from its arguments ("sub tab_out", "sub pulled_command" and the two lines of "sub run" that start processes, read from lzrprf and run here with an address)', $pulled_argv);
 my @pulled_log = log_of('pulledin');
 my ($pulled_at) = grep { $pulled_log[$_] eq "you pulled a tab out into this window $t/pulledin/one" } 0 .. $#pulled_log;
@@ -4878,7 +4879,7 @@ check($closed_order eq '10: 12@11+ 11@10+ 10@9 9@8 8@7 7@6 6@5 5@4 4@3 3@2 empty
     'the closed tabs are held newest first, ten at most, and only the two newest keep their page; a tab with no address is not held: "sub closed_kept", read from lzrprf and run here', $closed_order);
 check((out('reopenstrip') =~ s/\s+$//r) eq 'null,A,B 0,0.1,0.2 100,110,150 0 false null 3 | A,B,null 0.1,0.2,0 110,150,100 2 false null 3 | A,C 0.1,0.3 110,175 0 false null 2 | A,B,C 0.1,0.2,0.3 110,150,175 0 false null 3 viewed=4',
     'the strip, read from lzrprf and run with no window: a reopened tab gets its own place, the tabs after it keeping their drawings, where they were read and their zoom; a pulled tab is let go once lzrprf says the tabs without it, and stays when lzrprf could not start its window; the tab shown then says its zoom\'s width', out('reopenstrip') =~ s/\s+$//r =~ s/\n/ ; /gr || err('reopenstrip') =~ s/\s+/ /gr);
-check((out('pulledkind') =~ s/\s+$//r) eq '0 1 1' && $text_of_lzrprf =~ /\. \(defined \$OPEN_FRAME \? '\+' : ''\), \$OPEN_FRAME \/\/ frame_kept\(\)\)/,
+check((out('pulledkind') =~ s/\s+$//r) eq '0 1 1' && $text_of_lzrprf =~ /\. \(defined \$OPEN_FRAME \? '\+' : ''\);/,
     'a window a tab was pulled out into runs as an accessory, with no Dock or menu-bar icon of its own, and the first window as a regular app (T5): lzrprf says "+" after the kind to the window of an --open start only, and the window\'s kind() reads it',
     out('pulledkind') =~ s/\s+$//r || err('pulledkind') =~ s/\s+/ /gr);
 check((out('findzoom') =~ s/\s+$//r) eq "0:0 0:14 2:4 aa=2 empty=0 bound=1000\n0 2 0 2 2 -1 3 of 17|No match\n110 125 150 175 200 200 200 / 90 80 67 50 50 50 / 100 100 100\n800 2000 960 1 1.25 1 1.042 1.875\nview 960 640,view 640 427,view 1920 1280,view 960 640",
@@ -6046,7 +6047,7 @@ check(($click{firstfront} // '') =~ /^active=false refused=all keyonly=none tips
 check(($keyed{gotit} // '') =~ /^title=Got it modal=true kind=big return=true / && ($keyed{returntaken} // '') eq 'taken=true' && ($keyed{welcomed} // '') eq 'modal=false veil=true home=true' && slurp("$base.welcomekey/welcomed") eq '3'
         && slurp("$lzrprf") =~ /^function windowOrdered\(\) \{ win\.makeKeyAndOrderFront\(\$\(\)\); app\.activateIgnoringOtherApps\(true\); \}/m,
     'Return, handed to the real window as AppKit hands it to the key window (its key equivalents first), presses the welcome\'s Got it: lzrprf hears "welcomed" and keeps the release number; the production window activates its application, which makes it the key window', said_of(\%keyed, qw(gotit returntaken welcomed stuck)));
-check(($at{asked} // '') =~ /^No\|Yes, this once\|bar=false\|site\.test is not on the public internet/, 'a question stands in lzrprf\'s strip of that window, and the bar takes nothing while it is open', $at{asked} // 'nothing came of it');
+check(($at{asked} // '') =~ /^No\|Yes, this once\|bar=false\|(?:LZRBRWSR )?site\.test is not on the public internet/, 'a question stands in the modal of that window, as every box does, and the bar takes nothing while it is open', $at{asked} // 'nothing came of it');
 check(($at{page} // '') =~ m{^title=Test visible=false drawn=2 links=0 editable=false menu=1 bar=\Q$t\E/window\?q=1 strip=200 \S \d+ ms \S \d+ k?B words=site\.test answered \d+ bytes\. .* text=A page by the hostile application\?a link that is only a colour}, 'the page is drawn in the same window; the bar shows the address that was sent; the strip shows the status the site answered with, the time the whole took and the size, and holds the sentence in full as its tip; a link is a colour and leads nowhere; a page that names a picture is drawn twice, first at once with a grey box where the picture goes and then with the picture', substr($at{page} // 'nothing came of it', 0, 150));
 check(($at{secure} // '') =~ /^\d+ # Connection\|# Redirects on the way here\|# Certificate 1 of [1-6]: the site/, 'the lock knows the page shown: its connection, the redirects on the way and the certificate the site presented, from the fetch itself', $at{secure} // 'nothing came');
 check(($at{nav} // '') eq '0 0 1', 'after the first page of a tab there is nothing to go back or forward to, and it can be loaded again', $at{nav} // 'nothing came');
@@ -6299,14 +6300,14 @@ my %calls = map { my $name = $_; $name => scalar(() = $text_of_lzrprf =~ /(?<![\
         $tested ? 'separate jar state and file, private directory and symlink refusal' : "$@");
 }
 {
-    my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms } qw(kept_app_budget kept_app_request kept_app_fetched kept_app_response);
-    my $tested = eval 'package KeptAppFetchTest; our ($INCOGNITO, $TOR_WANTED, $TOR_WINDOW, $TOR_SESSION, %FILTER_DEST, $FETCH_BYTES, $FETCH_SECONDS, $AT, $TOUCHED); my $LIVE_FETCH_UP = 65536; '
+    my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms } qw(page_cap_refused kept_app_budget kept_app_request kept_app_fetched kept_app_response);
+    my $tested = eval 'package KeptAppFetchTest; our ($INCOGNITO, $TOR_WANTED, $TOR_WINDOW, $TOR_SESSION, %FILTER_DEST, $FETCH_BYTES, $FETCH_SECONDS, $AT, $TOUCHED, @CAPS); my $LIVE_FETCH_UP = 65536; '
         . q{sub now { return $AT } sub at { $AT = shift } sub touched { return $TOUCHED }
-            sub address { return ($_[0], ($_[0] =~ m{^https://([^/]+)})) }
+            sub address { return ($_[0], ($_[0] =~ m{^https://([^/]+)})) } sub link_line { push @CAPS, [@_]; return 1 } sub caps { return @CAPS }
             sub listed { $TOUCHED++; return 0 } sub live_replied { return $_[1] }} . $source . ' 1;';
     my $fits;
     if ($tested) {
-        my $app = { spec => { hosts => { 'discord.com' => 1, 'cdn.discordapp.com' => 1 }, requests => 120, reply => 16 * 1024 * 1024, bytes => 48 * 1024 * 1024 },
+        my $app = { spec => { name => 'discord', seconds => 120, hosts => { 'discord.com' => 1, 'cdn.discordapp.com' => 1 }, requests => 120, reply => 16 * 1024 * 1024, bytes => 48 * 1024 * 1024 },
             until => 121, minute => 0, requests => 0, bytes => 0 };
         KeptAppFetchTest::at(1);
         my $unknown = KeptAppFetchTest::kept_app_fetched({ kept_app => $app }, '=fetch GET 0 - data https://unknown.test/', '');
@@ -6318,7 +6319,7 @@ my %calls = map { my $name = $_; $name => scalar(() = $text_of_lzrprf =~ /(?<![\
         KeptAppFetchTest::at(60);
         $fits &&= KeptAppFetchTest::kept_app_budget($app, 1, 1) && $app->{requests} == 1 && $app->{bytes} == 1;
         KeptAppFetchTest::at(121);
-        $fits &&= !KeptAppFetchTest::kept_app_budget($app, 0, 0);
+        $fits &&= !KeptAppFetchTest::kept_app_budget($app, 0, 0) && join('|', map { join(':', @$_[0, 1, 4, 6, 8, 10, 12]) } KeptAppFetchTest::caps()) eq 'WARN:page-cap:discord:requests-per-minute:121:120:requests|WARN:page-cap:discord:bytes-per-minute:50331649:50331648:bytes|WARN:page-cap:discord:lifetime:120:120:seconds';
     }
     check($tested && $fits, 'a kept app refuses malformed requests and unlisted hosts before network checks and enforces both minute budgets and its deadline',
         $tested ? 'refusal before network checks and minute and deadline boundaries checked' : "$@");
@@ -6373,7 +6374,7 @@ my %calls = map { my $name = $_; $name => scalar(() = $text_of_lzrprf =~ /(?<![\
 {
     my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms }
         qw(kept_app_request live_asked curl_body_config);
-    my $tested = eval 'package KeptAuthWireTest; my ($PAGE_BYTES, $LIVE_FETCH_LINE, $LIVE_FETCH_UP) = (50331648, 8300, 65536); ' . $source . ' 1;';
+    my $tested = eval 'package KeptAuthWireTest; my ($PAGE_BYTES, $LIVE_FETCH_LINE, $LIVE_FETCH_UP) = (50331648, 8300, 65536); sub page_cap_refused { return } ' . $source . ' 1;';
     my $fits;
     if ($tested) {
         my $line = '=fetch PATCH 2 application/json data auth 4 https://discord.com/api/test';
@@ -6427,7 +6428,7 @@ check($text_of_lzrprf =~ /^sub ask \{ my \(\$words, \@buttons\) = \@_; return as
     && $asked_code =~ /hear\(\$left\) \/\/ leave\(\).*?return \$1 if \$event =~ \/\^button \$ASKED \(\[1-6\]\)\$\/ && \$1 <= \@buttons;.*?push \@LATER, \$event; next.*?\n    return 1;\n\}/s
     && $text_of_lzrprf =~ /^my \@WEB_CHOICES = \('Always allow', 'Allow once', 'Always Deny', 'Deny once', 'Forget'\);/m && $text_of_lzrprf =~ /web_question\('redirect', \$words, \$essential, defined \$fit/,
     'an unanswered question defaults to the first choice, which is Deny once on the web modal; checked answers address their own question, and closing the window ends lzrprf', $asked_code // 'no asked function');
-check($text_of_lzrprf =~ /^            if \(length \$link->\[2\] && \$link->\[4\] <= \$link->\[5\] && vec\(\$write, fileno \$to, 1\)\) \{/m && $text_of_lzrprf =~ /^    while \(now\(\) < \$until && length \$got <= \$bytes \+ \$WROTE_ROOM && .*!grep \{ \$_->\[4\] > \$_->\[5\] \} \@links\) \{/m && $text_of_lzrprf =~ /^    my \$capped = !\$done && length \$got > \$bytes \+ \$WROTE_ROOM;/m && $text_of_lzrprf =~ /^    return \(undef, 'the answer is larger than lzrprf takes'\) if \$capped \|\| /m && $text_of_lzrprf =~ /^    return \(\$got, undef, \$peer, \$certs\) if \$done && \$how == 0 /m, 'what is carried between curl and the site stops at the allowance of each side: a side that sent more has nothing more passed on, and the request ends; and an answer is taken only when curl\'s output was read to its end, so one whose reading stopped on its length is refused whatever it holds, a line like the one curl writes before the certificates among it too; read in "sub fetch"', 'read, not tried');
+check($text_of_lzrprf =~ /^            if \(length \$link->\[2\] && \$link->\[4\] <= \$link->\[5\] && vec\(\$write, fileno \$to, 1\)\) \{/m && $text_of_lzrprf =~ /^    while \(now\(\) < \$until && length \$got <= \$bytes \+ \$WROTE_ROOM && .*!grep \{ \$_->\[4\] > \$_->\[5\] \} \@links\) \{/m && $text_of_lzrprf =~ /^    my \$capped = !\$done && length \$got > \$bytes \+ \$WROTE_ROOM;/m && $text_of_lzrprf =~ /^    if \(\$capped \|\| length \$got > \$bytes \|\| \$exit == 63 \|\| \@links && \$links\[1\]\[4\] > \$wire\) \{.*?^        return \(undef, 'the answer is larger than lzrprf takes'\);\n    \}/ms && $text_of_lzrprf =~ /^    return \(\$got, undef, \$peer, \$certs\) if \$done && \$how == 0 /m, 'what is carried between curl and the site stops at the allowance of each side: a side that sent more has nothing more passed on, and the request ends; and an answer is taken only when curl\'s output was read to its end, so one whose reading stopped on its length is refused whatever it holds, a line like the one curl writes before the certificates among it too; read in "sub fetch"', 'read, not tried');
 my ($in_time, $gone) = hears();
 check(defined $in_time && $in_time eq '' && !defined $gone, 'the two ends of a question are told apart: "sub hear" of lzrprf, run against a pipe of the test\'s own, gives an empty line when nothing is said in time, so "sub ask" answers 1, and nothing when the window is gone, so lzrprf ends', defined $in_time ? (defined $gone ? 'the same for both' : 'time over: an empty line; window gone: nothing') : 'time over: nothing, as if the window were gone');
 my @no_folder = grep { my $pid = open(my $in, '-|') // die "selftest: cannot fork: $!\n"; if (!$pid) { open STDERR, '>&', \*STDOUT; { no warnings; exec '/usr/bin/perl', $cli, 'try', "$base.keepcli/$_", '-', '-', 'deny', '/usr/bin/true'; } POSIX::_exit(127) } my $all = do { local $/; <$in> } // ''; close $in; $all !~ /^usage: lzrprf run / } '.', '..', '.x';    # nothing is typed and every answer is the first button, so a folder that was taken would have nothing done in it
@@ -6734,10 +6735,10 @@ sub pulled_argv {                         # every command line lzrprf builds for
     my ($command) = $text_of_lzrprf =~ /^(sub pulled_command \{.*)$/m;
     my ($text) = join "", $text_of_lzrprf =~ /^(sub window(?:_sound)?_text \{.*?^END\n\}\n)/msg;    # the window's text and the part of a video's sound joined after it
     my ($run) = $text_of_lzrprf =~ /^(sub run \{.*?^\}\n)/ms;
-    my @lines = ($run // '') =~ /^(\s+become\(.*\n)/mg;
+    my @lines = (($run // '') =~ /^(    become\(\$from, .*\n)/m, ($run // '') =~ /^(    my \$window_source = .*?^    become\(\$window_in, [^\n]*\n)/ms);
     return 'not found in lzrprf' if grep({ !defined } @subs, $command, $text) || @lines != 2;
     my $got = eval "package Argv; no warnings; our (\$SELF, \$INCOGNITO, \$TOR_WINDOW, \$PROGRAM, \@ARGUMENTS, \@TABS, \$TAB, \$TRY, \$OPEN, \$OPEN_FRAME, \$APP, \$HOME, \$WINDOW_CONTAINER, \$SCRIPT, \$DIR, \$PEER, \$ANSWER, \$BASE, \$PROFILE, \$ROOT, \@made, \$PULLED, \$PULLED_MOST, \$GONE) = ('lzrprf');\n(\$PULLED, \$PULLED_MOST) = (0, 32);\n"
-        . "sub address { (\$_[0]) } sub idle {} sub window {} sub tabbed {} sub frame_kept { '1 2 300 400' } sub apart { push \@made, ['apart', \@_]; 1 } sub become { push \@made, ['become', 'nothing', \@_[3 .. \$#_]] }\n"
+        . "sub address { (\$_[0]) } sub idle {} sub window {} sub tabbed {} sub frame_kept { '1 2 300 400' } sub window_host { \$_[0] eq 'bundle' ? ('/app/lzrbrwsr-window', 'fixture-profile') : (undef, \$WINDOW_CONTAINER) } sub apart { push \@made, ['apart', \@_]; 1 } sub become { push \@made, ['become', 'nothing', \@_[3 .. \$#_]] }\n"
         . join("\n", @subs, $command, $text) . q{
         my $secret = 'https://site.test/secret/page';
         @TABS = ({ url => $secret }, { url => 'https://site.test/other' });
@@ -6745,7 +6746,7 @@ sub pulled_argv {                         # every command line lzrprf builds for
         for my $mode (0, 1) { $INCOGNITO = $mode; tab_out(0, '10 20 900 700') }
         ($OPEN, $OPEN_FRAME, $APP, $HOME, $SCRIPT, $DIR, $INCOGNITO) = ($secret, '10 20 900 700', 'App', '/Users/someone', '/usr/bin/osascript', '/tmp/x', 0);
         my ($from, $to, $window_in, $window_out, $more, $behind, $window, $program, @arguments) = (undef, undef, undef, undef, '', 0, 1, '/app', 'x');
-        eval join('', } . join(', ', map { "q\x01$_\x01" } @lines) . q{) . '1' or return "failed: $@";
+        eval join('', } . join(', ', map { "q\x01$_\x01" } @lines) . q{) . '1' or return "failed: $@"; $program = 'bundle'; eval } . "q\x01$lines[1]\x01" . q{ . '1' or return "failed: $@";
         join(' | ', map { my ($how, $in, @argv) = @$_; ($argv[0] =~ s{.*/}{}r) . ($how eq 'apart' ? ' in=' . ($in eq $secret ? 'the address' : $in) : '') . ' argv=' . @argv . ' holding it=' . grep({ index($_, 'site.test') >= 0 } @argv) } @made);
     };
     return $got // "failed: $@";

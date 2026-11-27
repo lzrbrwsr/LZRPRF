@@ -216,7 +216,16 @@ sub fetch {
     my $exit = $how >> 8;
     return (undef, 'the system did not say that curl was in its container') if $loose;
     return (undef, 'you stopped it') if $stopped;
-    return (undef, 'the answer is larger than lzrprf takes') if $capped || length $got > $bytes || $exit == 63 || @links && $links[1][4] > $wire;
+    if ($capped || length $got > $bytes || $exit == 63 || @links && $links[1][4] > $wire) {
+        my $scope = $ask && $ask->{kept_app} ? 'kept-app' : 'page';
+        if (@links && $links[1][4] > $wire) {
+            page_cap_refused($scope, 'fetch-wire', $links[1][4], $wire, 'bytes', 'The incoming transfer exceeded its encrypted wire allowance.');
+        } else {
+            my $value = !$capped && length($got) > $bytes ? length($got) : 'unobserved';
+            page_cap_refused($scope, 'fetch-reply', $value, $bytes, 'bytes', 'The reply exceeded its transfer size allowance.');
+        }
+        return (undef, 'the answer is larger than lzrprf takes');
+    }
     return (undef, $none) if @links && $links[0][4] > $links[0][5];
     return (undef, 'could not connect') if $unreached;
     return (undef, 'the site did not answer in time') if $late || $exit == 28;

@@ -164,6 +164,9 @@ sub behind {
         elsif ($event =~ m{^import allowed (chrome|edge|brave|vivaldi|firefox|safari) (/[\x20-\x7f]{0,1000})$}) { import_allowed($1, $2); said_noted() }    # [C15] Allow in the Open panel, and the folder chosen in it; a character past ASCII comes as \x7f, and the comparison refuses it
         elsif ($event =~ /^import denied (chrome|edge|brave|vivaldi|firefox|safari)(?: (failed|at-once))?$/) { import_unshown($1, $2) if $2; import_allowed($1, undef); said_noted() }    # Cancel in the Open panel, or a panel the window could not show
         elsif ($event eq 'import cancel') { import_cancelled() }    # the wizard closed: an Open panel asked for and not answered is dropped, so an answer that comes late is not taken
+        elsif ($event =~ /^frames scroll ([0-9]{1,5}) ([0-9]{1,4}) ([0-9]{1,6}) ([0-9]{1,6}) ([0-9]{1,6}) ([0-9]{1,5})$/) {    # ticket 1530: a burst of scrolling as the window measured it
+            link_line('INFO', 'scroll-frames', "A scroll of $1 moves drew $2 times: half the draws took under $3 us, 95 in 100 under $4 us, the slowest $5 us; $6 gaps were over a frame and a half.",
+                moves => $1, draws => $2, draw_p50_us => $3, draw_p95_us => $4, draw_max_us => $5, late_gaps => $6) }
         elsif ($event =~ /^fault / && $DRAWN) { $DRAWN = 0; fault('undrawn') }    # the window could not draw a list that "checked" let through: it shows nothing of it. Taken once for a page that was handed over, and never without one: the window's process cannot open the question about a report whenever it likes
         1 } or unheard($event, $@, $behind, ++$faults);    # Henry 2026-11-24: a page took the whole browser down. An error of lzrprf's own stays in the tab it met
     }

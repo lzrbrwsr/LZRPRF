@@ -28,10 +28,15 @@ sub kept_app_valid {
 sub kept_app_budget {
     my ($app, $requests, $bytes) = @_;
     my $at = now();
-    return if $at >= $app->{until};
+    my $spec = $app->{spec};
+    return page_cap_refused($spec->{name}, 'lifetime', int($at - $app->{until} + $spec->{seconds}), $spec->{seconds}, 'seconds',
+        'The kept-app session expired, so its request was refused.') if $at >= $app->{until};
     my $minute = int($at / 60);
     if ($app->{minute} != $minute) { @$app{qw(minute requests bytes)} = ($minute, 0, 0) }
-    return if $app->{requests} + $requests > $app->{spec}{requests} || $app->{bytes} + $bytes > $app->{spec}{bytes};
+    return page_cap_refused($spec->{name}, 'requests-per-minute', $app->{requests} + $requests, $spec->{requests}, 'requests',
+        'The kept app would exceed its request allowance for this minute.') if $app->{requests} + $requests > $spec->{requests};
+    return page_cap_refused($spec->{name}, 'bytes-per-minute', $app->{bytes} + $bytes, $spec->{bytes}, 'bytes',
+        'The kept app would exceed its transfer allowance for this minute.') if $app->{bytes} + $bytes > $spec->{bytes};
     $app->{requests} += $requests;
     $app->{bytes} += $bytes;
     return 1;
@@ -68,7 +73,11 @@ sub kept_app_request {
     my ($line) = @_;
     my ($method, $size, $type, $dest, $auth_bytes, $to) = $line =~
         m{\A=fetch (GET|HEAD|POST|PUT|PATCH|DELETE) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (data|script|module|worker|frame|image) (?:auth ([1-9][0-9]{0,3}) )?([\x21-\x7e]{1,8192})\z};
-    return unless $method && $size <= $LIVE_FETCH_UP && ($auth_bytes // 0) <= 4096;
+    return unless $method;
+    return page_cap_refused('kept-app', 'fetch-upload', $size, $LIVE_FETCH_UP, 'bytes',
+        'The kept-app upload exceeded the relay limit.') if $size > $LIVE_FETCH_UP;
+    return page_cap_refused('kept-app', 'fetch-authorization', $auth_bytes, 4096, 'bytes',
+        'The kept-app authorization field exceeded the relay limit.') if ($auth_bytes // 0) > 4096;
     return if $method =~ /\A(?:GET|HEAD)\z/ && ($size || $type ne '-');
     return ($method, $size, $type, $dest, $auth_bytes // 0, $to);
 }
@@ -95,7 +104,11 @@ sub kept_app_response {
         defined filter_said($url, $FILTER_DEST{$dest // 'data'} // $dest, 'discord.com') || shield_said($url) ne 'allow';
     return (undef, 403) unless kept_app_budget($app, 1, 0);
     my $remaining = $app->{spec}{bytes} - $app->{bytes};
-    return (undef, 403) unless $remaining > 0;
+    if ($remaining <= 0) {
+        page_cap_refused($app->{spec}{name}, 'bytes-per-minute', $app->{bytes}, $app->{spec}{bytes}, 'bytes',
+            'The kept app exhausted its transfer allowance for this minute.');
+        return (undef, 403);
+    }
     return (undef, 403) unless record("the kept app asked for $host ($method)");
     my ($where) = find($host);
     return (undef, 403) unless $where && !grep { $_->{own} } @$where;
@@ -106,6 +119,8 @@ sub kept_app_response {
     my ($got, $why, $peer, $certs) = @{ kept_app_jar($app, sub {
         return [fetch($url, $where, $ask, $nav, [$reserved, $FETCH_SECONDS])];
     }) };
+    page_cap_refused($app->{spec}{name}, 'fetch-reply', length($got), $reserved, 'bytes',
+        'The kept-app reply exceeded its reserved transfer size.') if defined $got && length($got) > $reserved;
     return (undef, 0) if $why || !defined $got || length($got) > $reserved;    # a failed transfer can still consume its reservation
     $app->{bytes} -= $reserved - length($got);
     my $parts = live_parts($got, $method);
@@ -124,21 +139,15 @@ sub kept_app_open_tab {
         tabbed('select', $i);
         return;
     }
-    return idle("A window holds $TABS_MOST tabs at most: close one to open Discord.") if @TABS >= $TABS_MOST;
     my $app = kept_app_discord() or return idle('Discord could not open its private kept-app store.');
-    $source->{shown} = $SHOWN;
-    my $tab = fresh_tab();
-    $tab->{kept_app} = $app;
-    push @TABS, $tab;
-    $TAB = $#TABS;
-    undef $SHOWN;
-    tab_shown('Opening Discord in its kept-app tab.');
-    return go($app->{spec}{start}, 'you opened Discord from LZRCHT');
+    @WAY = ();
+    $WENT = now();
+    return kept_app_visit($source, $app->{spec}{start}, 'you opened Discord from LZRCHT', $app);
 }
 
 sub kept_app_visit {
-    my ($tab, $typed, $how) = @_;
-    my $app = $tab->{kept_app};
+    my ($tab, $typed, $how, $opening) = @_;
+    my $app = $opening // $tab->{kept_app};
     my ($url, $host) = address($typed);
     return idle('This Discord tab opens Discord addresses only.') unless $url && kept_app_valid($app, $url) && $host =~ /\A(?:discord\.com|discord\.gg)\z/;
     my ($got, $status);
@@ -154,7 +163,7 @@ sub kept_app_visit {
     my $prior = live_of($tab);
     live_end($prior, 'its kept app went elsewhere', 1) if $prior;
     my $frame = "=sheets\n";
-    my ($lines, undef, $paths, $title, $named, $live) = laid_out($url, $got, $frame, 1, $app);
+    my ($lines, undef, $paths, $said, $named, $live) = laid_out($url, $got, $frame, 1, $app);    # $said: the page's compatibility statement, judged from Discord's static page; the kept app brings its own WebSocket, so it is not shown (ticket 1539: it was the tab's title, "Not supported yet: WebSocket, favicon.")
     return idle('Discord could not draw its page.') unless $lines && $live;
     if (@$named) {
         my @sheets = map {
@@ -166,12 +175,16 @@ sub kept_app_visit {
             my @next = laid_out($url, $got, $with, 1, $app);
             if ($next[0] && $next[5]) {
                 live_dropped($live);
-                ($lines, $paths, $title, $live) = @next[0, 2, 3, 5];
+                ($lines, $paths, $said, $live) = @next[0, 2, 3, 5];
                 $frame = $with;
             } else { live_dropped($next[5]) }
         }
     }
-    @$tab{qw(url title says)} = ($url, $title || 'Discord', 'Discord in its kept-app tab.');
+    if ($opening) {
+        cht_end($tab, 'Discord opened in this tab', 1);
+        $tab->{kept_app} = $opening;
+    }
+    @$tab{qw(url title says)} = ($url, 'Discord', 'Discord in its kept-app tab.');
     if (($how // '') !~ /\Ayou (?:went (?:back|forward) to|reloaded)\z/) {
         splice @{ $tab->{visited} }, $tab->{at} + 1;
         push @{ $tab->{visited} }, $url;
