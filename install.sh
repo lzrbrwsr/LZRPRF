@@ -166,12 +166,12 @@ BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 # that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="f69d1ed0e96475f25541183ea4c7d0b5ff1a4dcfd9481ffc32af2526efcda18f"
-RELEASE="179"
-LZRPRF_COMMIT="f59cc68311bcb5bd9658d8614d2b479560651321"
+SHA256="59d533eefbaf1dc8eb03d130a9c35ac33aa537ab3c78fbfc7fb302b6c1e4b922"
+RELEASE="182"
+LZRPRF_COMMIT="7f32ab4ae3300facfd22888a847f96a7067dcf52"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="48c0fefed9c08f2019f72ed6b2a9663ba1083f1f0f63e1a30b2243ab853275ab"
-SELFTEST_SHA256="535e050b1d5f24be3aedd7f594f967f2efb36a76bc7514beb3b787d3438f2c2b"
+LZRPRF_SHA256="921c0730a75b918ed6e881f368052cb4f3261ba3fd73693952b2ca2621a958cc"
+SELFTEST_SHA256="13c1127b89f74cc06a8aac11a9d6e149248b1ea743c842580b0d68c57ee228b4"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
 BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
 # RELEASE_KEY: the public half of the release key; a release is installed only when its manifest is signed with it
@@ -787,25 +787,25 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 179
+release 182
+new A new tab opens its home page about twice as fast: 92 ms down to 52 ms on our test machine.
+new Scrolling a long page like yle.fi redraws only the part around the view instead of the whole page: 50 times faster on our test page.
+new LZRDFNDR's panel has an on/off switch at the top of each tab: On Your Computer, and Scripts, Redirects and Sends each on their own; off lets that kind through without asking.
 new Stopping Tor from a tab asks first and Cancel keeps it on; short notices appear briefly at the top, and the black strip under the bar is gone.
 new Long pages draw to their end: every picture is fetched, not just the first 24, and pictures appear as they arrive.
 new LZRBRWSR no longer gets stuck at full CPU or stops answering: macOS AutoFill kept retrying inside its window.
-new Discord in LZRCHT now opens titled Discord in its own tab, instead of a "not supported yet" notice.
-new Scrolling is smoother with a little more momentum, a page no longer jumps while it loads, and a minimized LZRDFNDR question waits in its icon with a count.
-new The menu bar says LZRBRWSR, questions open in the same box as everything else and never hold your tabs, and Discord connects from LZRCHT in its own tab.
 home local
 newest https://lzrbrwsr.com/latest
 installer https://lzrbrwsr.com/install.sh
 same https://lzrbrwsr.vercel.app/install.sh
 report https://origin.lzrbrwsr.com/report
 file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-file lzrbrwsr-bin d6443f3cbabf7caf3cf1b44d2022c428e4f5ec9c3ef1261035ce341e6658b50f
+file lzrbrwsr-bin f6949da6633daf7f6ca717447ccf94197420488309d305d22b1579607f042872
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
 file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
 file lzrbrwsr-window 6472a7855c52851bd8db375b86a7f3b400b77353bcab70a663c39574497867c9
-lzrprf 48c0fefed9c08f2019f72ed6b2a9663ba1083f1f0f63e1a30b2243ab853275ab
+lzrprf 921c0730a75b918ed6e881f368052cb4f3261ba3fd73693952b2ca2621a958cc
 blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."
