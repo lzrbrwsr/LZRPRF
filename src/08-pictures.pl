@@ -152,7 +152,7 @@ sub pictures_ended {                      # what still runs of a page's pictures
 sub pictures_judged {                     # ($lines, $paths, $host): the pictures of the page's first list judged beside its second run (sub shield_ahead), so its early list finds their verdicts
     my ($lines, $paths, $host) = @_;
     return if $TOR_WANTED;
-    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;
+    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)(?:,|$)/ ? ($paths->[$1] => 1) : () } @$lines;
     shield_ahead(map { m{^/} ? "https://$host$_" : (address($_))[0] } grep { $wanted{$_} } @$paths);
     return;
 }
@@ -161,7 +161,7 @@ sub pictures_ahead {
     my ($lines, $paths, $host, $sent) = @_;
     my $page = $AHEAD_PAGE or return;
     return if $PICTURES_AHEAD || $TOR_WANTED || $page->{host} ne $host;
-    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;
+    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)(?:,|$)/ ? ($paths->[$1] => 1) : () } @$lines;
     return unless %wanted;
     $PICTURES_AHEAD = pictures_state($paths, \%wanted, $host, @$page{qw(where kept answer)}) or return;
     $PICTURES_AHEAD->{early} = [$lines, $paths, $host];    # the list they are drawn into when they are here (sub pictures_pumped)
@@ -229,8 +229,8 @@ sub pictures_dropped {                    # the pictures begun ahead and never t
 }
 
 sub pictured {
-    my ($lines, $paths, $host, $where, $kept, $decoded, $page) = @_;    # $decoded: the pictures of this page decoded before, by their entry in =pictures; given when it is laid out again, and then nothing is fetched (sub relaid); $page: the page's answer as it was fetched, which an address on another site must stand in
-    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;    # by entry: at another width the page may choose other sources, and an entry decoded then is placed again
+    my ($lines, $paths, $host, $where, $kept, $decoded, $page, $progress) = @_;    # $decoded: the pictures of this page decoded before, by their entry in =pictures; given when it is laid out again, and then nothing is fetched (sub relaid); $page: the page's answer as it was fetched, which an address on another site must stand in
+    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)(?:,|$)/ ? ($paths->[$1] => 1) : () } @$lines;    # by entry: at another width the page may choose other sources, and an entry decoded then is placed again
     @PICTURED = ();
     if (!%wanted) { pictures_dropped() unless $decoded; return ($lines, 0, 0, {}) }
     my %picture = $decoded ? %$decoded : ();
@@ -246,10 +246,16 @@ sub pictured {
             @$P{qw(where kept)} = ($where, $kept);
         }
         $P //= pictures_state($paths, \%wanted, $host, $where, $kept, $page) or return;
+        my ($told, $tell_at) = (0, now() + $PICTURES_TOLD_EVERY);
         while (!$P->{lost} && alive() && (%{ $P->{running} } || @{ $P->{waiting} } && now() < $P->{until})) {
             pictures_begun($P);
             last if $P->{lost} || !%{ $P->{running} };
             pictures_heard($P, 1);
+            if ($progress && now() >= $tell_at && keys(%{ $P->{picture} }) > $told) {    # the pictures come in as they are decoded: a page of hundreds is not held until its last
+                $told = keys %{ $P->{picture} };
+                $tell_at = now() + $PICTURES_TOLD_EVERY;
+                $progress->({ %{ $P->{picture} } });
+            }
         }
         pictures_ended($P);                 # the window is gone or a line could not be written: what still runs is ended
         return if $P->{lost};

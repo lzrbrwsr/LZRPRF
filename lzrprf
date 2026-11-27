@@ -181,10 +181,11 @@ my %LAID = (R => 20_000, X => 30_000, G => 1000, M => 64, I => 1000, K => 32, J 
 my $RUN_TEXT = 2000;                      # the most characters in one run of text of a laid page
 my $ALL_TEXT = 1_000_000;                 # the most characters in all its runs together
 my $PIXELS = 262_144;                     # the most pixels in all its pictures together: one picture of 512 by 512
-my $PICTURES = 24;                        # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURES, the same number): the most pictures one page may name, each fetched by a run of its own
+my $PICTURES = 512;                       # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURES, the same number, and the window's NAMED_MOST bitmaps): the most pictures one page may name, each fetched by a run of its own; 24 until 2026-11-27, when the owner's long pages of a hundred small pictures went grey past the 24th
 my $PICTURE_SITES = 8;                    # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURE_SITES, the same number): the most other sites, neither the page's host nor a name under it (sub under), that are asked for one page's pictures; a picture on one more is not fetched, and the log says why
 my $PICTURES_AT_ONCE = 8;                 # DECLARED: the most pictures of one page fetched and decoded side by side, the owner's order of 2026-11-21: 24 one after the other took over 4 seconds; 8 since 2026-11-24, when hs.fi's 24 AVIF pictures took 2.4 s at 4 (scripts/load-timeline.pl)
-my $PICTURE_SECONDS = 20;                 # one clock for all of a page's pictures: a picture not begun by then stays a grey box
+my $PICTURE_SECONDS = 60;                 # one clock for all of a page's pictures: a picture not begun by then stays a grey box; 60 since 2026-11-27, as a page may name 512 and 8 at a time take about 50 ms each
+my $PICTURES_TOLD_EVERY = 0.4;            # DECLARED(seconds): while a page's pictures come in, the window is given the ones decoded so far at most this often (sub pictured)
 my $PICTURE_PIXELS = 800_000;             # the most pixels in one fetched picture: four times 200,000 since retina pictures, sharp at two device pixels a point
 my $SIPS = '/usr/bin/sips';               # [C21] the system's own; it decodes for lzrprf what the application cannot (AVIF, HEIC, HEIF), lzrprf holds no code for it
 my $DECODE_SECONDS = 10;                  # DECLARED([C21] the most one run of the system's decoder may take in all: a picture of 1024 pixels a side takes it under one second)
@@ -219,7 +220,7 @@ my %NAMED;                                # the decoded pictures this lzrprf nam
 my %NAMED_AT;                             # the same, by where the picture stands in memory
 my ($NAMED_RUN, $NAMED_OWNER, $NAMED_COUNT) = ('', 0, 0);    # the eight random characters every name of this process begins with, the process they were made in, and how many it named: a copy made by fork, or lzrprf started again behind a window that lives on, never names a bitmap another one sent
 my $AHEAD_PAGE;                           # the answer being read now, with its host, its addresses and how its lines are kept: what a picture begun ahead is checked against (sub prefetch_begin)
-my $DRAWN_PIXELS = 8 * $PICTURE_PIXELS;   # the most pixels the window is given for fetched pictures on one page, however often one is placed: a place beyond that stays a grey box
+my $DRAWN_PIXELS = 64 * $PICTURE_PIXELS;  # the most pixels the window is given for fetched pictures on one page, however often one is placed: a place beyond that stays a grey box; 51.2 million (205 MB) is inside the window's NAMED_BYTES of 512 MB and about 600 news thumbnails of 392 by 220; 8 pictures' worth until 2026-11-27
 my @FACES = map { "/System/Library/Fonts/Supplemental/$_.ttf" } 'Arial', 'Arial Bold', 'Arial Italic', 'Arial Bold Italic', 'Courier New', 'Courier New Bold', 'Courier New Italic', 'Courier New Bold Italic';    # the fonts a page is drawn with, in the application's order: plain, bold, italic, both, then the same in fixed width
 my $FACE_BYTES = 2 * 1024 * 1024;         # the most of one font that is handed over: the largest of the eight is 773,236 bytes on this macOS
 my $ANSWER_SECONDS = 600;                 # a question that is still open then counts as answered with its first button
@@ -2386,7 +2387,14 @@ sub visit {
         $DRAWN = 1;
         timed('list');
     }
-    my ($shown, $fetched, $wanted, $decoded) = pictured($lines, $paths, $host, $where, $kept, undef, $got);
+    my $progress = $first && sub {        # the pictures decoded so far, drawn while the rest still come, as long as the window still holds the list sent last
+        my ($so_far) = @_;
+        return unless defined $first_mark && $first_mark == $WINDOW_LISTS;
+        my ($now) = pictured($lines, $paths, $host, $where, $kept, $so_far) or return;
+        window_changed($sent, $now);
+        ($sent, $first_mark) = ($now, $WINDOW_LISTS);
+    };
+    my ($shown, $fetched, $wanted, $decoded) = pictured($lines, $paths, $host, $where, $kept, undef, $got, $progress || undef);
     undef $PICTURES_BEFORE;                # the page's own pictures are here: what was kept of the page before is dropped
     window("page $TAB", '.') if !$shown && $first;    # a line of a picture could not be written: the page drawn at once is taken away again, as nothing of this answer would have been shown before
     return live_dropped($live, $UNWRITTEN) unless $shown;
@@ -3116,7 +3124,7 @@ sub pictures_ended {                      # what still runs of a page's pictures
 sub pictures_judged {                     # ($lines, $paths, $host): the pictures of the page's first list judged beside its second run (sub shield_ahead), so its early list finds their verdicts
     my ($lines, $paths, $host) = @_;
     return if $TOR_WANTED;
-    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;
+    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)(?:,|$)/ ? ($paths->[$1] => 1) : () } @$lines;
     shield_ahead(map { m{^/} ? "https://$host$_" : (address($_))[0] } grep { $wanted{$_} } @$paths);
     return;
 }
@@ -3125,7 +3133,7 @@ sub pictures_ahead {
     my ($lines, $paths, $host, $sent) = @_;
     my $page = $AHEAD_PAGE or return;
     return if $PICTURES_AHEAD || $TOR_WANTED || $page->{host} ne $host;
-    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;
+    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)(?:,|$)/ ? ($paths->[$1] => 1) : () } @$lines;
     return unless %wanted;
     $PICTURES_AHEAD = pictures_state($paths, \%wanted, $host, @$page{qw(where kept answer)}) or return;
     $PICTURES_AHEAD->{early} = [$lines, $paths, $host];    # the list they are drawn into when they are here (sub pictures_pumped)
@@ -3193,8 +3201,8 @@ sub pictures_dropped {                    # the pictures begun ahead and never t
 }
 
 sub pictured {
-    my ($lines, $paths, $host, $where, $kept, $decoded, $page) = @_;    # $decoded: the pictures of this page decoded before, by their entry in =pictures; given when it is laid out again, and then nothing is fetched (sub relaid); $page: the page's answer as it was fetched, which an address on another site must stand in
-    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)$/ ? ($paths->[$1] => 1) : () } @$lines;    # by entry: at another width the page may choose other sources, and an entry decoded then is placed again
+    my ($lines, $paths, $host, $where, $kept, $decoded, $page, $progress) = @_;    # $decoded: the pictures of this page decoded before, by their entry in =pictures; given when it is laid out again, and then nothing is fetched (sub relaid); $page: the page's answer as it was fetched, which an address on another site must stand in
+    my %wanted = map { /^I\d+,\d+,\d+,\d+,(\d+)(?:,|$)/ ? ($paths->[$1] => 1) : () } @$lines;    # by entry: at another width the page may choose other sources, and an entry decoded then is placed again
     @PICTURED = ();
     if (!%wanted) { pictures_dropped() unless $decoded; return ($lines, 0, 0, {}) }
     my %picture = $decoded ? %$decoded : ();
@@ -3210,10 +3218,16 @@ sub pictured {
             @$P{qw(where kept)} = ($where, $kept);
         }
         $P //= pictures_state($paths, \%wanted, $host, $where, $kept, $page) or return;
+        my ($told, $tell_at) = (0, now() + $PICTURES_TOLD_EVERY);
         while (!$P->{lost} && alive() && (%{ $P->{running} } || @{ $P->{waiting} } && now() < $P->{until})) {
             pictures_begun($P);
             last if $P->{lost} || !%{ $P->{running} };
             pictures_heard($P, 1);
+            if ($progress && now() >= $tell_at && keys(%{ $P->{picture} }) > $told) {    # the pictures come in as they are decoded: a page of hundreds is not held until its last
+                $told = keys %{ $P->{picture} };
+                $tell_at = now() + $PICTURES_TOLD_EVERY;
+                $progress->({ %{ $P->{picture} } });
+            }
         }
         pictures_ended($P);                 # the window is gone or a line could not be written: what still runs is ended
         return if $P->{lost};
@@ -17232,6 +17246,7 @@ $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSAutoFillHeuristicsE
 // method this window gives the system (ObjC.registerSubclass: its drawings, presses, timers and delayed calls) is timed;
 // once BUSY_EVERY_MS has passed, when the methods together took more than BUSY_SHARE of it, one line "frames busy
 // TOTAL_MS SPAN_MS NAME=CALLS/MS;..." names the five that took most, and lzrprf writes it to the link's log.
+var busySay = typeof say == 'function' ? say : null;    // the window's own say, taken as the script starts (a function declaration is there already): code that catches what the window says by putting its own say in place never catches the meter's report, which on a busy Mac broke checks of exact words (Ticket #1549)
 var BUSY_EVERY_MS = 5000, BUSY_SHARE = 0.2, busyMeter = {}, busyFrom = Date.now();    // DECLARED(5 s: a spin shows within one look; a fifth of a core: well above an idle window, well below a spin)
 function busyClass(spec) {    // every window class is registered through here (ObjC.registerSubclass itself cannot be replaced: JXA holds it read-only)
     Object.keys(spec.methods || {}).forEach(function (selector) {
@@ -17247,7 +17262,7 @@ function busyClass(spec) {    // every window class is registered through here (
 }
 function busyTold(now) {
     var span = now - busyFrom, keys = Object.keys(busyMeter), total = keys.reduce(function (sum, k) { return sum + busyMeter[k][1]; }, 0), calls = keys.reduce(function (sum, k) { return sum + busyMeter[k][0]; }, 0);
-    if ((total > span * BUSY_SHARE || calls > span / 4) && typeof say == 'function') say('frames busy ' + Math.min(total, 999999) + ' ' + Math.min(span, 999999) + ' ' + keys.sort(function (a, b) { return busyMeter[b][1] - busyMeter[a][1] || busyMeter[b][0] - busyMeter[a][0]; }).slice(0, 5).map(function (k) { return k.replace(/[^\x21-\x7e]/g, '') + '=' + busyMeter[k][0] + '/' + busyMeter[k][1]; }).join(';').slice(0, 600));
+    if ((total > span * BUSY_SHARE || calls > span / 4) && busySay) busySay('frames busy ' + Math.min(total, 999999) + ' ' + Math.min(span, 999999) + ' ' + keys.sort(function (a, b) { return busyMeter[b][1] - busyMeter[a][1] || busyMeter[b][0] - busyMeter[a][0]; }).slice(0, 5).map(function (k) { return k.replace(/[^\x21-\x7e]/g, '') + '=' + busyMeter[k][0] + '/' + busyMeter[k][1]; }).join(';').slice(0, 600));
     busyMeter = {}; busyFrom = now;
 }
 var TORWINDOW = false, TOR_APART = 'Tor opens a Tor window of its own, apart from this one: it shares nothing with this window, and Tor never carries this one.';    // [C17] a Tor window: lzrprf says so as the window's second word, "tor"

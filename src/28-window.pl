@@ -28,6 +28,7 @@ $.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSAutoFillHeuristicsE
 // method this window gives the system (ObjC.registerSubclass: its drawings, presses, timers and delayed calls) is timed;
 // once BUSY_EVERY_MS has passed, when the methods together took more than BUSY_SHARE of it, one line "frames busy
 // TOTAL_MS SPAN_MS NAME=CALLS/MS;..." names the five that took most, and lzrprf writes it to the link's log.
+var busySay = typeof say == 'function' ? say : null;    // the window's own say, taken as the script starts (a function declaration is there already): code that catches what the window says by putting its own say in place never catches the meter's report, which on a busy Mac broke checks of exact words (Ticket #1549)
 var BUSY_EVERY_MS = 5000, BUSY_SHARE = 0.2, busyMeter = {}, busyFrom = Date.now();    // DECLARED(5 s: a spin shows within one look; a fifth of a core: well above an idle window, well below a spin)
 function busyClass(spec) {    // every window class is registered through here (ObjC.registerSubclass itself cannot be replaced: JXA holds it read-only)
     Object.keys(spec.methods || {}).forEach(function (selector) {
@@ -43,7 +44,7 @@ function busyClass(spec) {    // every window class is registered through here (
 }
 function busyTold(now) {
     var span = now - busyFrom, keys = Object.keys(busyMeter), total = keys.reduce(function (sum, k) { return sum + busyMeter[k][1]; }, 0), calls = keys.reduce(function (sum, k) { return sum + busyMeter[k][0]; }, 0);
-    if ((total > span * BUSY_SHARE || calls > span / 4) && typeof say == 'function') say('frames busy ' + Math.min(total, 999999) + ' ' + Math.min(span, 999999) + ' ' + keys.sort(function (a, b) { return busyMeter[b][1] - busyMeter[a][1] || busyMeter[b][0] - busyMeter[a][0]; }).slice(0, 5).map(function (k) { return k.replace(/[^\x21-\x7e]/g, '') + '=' + busyMeter[k][0] + '/' + busyMeter[k][1]; }).join(';').slice(0, 600));
+    if ((total > span * BUSY_SHARE || calls > span / 4) && busySay) busySay('frames busy ' + Math.min(total, 999999) + ' ' + Math.min(span, 999999) + ' ' + keys.sort(function (a, b) { return busyMeter[b][1] - busyMeter[a][1] || busyMeter[b][0] - busyMeter[a][0]; }).slice(0, 5).map(function (k) { return k.replace(/[^\x21-\x7e]/g, '') + '=' + busyMeter[k][0] + '/' + busyMeter[k][1]; }).join(';').slice(0, 600));
     busyMeter = {}; busyFrom = now;
 }
 var TORWINDOW = false, TOR_APART = 'Tor opens a Tor window of its own, apart from this one: it shares nothing with this window, and Tor never carries this one.';    // [C17] a Tor window: lzrprf says so as the window's second word, "tor"
