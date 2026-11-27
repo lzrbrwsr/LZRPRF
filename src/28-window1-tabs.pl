@@ -161,14 +161,29 @@ function veilPressed(event) {
 // [C26] The question about scripts can be minimized (ticket 1230): Minimize closes it unanswered, so the page and the window go
 // on as with Deny Once, the answer when nobody answers, and the LZRDFNDR icon brings it back while it is still the newest
 // question. A newer question, or the page going on to another, ends it: lzrprf takes no late answer (sub permit_visited).
-var permitLater = null;    // { parts, number, scripts } of the question minimized, or null
+var permitLater = null;    // lzrprf sends only one unanswered script question at a time
+function permitLaterSet(question) {
+    permitLater = question;
+    if (toolIcon) toolIcon.needsDisplay = true;
+}
+function permitLaterBadge(size) {
+    if (!permitLater || permitLater.number != asked) return;
+    var bubble = $.NSMakeRect(size.width - 12, size.height - 12, 11, 11);
+    GREEN.setFill;
+    $.NSBezierPath.bezierPathWithOvalInRect(bubble).fill;
+    centred(styled('1', inked(sans(8, true), DARK)), bubble.origin.x + 5.5, bubble.origin.y, 0);
+}
 function permitShow(parts, number, scripts) {
     // Forget is a choice of the site's LZRDFNDR settings, not of the question (Henry, 2026-11-26).
     var answerByPosition = [4, 3, 2, 1];
     var choices = ASK_PILLS.map(function (choice, i) {
-        return [choice[0], function () { permitLater = null; closeModal(); say('button ' + number + ' ' + answerByPosition[i]); }];
+        return [choice[0], function () { permitLaterSet(null); closeModal(); say('button ' + number + ' ' + answerByPosition[i]); }];
     });
-    choices.push(['Minimize', function () { permitLater = { parts: parts, number: number, scripts: scripts }; closeModal(); if (toolIcon) toolIcon.needsDisplay = true; }]);
+    choices.push(['Minimize', function () {
+        permitLaterSet({ parts: parts, number: number, scripts: scripts });
+        modalFrom = toolIcon;
+        closeModal();
+    }]);
     modal('LZRDFNDR scripts', parts[1] || '', choices, scripts.length ? 'permit' : 'tall');
     if (parts.essential) webWarning('script', function () { permitShow(parts, number, scripts); });
     if (!scripts.length) return;
@@ -178,9 +193,11 @@ function permitShow(parts, number, scripts) {
     panelText.scrollRangeToVisible($.NSMakeRange(0, 0));
 }
 function permitReopened() {    // true when the LZRDFNDR icon brought a minimized question back
-    if (!permitLater || permitLater.number != asked) { permitLater = null; return false; }
-    var later = permitLater; permitLater = null;
+    if (!permitLater || permitLater.number != asked) { permitLaterSet(null); return false; }
+    var later = permitLater; permitLaterSet(null);
+    flyNext = { icon: toolIcon, at: Date.now() };
     permitShown = later.scripts; permitAsked = later.number;
     permitShow(later.parts, later.number, later.scripts);
+    firstFlown();
     return true;
 }

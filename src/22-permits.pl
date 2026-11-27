@@ -615,7 +615,8 @@ sub permit_visited {                      # [C26] a visit begins: what you allow
     $PERMIT_ROUND = defined $PERMIT_RELOAD && $PERMIT_RELOAD eq $url ? $PERMIT_ROUND + 1 : 0;
     undef $PERMIT_RELOAD;
     $PERMIT_ASK = { site => $site, url => $url, items => {}, stripped => 0, refused => 0, boxed => 0 };
-    undef $PERMIT_PENDING;                # a question of the page before that you left unanswered is Deny Once, as it always was; a late answer to it is not taken
+    window("permit answered $PERMIT_PENDING->{n}") if $PERMIT_PENDING;
+    undef $PERMIT_PENDING;                # an unanswered question from the previous page is Deny Once
 }
 
 sub permits_asked {                       # [C26] once the page is drawn: its scripts no rule allows, and what was taken out of it or refused, put to you, each by its name and with its source: Deny Once, Deny Always, Allow Once, Always Allow. Deny Once is the first button and the answer when nobody answers; Deny Always keeps a deny rule, and a script a deny rule names is never put to you again. Returns true when the page is to be loaded again with what you allowed

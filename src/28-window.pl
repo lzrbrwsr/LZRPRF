@@ -282,6 +282,27 @@ function layersTold(rest) {    // "layers T ITEMS" for the tab shown, onto the l
 // elsewhere. A line for a tab not shown is passed over. Nothing is said while no page is kept running, or the
 // page shown is not a laid one.
 var scrollSaid = null, scrollDue = false, scrollGen = 0, scrollDueGen = 0, scrollWanted = null, SCROLL_FRAME = 1 / 60;    // DECLARED(one frame of the screen: the most often a page is told it moved)
+// Ticket 1530: the frames of a scroll, measured where they are made. Each burst of scrolling (moves with less than
+// FRAMES_QUIET_MS between them) keeps the time each drawRect of the page took and the gaps between the moves; when it
+// ends, one line "frames scroll MOVES DRAWS P50_US P95_US MAX_US LATE" goes to lzrprf, which writes it to the link's log.
+// LATE counts the gaps over FRAMES_LATE_MS: a frame the screen showed twice. Nothing is kept past the line.
+var frames = null, FRAMES_QUIET_MS = 400, FRAMES_LATE_MS = 25, FRAMES_MOST = 2048;    // DECLARED(400 ms: past a momentum's last move; 25 ms: one and a half frames at 60 Hz; 2048 draws: past a 30 s burst)
+function framesNow() { return $.NSDate.timeIntervalSinceReferenceDate * 1000; }
+function framesMoved() {
+    var t = framesNow();
+    if (!frames) { frames = { moves: 0, draws: [], late: 0, last: t }; hand.performSelectorWithObjectAfterDelay('framesDue:', $(), FRAMES_QUIET_MS / 1000); }
+    else if (t - frames.last > FRAMES_LATE_MS) frames.late++;
+    frames.moves++; frames.last = t;
+}
+function framesDrawn(ms) { if (frames && frames.draws.length < FRAMES_MOST) frames.draws.push(ms); }
+function framesDue() {
+    if (!frames) return;
+    var idle = framesNow() - frames.last;
+    if (idle < FRAMES_QUIET_MS) return hand.performSelectorWithObjectAfterDelay('framesDue:', $(), (FRAMES_QUIET_MS - idle) / 1000 + 0.01);
+    var d = frames.draws.slice().sort(function (a, b) { return a - b; }), us = function (q) { return d.length ? Math.round(d[Math.min(d.length - 1, Math.floor(q * d.length))] * 1000) : 0; };
+    say('frames scroll ' + Math.min(frames.moves, 99999) + ' ' + d.length + ' ' + Math.min(us(0.5), 999999) + ' ' + Math.min(us(0.95), 999999) + ' ' + Math.min(us(1), 999999) + ' ' + Math.min(frames.late, 99999));
+    frames = null;
+}
 function pageScrollNow() {
     if (!sheet || !canvas || !scroll.documentView.isEqual(canvas)) return null;
     var at = canvas.visibleRect.origin;
@@ -421,7 +442,7 @@ function heard(line) {
     else if (word == 'pictures') { picturesRow = true; picturesBlocked = rest == 'block'; if (cogOpen) cogPlaced(); }
     else if (word == 'marksbar') { marksOn = rest == 'on'; marksView.hidden = !marksOn; if (barMenuItem) barMenuItem.title = $(barToggleWords(marksOn, true)); place(); }
     else if (word == 'flagged' || word == 'flagreport') flagTold(word, rest);    // [C28] LZRDFNDR's red page, and the report of a wrong block before it is sent
-    else if (word == 'permit') { if (/^answered [0-9]+$/.test(rest)) { if (rest == 'answered ' + asked) { permitLater = null; if (modalKind == 'permit') closeModal(); if (toolIcon) toolIcon.needsDisplay = true; } } else permitTold(rest); }    // [C26] lzrprf's question about the scripts of the page shown
+    else if (word == 'permit') { if (/^answered [0-9]+$/.test(rest)) { if (permitLater && rest == 'answered ' + permitLater.number) permitLaterSet(null); if (rest == 'answered ' + asked && permitAsked == asked && (modalKind == 'permit' || modalKind == 'tall')) closeModal(); } else permitTold(rest); }    // [C26] lzrprf's question about the scripts of the page shown
     else if (word == 'permitscript') permitScriptTold(rest);    // [C26] one script of that question, with its source
     else if (word == 'scripts') scriptsTold(rest);    // [C26] the list of LZRDFNDR scripts
     else if (word == 'webquestion') webQuestionTold(rest);
@@ -626,7 +647,7 @@ function laid(lines, first) {
         for (var b = Math.floor(op[0] / 256); b <= Math.floor((op[0] + op[1]) / 256); b++) (next.buckets[b] || (next.buckets[b] = [])).push(i);
     });
     var kept = restoring === null ? reloadPlaced() : (reloadPlace = null), share = restoring !== null ? restoring : again && sheet && sheet.high > 0 ? Math.min(1, Math.max(0, canvas.visibleRect.origin.y / sheet.high)) : 0;    // a tab chosen again is shown where it was read in it; a page laid out again at a new width where it was read, as a share of its height; a new page from its top
-    restoring = null;
+    var restoringWas = restoring; restoring = null;
     sheet = next; pageBack(false);
     if (again) videosPlaced(); else videosEnded();    // [C22] the same page at another width, or drawn again by its scripts, keeps its videos playing
     if (!scroll.documentView.isEqual(canvas)) scroll.documentView = canvas;
@@ -638,7 +659,12 @@ function laid(lines, first) {
             if (next.ops[i]) touched.push(next.ops[i]);
         }
         touched.forEach(function (op) { canvas.setNeedsDisplayInRect($.NSMakeRect(0, op[0] - 2, next.wide, op[1] + 4)); });
-    } else { fit(); canvas.scrollPoint($.NSMakePoint(0, kept ? kept.y : Math.round(share * sheet.high))); }
+    } else {
+        // Ticket 1536: a page drawn again at the same width while it loads keeps the place read, in points, not its share of the
+        // height: a page growing under the view moved what was read down by share x the growth at every drawing (the jerk).
+        var held = again && previous && previous.wide == next.wide && !kept && restoringWas === null ? Math.round(canvas.visibleRect.origin.y) : null;
+        fit(); canvas.scrollPoint($.NSMakePoint(0, kept ? kept.y : held !== null ? held : Math.round(share * sheet.high)));
+    }
     if (kept) kept.last = Math.round(canvas.visibleRect.origin.y); listed(lines.slice(0, first));    // where the view stands now: a shorter drawing stops short, and the next one is put at the place again
     if (findOpen) findRun(); namedSettled();
     drawn(lines.length, characters);
@@ -2023,7 +2049,7 @@ var shot = null, shotView = null, shotParts = null, SHOT_FLY = 0.11, SHOT_FLASH 
 function homeActionShot(action) {
     if (!homePress || Date.now() - homePress.at > 1000 || !flightAllowed()) return;
     var target = action == 'search' ? bar : tabsView, k = layersKit(), now = $.NSProcessInfo.processInfo.systemUptime;    // Core Animation's clock
-    var to = action == 'search' ? $.NSMakePoint(PILL.origin.x + PILL.size.width / 2 - bar.frame.origin.x, bar.frame.size.height / 2)    // T4 (Henry, 2026-11-26): the horizontal middle of the search box, the pill the bar is drawn in (both in the bar's row)
+    var to = action == 'search' ? searchPlaceholderCenter(bar)
         : $.NSMakePoint(TABS_X + (tabs.length + 0.5) * Math.max(1, Math.min(260, Math.floor((tabsView.frame.size.width - TABS_X - 48) / (tabs.length + 1)))), tabsView.frame.size.height / 2);
     if (!shotView) { shotView = $.LzrprfLayers.alloc.initWithFrame(root.bounds); shotView.layer = k.layer.layer; shotView.wantsLayer = true; root.addSubview(shotView); shotParts = [k.shape.layer, k.shape.layer]; shotParts.forEach(function (one) { shotView.layer.addSublayer(one); }); }
     shotView.frame = root.bounds; shotView.hidden = false;
@@ -2569,9 +2595,9 @@ function toolIconDrawn(view) {
     var size = view.frame.size, cx = size.width / 2, cy = size.height / 2, hot = hover.toolIcon && !modalOpen, lit = modalOpen && modalKind == 'tool', parts = toolParts(cx, cy);
     if (hot) glass($.NSBezierPath.bezierPathWithRoundedRectXRadiusYRadius($.NSMakeRect(1, 1, size.width - 2, size.height - 2), 7, 7), true);
     stroked(parts[0], lit ? GREEN : hot ? WHITE : ICON, 1.2, lit || hot ? GREEN : null, 7);
-    stroked(parts[1], toolBack ? YELLOW : GREEN, 1.3, toolBack ? YELLOW : GREEN, 5);    // the beam is always lit; yellow once something you switched off came back
+    stroked(parts[1], toolBack ? YELLOW : GREEN, 1.3, toolBack ? YELLOW : GREEN, 5);
+    permitLaterBadge(size);
 }
-
 // What the page is made of, in the modal every other panel uses (centred, over the veil), larger
 // than the others: the application's list as lzrprf checked it, and lzrprf's sentence that it
 // checked the form of the list and not its truth. The last row of the lock's panel opens it, flying out of
@@ -3308,7 +3334,7 @@ function permitCodeText(scripts) {    // the code block: each script under a lin
 }
 function permitTold(rest) {
     asked++;
-    var parts = rest.split('\t'); parts.essential = essentialScriptPrompt; essentialScriptPrompt = false;
+    permitLaterSet(null); var parts = rest.split('\t'); parts.essential = essentialScriptPrompt; essentialScriptPrompt = false;
     permitShow(parts, permitAsked = asked, permitShown = permitScripts);    // drawn by permitShow (28-window1-tabs.pl), which also minimizes it
     permitScripts = [];
 }
@@ -3903,10 +3929,22 @@ ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: c
     'menuForEvent:': { types: ['id', ['id']], implementation: function (event) { return inspectMenu(true); } }
 }) });
 
+// Ticket 1530 part 2 (Henry: "momentum a bit faster"): after the scroll view took a momentum move of a fling (the page's
+// wheel hands it on, 24-trmnl-window.pl), the page goes MOMENTUM_EXTRA further, clamped to the page. No class calls
+// ObjC.super for it: the move is added on the clip view the scroll view has just moved.
+var MOMENTUM_EXTRA = 0.25;    // DECLARED(Henry asked for a bit faster: a quarter more distance per momentum move)
+function momentumMore(event) {
+    if (!event.momentumPhase || !event.hasPreciseScrollingDeltas || !scroll.documentView.isEqual(canvas)) return;
+    var clip = scroll.contentView, at = clip.bounds.origin, room = Math.max(0, canvas.frame.size.height - clip.bounds.size.height);
+    var y = Math.max(0, Math.min(room, at.y - event.scrollingDeltaY * MOMENTUM_EXTRA));
+    if (y == at.y) return;
+    clip.scrollToPoint($.NSMakePoint(at.x, y)); scroll.reflectScrolledClipView(clip);
+}
 ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
     // A laid page is measured from its top, as the application laid it out. It has no menu of its own.
     'isFlipped': { implementation: function () { return true; } },
-    'drawRect:': { implementation: function (dirty) { viewDrawn('laid', function () { paint(dirty); }); } },
+    'isOpaque': { implementation: function () { return true; } },    // paint() fills white under everything: the compositor blends nothing under it
+    'drawRect:': { implementation: function (dirty) { viewDrawn('laid', function () { var began = framesNow(); paint(dirty); framesDrawn(framesNow() - began); }); } },
     'acceptsFirstResponder': { implementation: function () { return liveOn; } },    // the keyboard only for a page kept running
     'mouseDown:': { implementation: function (event) { pageClicked(event); } },
     'acceptsFirstMouse:': { types: ['bool', ['id']], implementation: function (event) { return true; } },    // H-0074, and Henry 2026-11-24: the press that brings the window forward is the page's too, a site's page as the home (clickThrough, 28-window1-tabs.pl); an incognito window is a process of its own that macOS does not bring forward, so a first press there was lost
@@ -4094,8 +4132,9 @@ ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowDidEnterFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },
     'windowDidExitFullScreen:': { types: ['void', ['id']], implementation: function (note) { viewNow(); frameSaid(); } },    // full screen keeps the system's own options, which hide the menu bar and show it at the top: options of its own (auto-hide toolbar on a window with no toolbar) hung a window that opened in full screen (release 131, 2026-11-26)
     'viewed:': { types: ['void', ['id']], implementation: function (sender) { view(); } },
-    'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { pageScrollMoved(); } },
+    'pageScrolled:': { types: ['void', ['id']], implementation: function (note) { framesMoved(); pageScrollMoved(); } },
     'pageScrollDue:': { types: ['void', ['id']], implementation: function (sender) { pageScrollFrame(); } },
+    'framesDue:': { types: ['void', ['id']], implementation: function (sender) { try { framesDue(); } catch (fault) { frames = null; } } },
     'unlaid:': { types: ['void', ['id']], implementation: function (sender) { unlaid(); page.string = $(''); listed([]); } },
     // Return sends the typed address; nonplain characters make the entire address invalid.
     'go:': { types: ['void', ['id']], implementation: function (sender) {

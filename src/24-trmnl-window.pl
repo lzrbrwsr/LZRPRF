@@ -36,7 +36,7 @@ var TRMNL_SHORTCUTS = { 'c \\': 'split-right', 'cs d': 'split-down', 'cs w': 'cl
 var TRMNL_NAMED_KEYS = { 123: 'left', 124: 'right', 125: 'down', 126: 'up', 116: 'pageup', 121: 'pagedown' }, TRMNL_KEY_GLYPHS = { left: 0xF702, right: 0xF703, down: 0xF701, up: 0xF700, pageup: 0xF72C, pagedown: 0xF72D };
 var trmnlOffered = [], trmnlHand = null;
 function trmnlMethods(methods) {    // the methods of LzrprfLaid, with the terminal's own added
-    methods['scrollWheel:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlWheeled(event)) canvas.nextResponder.scrollWheel(event); } };    // on any other page the wheel goes where it always went
+    methods['scrollWheel:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlWheeled(event)) { canvas.nextResponder.scrollWheel(event); try { momentumMore(event); } catch (lost) { } } } };    // OBSERVABILITY-EXEMPT(the extra of a momentum move left out is the system's own move alone)    // on any other page the wheel goes where it always went
     var pressed = methods['mouseDown:'].implementation, typed = methods['keyDown:'].implementation;
     methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; trmnlPressAt = Date.now(); pressed(event); } };    // a press starts a selection afresh, and is the press a copy of LZRCHT's answers [C32]
     methods['mouseDragged:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragged(event); } };

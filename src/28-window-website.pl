@@ -212,7 +212,7 @@ function webReviewOpened() {
 function webReviewEnded(resolved) {
     var again = webReturn;
     webReturn = null;
-    if (resolved) { permitLater = null; closeModal(); }
+    if (resolved) { permitLaterSet(null); closeModal(); }
     else if (again) again();
 }
 END

@@ -295,11 +295,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
 06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C18 C15
-06-behind.pl	173	unheard	-
-06-behind.pl	217	paired	-
-06-behind.pl	232	unnamed	-
-06-behind.pl	239	leave	C17 C7 C29 C32 C12 C16
-06-behind.pl	257	closed	-
+06-behind.pl	176	unheard	-
+06-behind.pl	220	paired	-
+06-behind.pl	235	unnamed	-
+06-behind.pl	242	leave	C17 C7 C29 C32 C12 C16
+06-behind.pl	260	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-
@@ -874,13 +874,13 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 22-permits.pl	579	permit_scripted	C26
 22-permits.pl	589	live_permitted	C26
 22-permits.pl	610	permit_visited	C26
-22-permits.pl	621	permits_asked	C26
-22-permits.pl	656	permit_button	C26
-22-permits.pl	664	permit_answered	C26
-22-permits.pl	721	permits_later	C26
-22-permits.pl	726	scripts_set	C26 C4
-22-permits.pl	750	scripts_layer	C26 C4
-22-permits.pl	768	scripts_told	C26
+22-permits.pl	622	permits_asked	C26
+22-permits.pl	657	permit_button	C26
+22-permits.pl	665	permit_answered	C26
+22-permits.pl	722	permits_later	C26
+22-permits.pl	727	scripts_set	C26 C4
+22-permits.pl	751	scripts_layer	C26 C4
+22-permits.pl	769	scripts_told	C26
 22-sends.pl	1	-	-
 22-sends.pl	7	send_keys	-
 22-sends.pl	11	sends_told	-

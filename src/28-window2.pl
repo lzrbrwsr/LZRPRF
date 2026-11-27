@@ -253,6 +253,13 @@ function partsMade() {    // the boxes of the two modals, made once with the pan
     tnnlTick = tick('Use also VPN: your own WireGuard VPN under Tor', 0, 'vpn:');
 }
 
+// Aim at the visible placeholder text inside the field, even when it is clipped.
+function searchPlaceholderCenter(field) {
+    var text = field.cell.drawingRectForBounds(field.bounds);
+    var width = Math.max(0, Math.min(text.size.width, field.placeholderAttributedString.size.width));
+    return $.NSMakePoint(text.origin.x + width / 2, text.origin.y + text.size.height / 2);
+}
+
 function run(argv) {
     NAME = (argv[0] || NAME).replace(/-Staging$/, ' - Staging');    // the staging application, LZRBRWSR-Staging.app, is named "LZRBRWSR - Staging" in the menu bar (Henry, 2026-11-26)
     PULLED = /\+$/.test(argv[1] || '');    // T5: "+" after the kind, said by lzrprf for a window a tab was pulled out into (sub pulled_command, --open)
@@ -343,6 +350,9 @@ function run(argv) {
     second.hidden = true;
     scroll = $.NSScrollView.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640));
     scroll.hasVerticalScroller = true;
+    // Ticket 1530: the page scrolls on Core Animation. Layer-backed, the scroll view moves what is drawn already on the
+    // compositor and asks the page to draw only the strip a move uncovers, where it drew the whole view each frame.
+    scroll.wantsLayer = true; canvas.wantsLayer = true;
     scroll.autoresizingMask = 2 | 16;
     page = unchecked($.LzrprfPage.alloc.initWithFrame($.NSMakeRect(0, 0, 960, 640)));
     page.editable = false;
