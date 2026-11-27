@@ -214,12 +214,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 02-limits-and-state.pl	19	unblocked	C20 C16 C17
 02-limits-and-state.pl	32	kept_in	-
 02-limits-and-state.pl	36	shared	C16 C19 C18 C12 C22 C21 C24 C30 C23 C11 C29 C32 C26
-02-limits-and-state.pl	212	sandbox_says	C26 C27 C4
-02-limits-and-state.pl	263	permit_class	C26
-02-limits-and-state.pl	264	permit_kinds	C26
-02-limits-and-state.pl	294	fresh_tab	C19
-02-limits-and-state.pl	310	now	C19 C6 C8 C14 C30
-02-limits-and-state.pl	329	timed	C28
+02-limits-and-state.pl	213	sandbox_says	C26 C27 C4
+02-limits-and-state.pl	265	permit_class	C26
+02-limits-and-state.pl	266	permit_kinds	C26
+02-limits-and-state.pl	296	fresh_tab	C19
+02-limits-and-state.pl	312	now	C19 C6 C8 C14 C30
+02-limits-and-state.pl	331	timed	C28
 03-containers.pl	1	-	C1 C28 C21 C3 C24 C12
 03-containers.pl	185	shell_held	-
 03-containers.pl	190	shell_measured	-
@@ -738,18 +738,18 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 20-window-side.pl	45	said_noted	-
 20-window-side.pl	57	stated	-
 20-window-side.pl	65	hear	C12 C29 C32 C19
-20-window-side.pl	120	window_changed	-
+20-window-side.pl	121	window_changed	-
 21-kept-app.pl	1	-	C32
-21-kept-app.pl	11	kept_app_discord	-
-21-kept-app.pl	19	kept_app_valid	-
-21-kept-app.pl	27	kept_app_budget	-
-21-kept-app.pl	40	kept_app_folder	-
-21-kept-app.pl	55	kept_app_jar	-
-21-kept-app.pl	66	kept_app_request	-
-21-kept-app.pl	75	kept_app_fetched	-
-21-kept-app.pl	86	kept_app_response	-
-21-kept-app.pl	118	kept_app_open_tab	-
-21-kept-app.pl	138	kept_app_visit	-
+21-kept-app.pl	12	kept_app_discord	-
+21-kept-app.pl	20	kept_app_valid	-
+21-kept-app.pl	28	kept_app_budget	-
+21-kept-app.pl	41	kept_app_folder	-
+21-kept-app.pl	56	kept_app_jar	-
+21-kept-app.pl	67	kept_app_request	-
+21-kept-app.pl	76	kept_app_fetched	-
+21-kept-app.pl	87	kept_app_response	-
+21-kept-app.pl	119	kept_app_open_tab	-
+21-kept-app.pl	139	kept_app_visit	-
 21-link.pl	1	-	C31
 21-link.pl	49	link_folder	-
 21-link.pl	50	link_state	C31
@@ -773,24 +773,25 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-link.pl	248	link_reaped	C31
 21-link.pl	261	link_checked	C31
 21-link.pl	280	link_command	C31
-21-link.pl	364	link_drew	C31
-21-link.pl	370	link_shot	C31
+21-link.pl	365	link_drew	C31
+21-link.pl	371	link_shot	C31
 21-live.pl	1	-	-
 21-live.pl	8	live_of	-
 21-live.pl	10	live_kept	C18
-21-live.pl	22	live_dropped	-
-21-live.pl	28	live_told	C29
-21-live.pl	36	live_end	-
-21-live.pl	67	live_read	-
-21-live.pl	80	live_due	C19
-21-live.pl	92	live_turn	C18 C19 C26 C5 C17 C6 C7
-21-live.pl	150	live_asked	C19 C26
-21-live.pl	192	live_early	C19
-21-live.pl	212	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	318	live_parts	C19
-21-live.pl	337	unchunked	-
-21-live.pl	352	live_replied	C19
-21-live.pl	357	live_sent	C19
+21-live.pl	23	live_dropped	-
+21-live.pl	31	live_window_focus	-
+21-live.pl	44	live_told	C29
+21-live.pl	53	live_end	-
+21-live.pl	84	live_read	-
+21-live.pl	97	live_due	C19
+21-live.pl	109	live_turn	C18 C19 C26 C5 C17 C6 C7
+21-live.pl	167	live_asked	C19 C26
+21-live.pl	209	live_early	C19
+21-live.pl	229	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
+21-live.pl	336	live_parts	C19
+21-live.pl	355	unchunked	-
+21-live.pl	370	live_replied	C19
+21-live.pl	375	live_sent	C19
 21-web-storage.pl	1	-	-
 21-web-storage.pl	7	kept_storage_file	-
 21-web-storage.pl	14	kept_storage_locked	-
@@ -870,14 +871,14 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 22-permits.pl	565	permit_tag	C26
 22-permits.pl	579	permit_scripted	C26
 22-permits.pl	589	live_permitted	C26
-22-permits.pl	605	permit_visited	C26
-22-permits.pl	616	permits_asked	C26
-22-permits.pl	651	permit_button	C26
-22-permits.pl	659	permit_answered	C26
-22-permits.pl	716	permits_later	C26
-22-permits.pl	721	scripts_set	C26 C4
-22-permits.pl	745	scripts_layer	C26 C4
-22-permits.pl	763	scripts_told	C26
+22-permits.pl	606	permit_visited	C26
+22-permits.pl	617	permits_asked	C26
+22-permits.pl	652	permit_button	C26
+22-permits.pl	660	permit_answered	C26
+22-permits.pl	717	permits_later	C26
+22-permits.pl	722	scripts_set	C26 C4
+22-permits.pl	746	scripts_layer	C26 C4
+22-permits.pl	764	scripts_told	C26
 22-sends.pl	1	-	-
 22-sends.pl	7	send_keys	-
 22-sends.pl	11	sends_told	-

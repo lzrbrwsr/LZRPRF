@@ -78,6 +78,7 @@ sub hear {                                # the next thing the window says; noth
             chomp $line;
             print STDERR "$line\n" if $TRY && $line =~ /^(?:test|fault) /;    # "lzrprf try" only: what a test's own text in the window reports
             if ($line =~ /^undrawn ([a-z]{1,20}) ([\x20-\x7e]{0,200})$/) { record("the window could not finish drawing its $1 view this once, and goes on: $2"); next }    # said by function viewDrawn in the window, the first fault of each view once: kept in the log wherever lzrprf listens, in the loop of sub behind, in a question or after an install
+            if ($line =~ /\Awindow focus ([01])\z/) { live_window_focus($1); next }
             return $line;
         }
         my ($ready, $writable, $wait) = ('', '', defined $until ? $until - now() : undef);

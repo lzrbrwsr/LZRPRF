@@ -16,6 +16,7 @@ sub live_kept {
     @$live{qw(tab made paths host pictures shown videos)} = ($tab, \@made, [@$paths], $host, $decoded // {}, $shown, [@{ $videos // [] }]);
     $live->{laid} = ($lines->[scalar @made] // '') =~ /^(L[0-9]+x[0-9]+)$/ ? $1 : '';    # [C18] the size it was laid at, when it was laid: a drawing of another height has its end somewhere else (sub live_answered)
     push @LIVE, $live;
+    live_window_focus();
     live_end($LIVE[0], 'more pages were kept running than lzrprf keeps') while @LIVE > $LIVE_MOST;
 }
 
@@ -25,8 +26,24 @@ sub live_dropped {                        # a run that kept its page and is not 
     return defined $words ? idle($words) : undef;
 }
 
+my $window_focused;
+
+sub live_window_focus {
+    $window_focused = $_[0] if @_;
+    return unless defined $window_focused;
+    my $selected = live_of($TABS[$TAB]);
+    for my $live (@LIVE) {
+        next if $live->{ended} || $live->{starting};
+        my $focused = $window_focused && $selected && $live == $selected ? 1 : 0;
+        next if defined $live->{window_focused} && $live->{window_focused} == $focused;
+        $live->{window_focused} = $focused;
+        live_wrote($live, "window-focus $focused");
+    }
+}
+
 sub live_told {                           # the window is told whether the page shown is kept running, and whether a text field of it has the focus: "live on|off 1|0"
     my $live = live_of($TABS[$TAB]);
+    live_window_focus();
     my @now = $TABS[$TAB]{trmnl} ? ('on', 1, 'trmnl') : $TABS[$TAB]{cht} ? ('on', 0, 'cht') : $live ? ('on', $live->{focus} ? 1 : 0) : ('off', 0);    # [C29] a terminal's tab takes every key, and keys held with Control
     return if "@now" eq "@LIVE_TOLD";
     @LIVE_TOLD = @now;
@@ -276,7 +293,8 @@ sub live_fetched {                        # [C19]
         }
     }
     record($asked_for, $kept) or return live_replied($live, 0, '', '');    # [C5] before the name is even looked up
-    $why = "the page asked for more than $LIVE_FETCH_MOST addresses" if ++$live->{fetches} > $LIVE_FETCH_MOST;
+    my $fetch_most = $live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST;
+    $why = "the page asked for more than $fetch_most addresses" if ++$live->{fetches} > $fetch_most;
     if (!$why) { my $shield = shield_said($url); $why = shield_why($shield) if $shield ne 'allow' }    # [C28] before any DNS lookup, including requests while a page is still being read
     my $where;
     my $sent_ask = { method => $method, type => $type, body => $body, origin => $host eq $live->{host} ? undef : "https://$live->{host}", cookie => scalar(sso_cookie($url, $live->{host})), top => $allowed eq 'sandbox' ? undef : $live->{url}, as => $as, dest => $dest, from => $live->{host} };

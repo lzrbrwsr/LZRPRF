@@ -125,7 +125,7 @@ sub prefetch_go {                         # ($first, $page): the page $page aske
 
 sub prefetch_soon {                       # [C19] ($live, $dest, $to): "=soon DEST URL", a GET the page's own script set going and makes in a later task (a script it made: yle.fi waited 205, 88 and 280 ms on three, one after another, 2026-11-25). Judged here as sub live_fetched will judge the request, begun with the two lines sub prefetch_pump writes first, and handed over only by sub prefetch_take when the page asks for exactly it. Whatever this refuses is simply not begun: the request says why when it comes
     my ($live, $dest, $to) = @_;
-    return if $live->{home} || $TOR_WANTED || listed($to) || ++$live->{soon} > $LIVE_FETCH_MOST;
+    return if $live->{home} || $TOR_WANTED || listed($to) || ++$live->{soon} > ($live->{kept_app} ? $LIVE_FETCH_KEPT_MOST : $LIVE_FETCH_MOST);
     my ($url, $host) = address($to);
     return if !$url || $PREFETCH{$url};
     my ($rules) = permit_rules();
