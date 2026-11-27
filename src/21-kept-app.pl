@@ -5,7 +5,7 @@ my @KEPT_APPS = ({
     start => 'https://discord.com/app',
     hosts => { map { $_ => 1 } qw(discord.com gateway.discord.gg cdn.discordapp.com media.discordapp.net discord.gg) },
     socket_host => 'gateway.discord.gg',
-    seconds => 86_400, requests => 120, bytes => 8 * 1024 * 1024, sockets => 2,
+    seconds => 86_400, requests => 120, bytes => 48 * 1024 * 1024, reply => 16 * 1024 * 1024, sockets => 2,
 });
 
 sub kept_app_discord {
@@ -63,21 +63,33 @@ sub kept_app_jar {
 
 # The kept application has a separate network route. Every request still passes
 # the blocklist, content shield, checked address broker and TLS verification.
+sub kept_app_request {
+    my ($line) = @_;
+    my ($method, $size, $type, $dest, $auth_bytes, $to) = $line =~
+        m{\A=fetch (GET|HEAD|POST|PUT|PATCH|DELETE) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (data|script|module|worker|frame|image) (?:auth ([1-9][0-9]{0,3}) )?([\x21-\x7e]{1,8192})\z};
+    return unless $method && $size <= $LIVE_FETCH_UP && ($auth_bytes // 0) <= 4096;
+    return if $method =~ /\A(?:GET|HEAD)\z/ && ($size || $type ne '-');
+    return ($method, $size, $type, $dest, $auth_bytes // 0, $to);
+}
+
 sub kept_app_fetched {
-    my ($live, $line, $body) = @_;
+    my ($live, $line, $body, $auth) = @_;
     my $app = $live->{kept_app};
-    my ($method, $size, $type, $dest, $to) = $line =~ m{\A=fetch (GET|HEAD|POST|PUT|PATCH|DELETE) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?([\x21-\x7e]{1,8192})\z};
+    my ($method, $size, $type, $dest, $auth_bytes, $to) = kept_app_request($line);
     return live_replied($live, 403, '', '') unless $method && $size == length($body)
-        && ($method !~ /\A(?:GET|HEAD)\z/ || !$size && $type eq '-')
+        && $auth_bytes == length($auth // '') && (!defined $auth || $auth =~ /\A[\x20-\x7e]+\z/)
         && !$INCOGNITO && !$TOR_WANTED && !$TOR_WINDOW && !$TOR_SESSION;
-    my (undef, $status, undef, undef, $parts) = kept_app_response($app, $to, $method, $type, $body, $dest, 0, $FETCH_BYTES);
+    my (undef, $status, undef, undef, $parts) = kept_app_response($app, $to, $method, $type, $body, $dest, 0, $app->{spec}{reply}, $auth);
     return live_replied($live, $parts ? @$parts : ($status, '', ''));
 }
 
 sub kept_app_response {
-    my ($app, $to, $method, $type, $body, $dest, $nav, $maximum) = @_;
+    my ($app, $to, $method, $type, $body, $dest, $nav, $maximum, $auth) = @_;
     my ($url, $host) = address($to);
     return (undef, 403) unless $url && $app->{spec}{hosts}{$host};
+    # The app's CDN and other origins receive no account credential. The
+    # script must ask for Discord's own API and cannot authorize a redirect here.
+    return (undef, 403) if defined $auth && ($host ne 'discord.com' || $url !~ m{\Ahttps://discord\.com/api/} || $body =~ /\x00/);
     return (undef, 403) if listed($url) ||
         defined filter_said($url, $FILTER_DEST{$dest // 'data'} // $dest, 'discord.com') || shield_said($url) ne 'allow';
     return (undef, 403) unless kept_app_budget($app, 1, 0);
@@ -87,11 +99,14 @@ sub kept_app_response {
     my ($where) = find($host);
     return (undef, 403) unless $where && !grep { $_->{own} } @$where;
     return (undef, 403) unless record("the kept app connects to $host at the first public address that answers: " . join(', ', map { $_->{text} } @$where));
-    my $ask = { method => $method, type => $type, body => $body, origin => 'https://discord.com', top => $app->{spec}{start}, kept_app => 1 };
+    my $reserved = $remaining < $maximum ? $remaining : $maximum;
+    return (undef, 403) unless kept_app_budget($app, 0, $reserved);
+    my $ask = { method => $method, type => $type, body => $body, origin => 'https://discord.com', top => $app->{spec}{start}, kept_app => 1, authorization => $auth };
     my ($got, $why, $peer, $certs) = @{ kept_app_jar($app, sub {
-        return [fetch($url, $where, $ask, $nav, [$remaining < $maximum ? $remaining : $maximum, $FETCH_SECONDS])];
+        return [fetch($url, $where, $ask, $nav, [$reserved, $FETCH_SECONDS])];
     }) };
-    return (undef, 0) if $why || !defined $got || !kept_app_budget($app, 0, length($got));
+    return (undef, 0) if $why || !defined $got || length($got) > $reserved;    # a failed transfer can still consume its reservation
+    $app->{bytes} -= $reserved - length($got);
     my $parts = live_parts($got, $method);
     return (undef, 0) unless $parts && record("$host answered the kept app with $parts->[0]: " . length($got) . ' bytes');
     if ($method eq 'POST' && $url =~ m{\Ahttps://discord\.com/api/(?:v[0-9]+/)?auth/logout(?:\?[^#]*)?\z} && $parts->[0] >= 200 && $parts->[0] < 300) {

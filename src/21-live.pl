@@ -166,6 +166,13 @@ sub live_asked {                          # [C19] the request at the front of wh
     if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
     my $line = substr($live->{held}, 0, $end);
     return [$line, '', $end + 1] if $permit || $soon;
+    if ($live->{kept_app}) {
+        my (undef, $size, undef, undef, $auth_bytes) = kept_app_request($line);
+        return [$line] unless defined $size;
+        return 0 if length($live->{held}) < $end + 1 + $auth_bytes + $size;
+        my $auth = $auth_bytes ? substr($live->{held}, $end + 1, $auth_bytes) : undef;
+        return [$line, substr($live->{held}, $end + 1 + $auth_bytes, $size), $end + 1 + $auth_bytes + $size, $auth];
+    }
     my ($size) = $line =~ /^=fetch [A-Z]{1,8} (0|[1-9][0-9]{0,5}) / or return [$line];
     return [$line] if $size > $LIVE_FETCH_UP;
     return 0 if length($live->{held}) < $end + 1 + $size;
@@ -206,7 +213,7 @@ sub live_fetched {                        # [C19]
     timed('live-asked') if $TIMED;
     pictures_pumped();
     my ($live, $asked) = @_;
-    my ($line, $body, $took) = @$asked;
+    my ($line, $body, $took, $auth) = @$asked;
     return live_end($live, 'it wrote a line of no form') unless defined $took;
     substr($live->{held}, 0, $took, '');
     $live->{looked} = 0;
@@ -215,7 +222,7 @@ sub live_fetched {                        # [C19]
     return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';
     if (substr($line, 0, 6) eq '=soon ') { return if $live->{kept_app}; $line =~ m{^=soon (script|image|data) ([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form'); return prefetch_soon($live, $1, $2) }
-    return kept_app_fetched($live, $line, $body) if $live->{kept_app};
+    return kept_app_fetched($live, $line, $body, $auth) if $live->{kept_app};
     return live_replied($live, 0, '', '') if $live->{home};    # the local home has no network door, including absolute script requests    # [C26]
     my ($method, $size, $type, $dest, $as, $to) = $line =~ m{^=fetch (GET|HEAD|POST) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?(?:as ([a-z]{1,16}) )?([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form');
     return live_end($live, 'it wrote a line of no form') if $method ne 'POST' && ($size || $type ne '-');

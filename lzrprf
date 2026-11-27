@@ -8190,12 +8190,17 @@ sub fetch {
     my $jarred = ($page || $ask && defined $ask->{top}) && !defined $cookie && !jar_skips($url);    # [C7] or else the jar's, for a page you visit or a page kept running outside the sandbox (sub jar_cookie)
     my $ahead = $ask && exists $ask->{jar};    # a request made ahead: the window asked the jar before this run began, and tells it of the answer when the page takes it (sub prefetch_pump)
     $cookie = $ahead ? (length $ask->{jar} ? $ask->{jar} : undef) : jar_cookie($url, $page, $ask) if $jarred;
-    if (defined $cookie && !defined $up) { $up = "$cookie\n"; push @asked, '-H', '@-' }
-    elsif (defined $cookie && $sends && $up !~ /\x00/) {    # a POST's body and its cookies, both on curl's input as its settings: a quoted text, with \\ \" \t \n \r \v written as curl reads them
-        my $quoted = sub { my ($text) = @_; $text =~ s/([\\"])/\\$1/g; $text =~ s/\t/\\t/g; $text =~ s/\n/\\n/g; $text =~ s/\r/\\r/g; $text =~ s/\x0b/\\v/g; return qq("$text") };
-        $up = 'header = ' . $quoted->($cookie) . "\ndata-raw = " . $quoted->($up) . "\n";
-        my ($at) = grep { $asked[$_] eq '--data-binary' } 0 .. $#asked;
-        @asked[$at, $at + 1] = ('-K', '-');    # in place of --data-binary @-: -K - reads both
+    my $auth = $ask && $ask->{kept_app} ? $ask->{authorization} : undef;
+    if (defined $auth) {
+        return (undef, $none) unless $url =~ m{\Ahttps://discord\.com/api/} && $auth =~ /\A[\x20-\x7e]{1,4096}\z/;
+        my @headers = ("Authorization: $auth", defined $cookie ? $cookie : ());
+        if (!$sends) { $up = join("\n", @headers) . "\n"; push @asked, '-H', '@-' }
+        elsif ($up !~ /\x00/) { $up = curl_body_config($up, \@asked, @headers) }
+        else { return (undef, $none) }
+    } elsif (defined $cookie && !defined $up) {
+        $up = "$cookie\n"; push @asked, '-H', '@-';
+    } elsif (defined $cookie && $sends && $up !~ /\x00/) {
+        $up = curl_body_config($up, \@asked, $cookie);
     }
     my $set = !defined $up && !@asked && !grep({ /[\x00-\x1f\x7f]/ } $url, @sent) && !grep({ $sent[$_] ne '-H' } grep { !($_ % 2) } 0 .. $#sent) ? curl_taken() : undef;    # curl started before this request, for one that is the address and its headers alone (sub curl_for)
     $way = $set->{way} if $set;
@@ -8292,6 +8297,24 @@ sub fetch {
     return (undef, 'the certificate does not prove the host') if grep { $exit == $_ } 51, 53, 54, 58, 59, 60, 66, 77, 80, 82, 83, 90, 91;
     return (undef, 'no secure connection could be made') if $exit == 35;
     return (undef, $none);
+}
+
+# A request's headers and text body both travel on curl's stdin. The quoted
+# config keeps header values out of argv and makes control bytes literal data.
+sub curl_body_config {
+    my ($body, $asked, @headers) = @_;
+    my $quoted = sub {
+        my ($text) = @_;
+        $text =~ s/([\\"])/\\$1/g;
+        $text =~ s/\t/\\t/g;
+        $text =~ s/\n/\\n/g;
+        $text =~ s/\r/\\r/g;
+        $text =~ s/\x0b/\\v/g;
+        return qq("$text");
+    };
+    my ($at) = grep { $asked->[$_] eq '--data-binary' } 0 .. $#$asked;
+    @$asked[$at, $at + 1] = ('-K', '-');
+    return join('', map { 'header = ' . $quoted->($_) . "\n" } @headers) . 'data-raw = ' . $quoted->($body) . "\n";
 }
 
 # curl's process for one request: the fixed switches, then what this request adds. It is started
@@ -10237,7 +10260,7 @@ my @KEPT_APPS = ({
     start => 'https://discord.com/app',
     hosts => { map { $_ => 1 } qw(discord.com gateway.discord.gg cdn.discordapp.com media.discordapp.net discord.gg) },
     socket_host => 'gateway.discord.gg',
-    seconds => 86_400, requests => 120, bytes => 8 * 1024 * 1024, sockets => 2,
+    seconds => 86_400, requests => 120, bytes => 48 * 1024 * 1024, reply => 16 * 1024 * 1024, sockets => 2,
 });
 
 sub kept_app_discord {
@@ -10295,21 +10318,33 @@ sub kept_app_jar {
 
 # The kept application has a separate network route. Every request still passes
 # the blocklist, content shield, checked address broker and TLS verification.
+sub kept_app_request {
+    my ($line) = @_;
+    my ($method, $size, $type, $dest, $auth_bytes, $to) = $line =~
+        m{\A=fetch (GET|HEAD|POST|PUT|PATCH|DELETE) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (data|script|module|worker|frame|image) (?:auth ([1-9][0-9]{0,3}) )?([\x21-\x7e]{1,8192})\z};
+    return unless $method && $size <= $LIVE_FETCH_UP && ($auth_bytes // 0) <= 4096;
+    return if $method =~ /\A(?:GET|HEAD)\z/ && ($size || $type ne '-');
+    return ($method, $size, $type, $dest, $auth_bytes // 0, $to);
+}
+
 sub kept_app_fetched {
-    my ($live, $line, $body) = @_;
+    my ($live, $line, $body, $auth) = @_;
     my $app = $live->{kept_app};
-    my ($method, $size, $type, $dest, $to) = $line =~ m{\A=fetch (GET|HEAD|POST|PUT|PATCH|DELETE) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?([\x21-\x7e]{1,8192})\z};
+    my ($method, $size, $type, $dest, $auth_bytes, $to) = kept_app_request($line);
     return live_replied($live, 403, '', '') unless $method && $size == length($body)
-        && ($method !~ /\A(?:GET|HEAD)\z/ || !$size && $type eq '-')
+        && $auth_bytes == length($auth // '') && (!defined $auth || $auth =~ /\A[\x20-\x7e]+\z/)
         && !$INCOGNITO && !$TOR_WANTED && !$TOR_WINDOW && !$TOR_SESSION;
-    my (undef, $status, undef, undef, $parts) = kept_app_response($app, $to, $method, $type, $body, $dest, 0, $FETCH_BYTES);
+    my (undef, $status, undef, undef, $parts) = kept_app_response($app, $to, $method, $type, $body, $dest, 0, $app->{spec}{reply}, $auth);
     return live_replied($live, $parts ? @$parts : ($status, '', ''));
 }
 
 sub kept_app_response {
-    my ($app, $to, $method, $type, $body, $dest, $nav, $maximum) = @_;
+    my ($app, $to, $method, $type, $body, $dest, $nav, $maximum, $auth) = @_;
     my ($url, $host) = address($to);
     return (undef, 403) unless $url && $app->{spec}{hosts}{$host};
+    # The app's CDN and other origins receive no account credential. The
+    # script must ask for Discord's own API and cannot authorize a redirect here.
+    return (undef, 403) if defined $auth && ($host ne 'discord.com' || $url !~ m{\Ahttps://discord\.com/api/} || $body =~ /\x00/);
     return (undef, 403) if listed($url) ||
         defined filter_said($url, $FILTER_DEST{$dest // 'data'} // $dest, 'discord.com') || shield_said($url) ne 'allow';
     return (undef, 403) unless kept_app_budget($app, 1, 0);
@@ -10319,11 +10354,14 @@ sub kept_app_response {
     my ($where) = find($host);
     return (undef, 403) unless $where && !grep { $_->{own} } @$where;
     return (undef, 403) unless record("the kept app connects to $host at the first public address that answers: " . join(', ', map { $_->{text} } @$where));
-    my $ask = { method => $method, type => $type, body => $body, origin => 'https://discord.com', top => $app->{spec}{start}, kept_app => 1 };
+    my $reserved = $remaining < $maximum ? $remaining : $maximum;
+    return (undef, 403) unless kept_app_budget($app, 0, $reserved);
+    my $ask = { method => $method, type => $type, body => $body, origin => 'https://discord.com', top => $app->{spec}{start}, kept_app => 1, authorization => $auth };
     my ($got, $why, $peer, $certs) = @{ kept_app_jar($app, sub {
-        return [fetch($url, $where, $ask, $nav, [$remaining < $maximum ? $remaining : $maximum, $FETCH_SECONDS])];
+        return [fetch($url, $where, $ask, $nav, [$reserved, $FETCH_SECONDS])];
     }) };
-    return (undef, 0) if $why || !defined $got || !kept_app_budget($app, 0, length($got));
+    return (undef, 0) if $why || !defined $got || length($got) > $reserved;    # a failed transfer can still consume its reservation
+    $app->{bytes} -= $reserved - length($got);
     my $parts = live_parts($got, $method);
     return (undef, 0) unless $parts && record("$host answered the kept app with $parts->[0]: " . length($got) . ' bytes');
     if ($method eq 'POST' && $url =~ m{\Ahttps://discord\.com/api/(?:v[0-9]+/)?auth/logout(?:\?[^#]*)?\z} && $parts->[0] >= 200 && $parts->[0] < 300) {
@@ -10950,6 +10988,13 @@ sub live_asked {                          # [C19] the request at the front of wh
     if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
     my $line = substr($live->{held}, 0, $end);
     return [$line, '', $end + 1] if $permit || $soon;
+    if ($live->{kept_app}) {
+        my (undef, $size, undef, undef, $auth_bytes) = kept_app_request($line);
+        return [$line] unless defined $size;
+        return 0 if length($live->{held}) < $end + 1 + $auth_bytes + $size;
+        my $auth = $auth_bytes ? substr($live->{held}, $end + 1, $auth_bytes) : undef;
+        return [$line, substr($live->{held}, $end + 1 + $auth_bytes, $size), $end + 1 + $auth_bytes + $size, $auth];
+    }
     my ($size) = $line =~ /^=fetch [A-Z]{1,8} (0|[1-9][0-9]{0,5}) / or return [$line];
     return [$line] if $size > $LIVE_FETCH_UP;
     return 0 if length($live->{held}) < $end + 1 + $size;
@@ -10990,7 +11035,7 @@ sub live_fetched {                        # [C19]
     timed('live-asked') if $TIMED;
     pictures_pumped();
     my ($live, $asked) = @_;
-    my ($line, $body, $took) = @$asked;
+    my ($line, $body, $took, $auth) = @$asked;
     return live_end($live, 'it wrote a line of no form') unless defined $took;
     substr($live->{held}, 0, $took, '');
     $live->{looked} = 0;
@@ -10999,7 +11044,7 @@ sub live_fetched {                        # [C19]
     return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';
     if (substr($line, 0, 6) eq '=soon ') { return if $live->{kept_app}; $line =~ m{^=soon (script|image|data) ([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form'); return prefetch_soon($live, $1, $2) }
-    return kept_app_fetched($live, $line, $body) if $live->{kept_app};
+    return kept_app_fetched($live, $line, $body, $auth) if $live->{kept_app};
     return live_replied($live, 0, '', '') if $live->{home};    # the local home has no network door, including absolute script requests    # [C26]
     my ($method, $size, $type, $dest, $as, $to) = $line =~ m{^=fetch (GET|HEAD|POST) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?(?:as ([a-z]{1,16}) )?([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form');
     return live_end($live, 'it wrote a line of no form') if $method ne 'POST' && ($size || $type ne '-');

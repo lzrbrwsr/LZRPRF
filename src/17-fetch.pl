@@ -118,12 +118,17 @@ sub fetch {
     my $jarred = ($page || $ask && defined $ask->{top}) && !defined $cookie && !jar_skips($url);    # [C7] or else the jar's, for a page you visit or a page kept running outside the sandbox (sub jar_cookie)
     my $ahead = $ask && exists $ask->{jar};    # a request made ahead: the window asked the jar before this run began, and tells it of the answer when the page takes it (sub prefetch_pump)
     $cookie = $ahead ? (length $ask->{jar} ? $ask->{jar} : undef) : jar_cookie($url, $page, $ask) if $jarred;
-    if (defined $cookie && !defined $up) { $up = "$cookie\n"; push @asked, '-H', '@-' }
-    elsif (defined $cookie && $sends && $up !~ /\x00/) {    # a POST's body and its cookies, both on curl's input as its settings: a quoted text, with \\ \" \t \n \r \v written as curl reads them
-        my $quoted = sub { my ($text) = @_; $text =~ s/([\\"])/\\$1/g; $text =~ s/\t/\\t/g; $text =~ s/\n/\\n/g; $text =~ s/\r/\\r/g; $text =~ s/\x0b/\\v/g; return qq("$text") };
-        $up = 'header = ' . $quoted->($cookie) . "\ndata-raw = " . $quoted->($up) . "\n";
-        my ($at) = grep { $asked[$_] eq '--data-binary' } 0 .. $#asked;
-        @asked[$at, $at + 1] = ('-K', '-');    # in place of --data-binary @-: -K - reads both
+    my $auth = $ask && $ask->{kept_app} ? $ask->{authorization} : undef;
+    if (defined $auth) {
+        return (undef, $none) unless $url =~ m{\Ahttps://discord\.com/api/} && $auth =~ /\A[\x20-\x7e]{1,4096}\z/;
+        my @headers = ("Authorization: $auth", defined $cookie ? $cookie : ());
+        if (!$sends) { $up = join("\n", @headers) . "\n"; push @asked, '-H', '@-' }
+        elsif ($up !~ /\x00/) { $up = curl_body_config($up, \@asked, @headers) }
+        else { return (undef, $none) }
+    } elsif (defined $cookie && !defined $up) {
+        $up = "$cookie\n"; push @asked, '-H', '@-';
+    } elsif (defined $cookie && $sends && $up !~ /\x00/) {
+        $up = curl_body_config($up, \@asked, $cookie);
     }
     my $set = !defined $up && !@asked && !grep({ /[\x00-\x1f\x7f]/ } $url, @sent) && !grep({ $sent[$_] ne '-H' } grep { !($_ % 2) } 0 .. $#sent) ? curl_taken() : undef;    # curl started before this request, for one that is the address and its headers alone (sub curl_for)
     $way = $set->{way} if $set;
@@ -220,6 +225,24 @@ sub fetch {
     return (undef, 'the certificate does not prove the host') if grep { $exit == $_ } 51, 53, 54, 58, 59, 60, 66, 77, 80, 82, 83, 90, 91;
     return (undef, 'no secure connection could be made') if $exit == 35;
     return (undef, $none);
+}
+
+# A request's headers and text body both travel on curl's stdin. The quoted
+# config keeps header values out of argv and makes control bytes literal data.
+sub curl_body_config {
+    my ($body, $asked, @headers) = @_;
+    my $quoted = sub {
+        my ($text) = @_;
+        $text =~ s/([\\"])/\\$1/g;
+        $text =~ s/\t/\\t/g;
+        $text =~ s/\n/\\n/g;
+        $text =~ s/\r/\\r/g;
+        $text =~ s/\x0b/\\v/g;
+        return qq("$text");
+    };
+    my ($at) = grep { $asked->[$_] eq '--data-binary' } 0 .. $#$asked;
+    @$asked[$at, $at + 1] = ('-K', '-');
+    return join('', map { 'header = ' . $quoted->($_) . "\n" } @headers) . 'data-raw = ' . $quoted->($body) . "\n";
 }
 
 # curl's process for one request: the fixed switches, then what this request adds. It is started

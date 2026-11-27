@@ -623,14 +623,15 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 17-fetch.pl	65	identity_site	-
 17-fetch.pl	75	identity_headers	C7 C19
 17-fetch.pl	102	fetch	C7 C23 C28 C19 C3
-17-fetch.pl	227	curl_started	C3
-17-fetch.pl	253	curl_for	-
-17-fetch.pl	266	curl_taken	-
-17-fetch.pl	275	curl_ended	-
-17-fetch.pl	283	alive	-
-17-fetch.pl	285	public	-
-17-fetch.pl	298	public4	C4
-17-fetch.pl	316	fixed	C23 C5
+17-fetch.pl	232	curl_body_config	-
+17-fetch.pl	250	curl_started	C3
+17-fetch.pl	276	curl_for	-
+17-fetch.pl	289	curl_taken	-
+17-fetch.pl	298	curl_ended	-
+17-fetch.pl	306	alive	-
+17-fetch.pl	308	public	-
+17-fetch.pl	321	public4	C4
+17-fetch.pl	339	fixed	C23 C5
 17-jar.pl	1	-	C7 C12 C16 C17 C26
 17-jar.pl	40	jar_kept	C16 C17
 17-jar.pl	41	jar_directory	-
@@ -744,10 +745,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-kept-app.pl	27	kept_app_budget	-
 21-kept-app.pl	40	kept_app_folder	-
 21-kept-app.pl	55	kept_app_jar	-
-21-kept-app.pl	66	kept_app_fetched	-
-21-kept-app.pl	77	kept_app_response	-
-21-kept-app.pl	103	kept_app_open_tab	-
-21-kept-app.pl	123	kept_app_visit	-
+21-kept-app.pl	66	kept_app_request	-
+21-kept-app.pl	75	kept_app_fetched	-
+21-kept-app.pl	86	kept_app_response	-
+21-kept-app.pl	118	kept_app_open_tab	-
+21-kept-app.pl	138	kept_app_visit	-
 21-link.pl	1	-	C31
 21-link.pl	49	link_folder	-
 21-link.pl	50	link_state	C31
@@ -783,12 +785,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-live.pl	80	live_due	C19
 21-live.pl	92	live_turn	C18 C19 C26 C5 C17 C6 C7
 21-live.pl	150	live_asked	C19 C26
-21-live.pl	185	live_early	C19
-21-live.pl	205	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
-21-live.pl	311	live_parts	C19
-21-live.pl	330	unchunked	-
-21-live.pl	345	live_replied	C19
-21-live.pl	350	live_sent	C19
+21-live.pl	192	live_early	C19
+21-live.pl	212	live_fetched	C19 C26 C7 C27 C23 C5 C28 C17 C8 C6
+21-live.pl	318	live_parts	C19
+21-live.pl	337	unchunked	-
+21-live.pl	352	live_replied	C19
+21-live.pl	357	live_sent	C19
 21-web-storage.pl	1	-	-
 21-web-storage.pl	7	kept_storage_file	-
 21-web-storage.pl	14	kept_storage_locked	-
