@@ -36,7 +36,7 @@ function videoClock(k, one) {    // where the picture of a video with its sound 
 function videoTick(after) {
     if (videoTicking) return;
     if (!videoClockHand) {
-        ObjC.registerSubclass({ name: 'LzrprfVideoClock', methods: { 'ticked:': { types: ['void', ['id']], implementation: function () { videoTicking = false; Object.keys(videos).forEach(function (k) { videoClock(k, videos[k]); }); } } } });
+        busyClass({ name: 'LzrprfVideoClock', methods: { 'ticked:': { types: ['void', ['id']], implementation: function () { videoTicking = false; Object.keys(videos).forEach(function (k) { videoClock(k, videos[k]); }); } } } });
         videoClockHand = $.LzrprfVideoClock.alloc.init;
     }
     videoTicking = true;

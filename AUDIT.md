@@ -295,11 +295,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
 06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C18 C15
-06-behind.pl	176	unheard	-
-06-behind.pl	220	paired	-
-06-behind.pl	235	unnamed	-
-06-behind.pl	242	leave	C17 C7 C29 C32 C12 C16
-06-behind.pl	260	closed	-
+06-behind.pl	178	unheard	-
+06-behind.pl	222	paired	-
+06-behind.pl	237	unnamed	-
+06-behind.pl	244	leave	C17 C7 C29 C32 C12 C16
+06-behind.pl	262	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-

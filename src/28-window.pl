@@ -18,6 +18,34 @@
 sub window_text {
     return <<'END';
 ObjC.import('Cocoa');
+// AutoFill stays off (ticket 1543, 2026-11-27): macOS asks com.apple.SafariPlatformSupport.Helper for a remote view
+// on every text field that takes the keys; the window's container refuses that lookup (as it should: the passwords
+// helper is not the window's), and AppKit tried again and again, making and tearing down remote views at 100% of a
+// core until the window stopped answering. Registered for this process alone, before any field is made; nothing is
+// written to anyone's defaults.
+$.NSUserDefaults.standardUserDefaults.registerDefaults($({ NSAutoFillHeuristicsEnabled: false, NSEnableTextInputContextBasedAutoFill: false, NSAutoFillPanelEnabled: false, NSAutoFillRequiresTextContentTypeForOneTimeCodeOnMac: true }));    // AppKit's own switches (macOS 26): its AutoFill heuristics, the panel, and one-time codes only where a field asks for them
+// THE BUSY METER (ticket 1543: the window spun at 90% of a core while it drew nothing, and once froze for 10 s). Every
+// method this window gives the system (ObjC.registerSubclass: its drawings, presses, timers and delayed calls) is timed;
+// once BUSY_EVERY_MS has passed, when the methods together took more than BUSY_SHARE of it, one line "frames busy
+// TOTAL_MS SPAN_MS NAME=CALLS/MS;..." names the five that took most, and lzrprf writes it to the link's log.
+var BUSY_EVERY_MS = 5000, BUSY_SHARE = 0.2, busyMeter = {}, busyFrom = Date.now();    // DECLARED(5 s: a spin shows within one look; a fifth of a core: well above an idle window, well below a spin)
+function busyClass(spec) {    // every window class is registered through here (ObjC.registerSubclass itself cannot be replaced: JXA holds it read-only)
+    Object.keys(spec.methods || {}).forEach(function (selector) {
+        var method = spec.methods[selector], body = method.implementation, key = (spec.name || '').replace(/^Lzrprf/, '') + '.' + selector;
+        if (typeof body != 'function') return;
+        method.implementation = function () {
+            var began = Date.now();
+            try { return body.apply(this, arguments); }
+            finally { var one = busyMeter[key] || (busyMeter[key] = [0, 0]), now = Date.now(); one[0]++; one[1] += now - began; if (now - busyFrom >= BUSY_EVERY_MS) busyTold(now); }
+        };
+    });
+    return ObjC.registerSubclass(spec);
+}
+function busyTold(now) {
+    var span = now - busyFrom, keys = Object.keys(busyMeter), total = keys.reduce(function (sum, k) { return sum + busyMeter[k][1]; }, 0), calls = keys.reduce(function (sum, k) { return sum + busyMeter[k][0]; }, 0);
+    if ((total > span * BUSY_SHARE || calls > span / 4) && typeof say == 'function') say('frames busy ' + Math.min(total, 999999) + ' ' + Math.min(span, 999999) + ' ' + keys.sort(function (a, b) { return busyMeter[b][1] - busyMeter[a][1] || busyMeter[b][0] - busyMeter[a][0]; }).slice(0, 5).map(function (k) { return k.replace(/[^\x21-\x7e]/g, '') + '=' + busyMeter[k][0] + '/' + busyMeter[k][1]; }).join(';').slice(0, 600));
+    busyMeter = {}; busyFrom = now;
+}
 var TORWINDOW = false, TOR_APART = 'Tor opens a Tor window of its own, apart from this one: it shares nothing with this window, and Tor never carries this one.';    // [C17] a Tor window: lzrprf says so as the window's second word, "tor"
 var INCOGNITO = false, UNKEPT_TIP = 'An incognito window writes nothing, so it adds no bookmark and imports none.';    // an incognito window [C16]: lzrprf says so as the window's second word
 var PULLED = false;    // T5 (Henry, 2026-11-26): a window a tab was pulled out into is its own process, which macOS showed as a second app named osascript; it runs as an accessory, with no Dock or menu-bar icon of its own
@@ -92,7 +120,7 @@ function layersKit() {    // the classes and the Core Graphics calls the layers 
     if (!space) space = $.CGColorSpaceCreateWithName($.kCGColorSpaceSRGB);
     var dot = $.CGBitmapContextCreate(null, 16, 16, 8, 64, space, 8194);    // a particle: a soft white dot, 16 by 16, alpha premultiplied
     for (var r = 8; r >= 1; r--) { $.CGContextSetRGBFillColor(dot, 1, 1, 1, 0.16); $.CGContextAddArc(dot, 8, 8, r, 0, 6.2832, 0); $.CGContextFillPath(dot); }
-    ObjC.registerSubclass({ name: 'LzrprfLayers', superclass: 'NSView', methods: {
+    busyClass({ name: 'LzrprfLayers', superclass: 'NSView', methods: {
         'isFlipped': { implementation: function () { return true; } },    // the same top-down coordinates as the laid page and its pointer events
         'hitTest:': { implementation: function (point) { return $(); } }    // no press is its own: every one goes to the laid page under it
     } });
@@ -3697,7 +3725,7 @@ function videoItem(name) {    // a new item of the system's player for a video h
 function videoReady() {    // the system's player, made ready once, the first time a video came
     if (videoLoader) return;
     $.NSBundle.bundleWithPath('/System/Library/Frameworks/AVFoundation.framework').load;
-    ObjC.registerSubclass({ name: 'LzrprfVideoLoader', protocols: ['AVAssetResourceLoaderDelegate'], methods: {
+    busyClass({ name: 'LzrprfVideoLoader', protocols: ['AVAssetResourceLoaderDelegate'], methods: {
         'resourceLoader:shouldWaitForLoadingOfRequestedResource:': { types: ['bool', ['id', 'id']], implementation: function (loader, request) {
             var data = videoBytes[ObjC.unwrap(request.request.URL.absoluteString)];
             if (!data) return false;    // an address of no video held here: the player is told no
@@ -3711,12 +3739,12 @@ function videoReady() {    // the system's player, made ready once, the first ti
             return true;
         } }
     } });
-    ObjC.registerSubclass({ name: 'LzrprfVideoWatch', methods: {
+    busyClass({ name: 'LzrprfVideoWatch', methods: {
         'ended:': { types: ['void', ['id']], implementation: function (note) {
             Object.keys(videos).forEach(function (k) { var one = videos[k]; if (one.item && note.object.isEqual(one.item)) { one.state = 'ended'; videoWords(one); videoClock(k, one); } });
         } }
     } });
-    ObjC.registerSubclass({ name: 'LzrprfVideoView', superclass: 'NSView', methods: {
+    busyClass({ name: 'LzrprfVideoView', superclass: 'NSView', methods: {
         'isFlipped': { implementation: function () { return true; } },    // measured from its top, as the laid page is
         'hitTest:': { implementation: function (point) { return $(); } }    // no press is its own, nor its words': every one goes to the laid page under it
     } });
@@ -3924,7 +3952,7 @@ function viewDrawn(view, paintIt) {
     } finally { $.NSGraphicsContext.restoreGraphicsState; }
 }
 
-ObjC.registerSubclass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: clickThrough({
+busyClass({ name: 'LzrprfPage', superclass: 'NSTextView', methods: clickThrough({
     // The browser's own Copy and local Inspect actions.
     'menuForEvent:': { types: ['id', ['id']], implementation: function (event) { return inspectMenu(true); } }
 }) });
@@ -3940,7 +3968,7 @@ function momentumMore(event) {
     if (y == at.y) return;
     clip.scrollToPoint($.NSMakePoint(at.x, y)); scroll.reflectScrolledClipView(clip);
 }
-ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
+busyClass({ name: 'LzrprfLaid', superclass: 'NSView', methods: pointerMethods(trmnlMethods({    // and a terminal's wheel, drag, copy and paste [C29], and the pointer's moves, release and cursor (28-window-pointer.pl)
     // A laid page is measured from its top, as the application laid it out. It has no menu of its own.
     'isFlipped': { implementation: function () { return true; } },
     'isOpaque': { implementation: function () { return true; } },    // paint() fills white under everything: the compositor blends nothing under it
@@ -3951,13 +3979,13 @@ ObjC.registerSubclass({ name: 'LzrprfLaid', superclass: 'NSView', methods: point
     'keyDown:': { implementation: function (event) { pageKey(event); } }
 })) });
 
-ObjC.registerSubclass({ name: 'LzrprfFrame', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfFrame', superclass: 'NSView', methods: clickThrough({
     'mouseDownCanMoveWindow': { types: ['bool', []], implementation: function () { return false; } },    // HC-0856: macOS never moves the window from a press here on its own; windowHeld moves it where nothing else is pressed
     'mouseDown:': { implementation: function (event) { pressSeen(event); frameClicked(event); } },    // it draws nothing: the glass and the beam are layers (glassPlaced)
     'resetCursorRects': { implementation: function () { frameCursors(); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfHome', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfHome', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('home', function () { paintHome(); }); } },
     'mouseDown:': { implementation: function (event) { pressSeen(event); homeClicked(event); } },
     'acceptsFirstMouse:': { types: ['bool', ['id']], implementation: function (event) { return true; } },    // the press that brings the window to the front is the home page's too, as its lasers saw it when they took presses before the window did
@@ -3965,7 +3993,7 @@ ObjC.registerSubclass({ name: 'LzrprfHome', superclass: 'NSView', methods: {
     'mouseExited:': { implementation: function (event) { hovered('home', null); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfList', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfList', superclass: 'NSView', methods: clickThrough({
     'isFlipped': { implementation: function () { return true; } },
     'drawRect:': { implementation: function (dirty) { viewDrawn('list', function () { paintList(dirty); }); } },
     'mouseDown:': { implementation: function (event) { listClicked(event); } },
@@ -3973,7 +4001,7 @@ ObjC.registerSubclass({ name: 'LzrprfList', superclass: 'NSView', methods: click
     'mouseExited:': { implementation: function (event) { hovered('list', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfCogMenu', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfCogMenu', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('cogmenu', function () { paintCogMenu(); }); } },
     'mouseDown:': { implementation: function (event) { cogMenuClicked(event); } },
     'acceptsFirstMouse:': { types: ['bool', ['id']], implementation: function (event) { return true; } },
@@ -3984,56 +4012,56 @@ ObjC.registerSubclass({ name: 'LzrprfCogMenu', superclass: 'NSView', methods: {
 } });
 
 // Under the cogwheel's open menu, over all else: a press anywhere outside the menu closes it and reaches nothing.
-ObjC.registerSubclass({ name: 'LzrprfCatch', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfCatch', superclass: 'NSView', methods: {
     'mouseDown:': { implementation: function (event) { cogHidden(); } },
     'rightMouseDown:': { implementation: function (event) { cogHidden(); } },
     'scrollWheel:': { implementation: function (event) { cogHidden(); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfLogIcon', superclass: 'NSButton', methods: clickThrough({
+busyClass({ name: 'LzrprfLogIcon', superclass: 'NSButton', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('logicon', function () { paintIcon(logs, logGlyph, hover.logIcon, logs.enabled, false); }); } },
     'mouseEntered:': { implementation: function (event) { hovered('logIcon', event); } },
     'mouseExited:': { implementation: function (event) { hovered('logIcon', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfTechIcon', superclass: 'NSButton', methods: clickThrough({
+busyClass({ name: 'LzrprfTechIcon', superclass: 'NSButton', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('techicon', function () { paintIcon(techs, techGlyph, hover.techIcon, !modalOpen, techOpen); }); } },
     'mouseEntered:': { implementation: function (event) { hovered('techIcon', event); } },
     'mouseExited:': { implementation: function (event) { hovered('techIcon', null); } }
 }) });
 
 
-ObjC.registerSubclass({ name: 'LzrprfTorIcon', superclass: 'NSButton', methods: clickThrough({
+busyClass({ name: 'LzrprfTorIcon', superclass: 'NSButton', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('toricon', function () { torIconDrawn(torIcon); }); } },
     'mouseEntered:': { implementation: function (event) { hovered('torIcon', event); } },
     'mouseExited:': { implementation: function (event) { hovered('torIcon', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfToolIcon', superclass: 'NSButton', methods: clickThrough({
+busyClass({ name: 'LzrprfToolIcon', superclass: 'NSButton', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('toolicon', function () { toolIconDrawn(toolIcon); }); } },
     'mouseEntered:': { implementation: function (event) { hovered('toolIcon', event); } },
     'mouseExited:': { implementation: function (event) { hovered('toolIcon', null); } }
 }) });
 
 
-ObjC.registerSubclass({ name: 'LzrprfTool', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfTool', superclass: 'NSView', methods: clickThrough({
     'isFlipped': { implementation: function () { return true; } },
     'drawRect:': { implementation: function (dirty) { viewDrawn('tool', function () { paintTool(); }); } },
     'mouseDown:': { implementation: function (event) { toolClicked(event); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfTorBeam', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfTorBeam', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('torbeam', function () { torBeamDrawn(torView); }); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfSuggest', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfSuggest', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('suggest', function () { paintSuggest(); }); } },
     'mouseDown:': { implementation: function (event) { suggestClicked(event); } },
     'mouseMoved:': { implementation: function (event) { hovered('suggest', event); } },
     'mouseExited:': { implementation: function (event) { hovered('suggest', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfWizard', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfWizard', superclass: 'NSView', methods: clickThrough({
     'isFlipped': { implementation: function () { return true; } },
     'drawRect:': { implementation: function (dirty) { viewDrawn('wizard', function () { paintWizard(); }); } },
     'mouseDown:': { implementation: function (event) { wizClicked(event); } },
@@ -4041,17 +4069,17 @@ ObjC.registerSubclass({ name: 'LzrprfWizard', superclass: 'NSView', methods: cli
     'mouseExited:': { implementation: function (event) { hovered('wiz', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfFind', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfFind', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('find', function () { paintFind(); }); } },
     'mouseDown:': { implementation: function (event) { findClicked(event); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfSecure', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfSecure', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('secure', function () { paintSecure(); }); } },
     'mouseDown:': { implementation: function (event) { } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfTabs', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfTabs', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('tabs', function () { paintTabs(); }); } },
     'mouseDownCanMoveWindow': { types: ['bool', []], implementation: function () { return false; } },    // HC-0856: macOS never moves the window from a press here on its own; windowHeld moves it where nothing else is pressed
     'mouseDown:': { implementation: function (event) { pressSeen(event); tabClicked(event); } },
@@ -4059,7 +4087,7 @@ ObjC.registerSubclass({ name: 'LzrprfTabs', superclass: 'NSView', methods: click
     'mouseExited:': { implementation: function (event) { hovered('tabs', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfBelt', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfBelt', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('belt', function () { paintBelt(); }); } },
     'mouseDownCanMoveWindow': { types: ['bool', []], implementation: function () { return false; } },    // HC-0856: macOS never moves the window from a press here on its own; windowHeld moves it where nothing else is pressed
     'mouseDown:': { implementation: function (event) { pressSeen(event); beltClicked(event); } },
@@ -4067,7 +4095,7 @@ ObjC.registerSubclass({ name: 'LzrprfBelt', superclass: 'NSView', methods: click
     'mouseExited:': { implementation: function (event) { hovered('belt', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfCog', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfCog', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('cog', function () { paintCog(); }); } },
     'mouseDown:': { implementation: function (event) { pressSeen(event); cogClicked(); } },
     'acceptsFirstMouse:': { types: ['bool', ['id']], implementation: function (event) { return true; } },    // the press that brings the window to the front opens the menu too, as a button of the system's does
@@ -4075,21 +4103,21 @@ ObjC.registerSubclass({ name: 'LzrprfCog', superclass: 'NSView', methods: {
     'mouseExited:': { implementation: function (event) { hovered('cog', null); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfFaces', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfFaces', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('faces', function () { paintFaces(); }); } },
     'mouseDown:': { implementation: function (event) { pressSeen(event); facesClicked(); } },
     'mouseEntered:': { implementation: function (event) { hovered('faces', event); } },
     'mouseExited:': { implementation: function (event) { hovered('faces', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfStar', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfStar', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('star', function () { paintStar(); }); } },
     'mouseDown:': { implementation: function (event) { pressSeen(event); starClicked(); } },
     'mouseEntered:': { implementation: function (event) { hovered('star', event); } },
     'mouseExited:': { implementation: function (event) { hovered('star', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfMarks', superclass: 'NSView', methods: clickThrough({
+busyClass({ name: 'LzrprfMarks', superclass: 'NSView', methods: clickThrough({
     'drawRect:': { implementation: function (dirty) { viewDrawn('marks', function () { paintMarks(); }); } },
     'mouseDownCanMoveWindow': { types: ['bool', []], implementation: function () { return false; } },    // HC-0856: macOS never moves the window from a press here on its own; windowHeld moves it where nothing else is pressed
     'mouseDown:': { implementation: function (event) { pressSeen(event); marksClicked(event); } },
@@ -4097,28 +4125,28 @@ ObjC.registerSubclass({ name: 'LzrprfMarks', superclass: 'NSView', methods: clic
     'mouseExited:': { implementation: function (event) { hovered('marks', null); } }
 }) });
 
-ObjC.registerSubclass({ name: 'LzrprfBack', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfBack', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('back', function () { paintBack(); }); } }
 } });
 
 // The veil under the modal takes every click and scroll, so nothing under it is reached.
-ObjC.registerSubclass({ name: 'LzrprfVeil', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfVeil', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('veil', function () { (modalOpen && modalKind == 'flag' ? $.NSColor.colorWithSRGBRedGreenBlueAlpha(0.72, 0.04, 0.04, 1) : $.NSColor.colorWithWhiteAlpha(0, 0.62)).setFill; $.NSRectFillUsingOperation(dirty, 2); }); } },
     'mouseDown:': { implementation: function (event) { veilPressed(event); } },    // the tab strip still takes a press under the question about scripts (veilPressed, 28-window1-tabs.pl)
     'rightMouseDown:': { implementation: function (event) { } },
     'scrollWheel:': { implementation: function (event) { } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfKeys', superclass: 'NSView', methods: {    // of no size, in the veil: Return and Escape of a modal (function modalKeyed)
+busyClass({ name: 'LzrprfKeys', superclass: 'NSView', methods: {    // of no size, in the veil: Return and Escape of a modal (function modalKeyed)
     'performKeyEquivalent:': { types: ['bool', ['id']], implementation: function (event) { return modalKeyed(event); } },
     'hitTest:': { implementation: function (point) { return $(); } }
 } });
 
-ObjC.registerSubclass({ name: 'LzrprfPanel', superclass: 'NSView', methods: {
+busyClass({ name: 'LzrprfPanel', superclass: 'NSView', methods: {
     'drawRect:': { implementation: function (dirty) { viewDrawn('panel', function () { paintPanel(); }); } },
     'mouseDown:': { implementation: function (event) { } }
 } });
-ObjC.registerSubclass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
+busyClass({ name: 'LzrprfHand', superclass: 'NSObject', methods: {
     'windowWillReturnFieldEditor:toObject:': { types: ['id', ['id', 'id']], implementation: function (sender, client) { return typingView(); } },    // every text field of the window is typed into through this one, which asks no language service
     'windowDidResize:': { types: ['void', ['id']], implementation: function (note) { place(); resting(); frameSaid(); } },
     'windowDidBecomeKey:': { types: ['void', ['id']], implementation: function () { say('window focus 1'); } },
