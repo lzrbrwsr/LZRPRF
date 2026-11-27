@@ -3,21 +3,21 @@ This record, the installer and the download each stand in two places: https://lz
 https://github.com/lzrbrwsr/lzrprf. Compare them. A difference means one place does not hold this
 release: a copy that was changed, an older answer from a cache, or a release on its way. Fetch both again
 before you conclude, and install nothing while they differ.
-lzrprf, selftest and blocklist are the files of that repository at commit f59cc68311bcb5bd9658d8614d2b479560651321.
+lzrprf, selftest and blocklist are the files of that repository at commit bf9d97df4affb5f358b04eb70b297aa1834455d8.
 Check a file with: shasum -a 256 FILE
 
-ce9b37a25a42531136b0e88816b7bb48ab8b14d79aa6a88f819e50ef4b776197  install.sh
-f69d1ed0e96475f25541183ea4c7d0b5ff1a4dcfd9481ffc32af2526efcda18f  lzrbrwsr-macos-arm64.tar.gz
+29cf0f9369b982b703c752fa92015b7ec81e3c30e1e4e3d09355b97b096dcfa4  install.sh
+428febaaff520fdfd4f91b171784d92f1706b8f3291b9ede2be40cce48d18173  lzrbrwsr-macos-arm64.tar.gz
 e90b0a714519f5959185152fa2acfd4cac03662896ab77a86392e988f87d30b4  LZRBRWSR.app/Contents/Info.plist
 b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444  LZRBRWSR.app/Contents/MacOS/arti
 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2  LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-cht
 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03  LZRBRWSR.app/Contents/MacOS/core-lzrbrwsr-trmnl
 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1  LZRBRWSR.app/Contents/MacOS/lzrbrwsr
-d6443f3cbabf7caf3cf1b44d2022c428e4f5ec9c3ef1261035ce341e6658b50f  LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin
+4bfbae9b2ecef6eae94da19bf6a7d5fbfc26fda097512e0a2a705395f5a717f7  LZRBRWSR.app/Contents/MacOS/lzrbrwsr-bin
 6472a7855c52851bd8db375b86a7f3b400b77353bcab70a663c39574497867c9  LZRBRWSR.app/Contents/MacOS/lzrbrwsr-window
 6ac700043a5fdb204381ff0c6fcdde89eea55dbacee977e10674fa5a59b7c4d1  LZRBRWSR.app/Contents/Resources/LICENSE.txt
 7cbea3d9d37e2dbef99a70c56ecda8814a1ee191ba5e4c81e5241a457aaac398  LZRBRWSR.app/Contents/Resources/lzrbrwsr.icns
-9ff5d3fdfc10781d6c99d0d6a6b2ea8586d04a8398748e3e463cc78c4fba85da  LZRBRWSR.app/Contents/Resources/release
-48c0fefed9c08f2019f72ed6b2a9663ba1083f1f0f63e1a30b2243ab853275ab  lzrprf
-535e050b1d5f24be3aedd7f594f967f2efb36a76bc7514beb3b787d3438f2c2b  selftest
+3de0030a53b2a44bc83303b3e1ac6909c06659f4ddd029d822058516fa0fe3fb  LZRBRWSR.app/Contents/Resources/release
+2c617bf364df6b2a4db1fd053cc5dead79b6ed3d806ecac131f4b756622ea9aa  lzrprf
+003e136d9ebbc990d6d7b9ca064e8783adc6906bd313b8fb798373ee732766fd  selftest
 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092  blocklist
