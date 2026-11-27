@@ -167,6 +167,8 @@ sub behind {
         elsif ($event =~ /^frames scroll ([0-9]{1,5}) ([0-9]{1,4}) ([0-9]{1,6}) ([0-9]{1,6}) ([0-9]{1,6}) ([0-9]{1,5})$/) {    # ticket 1530: a burst of scrolling as the window measured it
             link_line('INFO', 'scroll-frames', "A scroll of $1 moves drew $2 times: half the draws took under $3 us, 95 in 100 under $4 us, the slowest $5 us; $6 gaps were over a frame and a half.",
                 moves => $1, draws => $2, draw_p50_us => $3, draw_p95_us => $4, draw_max_us => $5, late_gaps => $6) }
+        elsif ($event =~ /^frames busy ([0-9]{1,6}) ([0-9]{1,6}) ([\x21-\x7e]{1,600})$/) {    # ticket 1543: the window's own methods took a large share of a core, or were called very often: the five that took most
+            link_line('WARN', 'window-busy', "The window's own methods took $1 ms of $2 ms, or were called very often; the most: $3 (calls/ms).", busy_ms => $1, span_ms => $2, most => $3) }
         elsif ($event =~ /^fault / && $DRAWN) { $DRAWN = 0; fault('undrawn') }    # the window could not draw a list that "checked" let through: it shows nothing of it. Taken once for a page that was handed over, and never without one: the window's process cannot open the question about a report whenever it likes
         1 } or unheard($event, $@, $behind, ++$faults);    # Henry 2026-11-24: a page took the whole browser down. An error of lzrprf's own stays in the tab it met
     }

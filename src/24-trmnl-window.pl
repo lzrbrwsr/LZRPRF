@@ -110,7 +110,7 @@ function trmnlPicked(item) {    // an item chosen: Copy and Paste are the window
     if (id == 'paste') return trmnlPaste();
     say('page menu ' + id);
 }
-ObjC.registerSubclass({ name: 'LzrprfTrmnlHand', superclass: 'NSObject', methods: {
+busyClass({ name: 'LzrprfTrmnlHand', superclass: 'NSObject', methods: {
     'trmnlPicked:': { types: ['void', ['id']], implementation: function (item) { trmnlPicked(item); } }
 } });
 function trmnlWheeled(event) {

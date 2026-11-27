@@ -28,7 +28,7 @@ function menuBarNamed(name) {
         $._LSSetApplicationInformationItem(-2, $._LSGetCurrentApplicationASN(), $('LSDisplayName'), $(name), $());    // -2: this login session
     } catch (e) { }    // a macOS without these calls keeps the name "osascript" in the bar; the window works the same
 }
-ObjC.registerSubclass({ name: 'LzrprfMenu', methods: {
+busyClass({ name: 'LzrprfMenu', methods: {
     'newWindow:': { types: ['void', ['id']], implementation: function (sender) { say('window new'); } },    // lzrprf starts a second lzrprf: this process starts nothing
     'torWindow:': { types: ['void', ['id']], implementation: function (sender) { say('window tor'); } },
     'closeWindow:': { types: ['void', ['id']], implementation: function (sender) { win.performClose($()); } },    // as the red dot

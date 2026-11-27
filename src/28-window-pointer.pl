@@ -88,7 +88,7 @@ function namedSettled() {    // after a list is drawn: a missing bitmap asked fo
 }
 var POINTER_CURSORS = { 'default': 'arrowCursor', pointer: 'pointingHandCursor', text: 'IBeamCursor', 'vertical-text': 'IBeamCursorForVerticalLayout', crosshair: 'crosshairCursor', move: 'openHandCursor', grab: 'openHandCursor', grabbing: 'closedHandCursor', 'not-allowed': 'operationNotAllowedCursor', 'no-drop': 'operationNotAllowedCursor', copy: 'dragCopyCursor', alias: 'dragLinkCursor', 'context-menu': 'contextualMenuCursor', 'col-resize': 'resizeLeftRightCursor', 'row-resize': 'resizeUpDownCursor', 'ew-resize': 'resizeLeftRightCursor', 'ns-resize': 'resizeUpDownCursor', 'e-resize': 'resizeRightCursor', 'w-resize': 'resizeLeftCursor', 'n-resize': 'resizeUpCursor', 's-resize': 'resizeDownCursor' };    // as lzrprf %CURSORS
 var pointerAt = null, pointerDue = false, pointerHeld = false, pointerShapes = {}, pointerHand = null;    // the newest place not yet said, a frame asked for, the button down on the page, the cursor of each tab as lzrprf told it
-ObjC.registerSubclass({ name: 'LzrprfPointer', superclass: 'NSObject', methods: {
+busyClass({ name: 'LzrprfPointer', superclass: 'NSObject', methods: {
     'due:': { types: ['void', ['id']], implementation: function (sender) { pointerDue = false; pointerSaid(); } }
 } });
 function pointerMethods(methods) {    // the methods of LzrprfLaid, with the pointer's own added

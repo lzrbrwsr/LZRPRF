@@ -93,7 +93,7 @@ function inspectPaste() {
     }
     inspectPasteboard($.NSPasteboard.generalPasteboard);
 }
-ObjC.registerSubclass({ name: 'LzrprfInspectActions', superclass: 'NSObject', methods: {
+busyClass({ name: 'LzrprfInspectActions', superclass: 'NSObject', methods: {
     'openInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectOpen(); } },
     'runInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectRun(); } },
     'closeInspect:': { types: ['void', ['id']], implementation: function (sender) { inspectClose(); } },
@@ -105,7 +105,7 @@ ObjC.registerSubclass({ name: 'LzrprfInspectActions', superclass: 'NSObject', me
         return false;
     } }
 } });
-ObjC.registerSubclass({ name: 'LzrprfInspectInput', superclass: 'NSTextView', methods: {
+busyClass({ name: 'LzrprfInspectInput', superclass: 'NSTextView', methods: {
     'paste:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },
     'pasteAsPlainText:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },
     'pasteAsRichText:': { types: ['void', ['id']], implementation: function (sender) { inspectPaste(); } },

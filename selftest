@@ -2334,6 +2334,7 @@ my %about = (
 );
 sub run_of {
     my ($name, %how) = @_;
+    if (my $c = $how{command}) { for my $i (1 .. $#$c) { $c->[$i] = "function busyClass(spec) { return ObjC.registerSubclass(spec); }\n$c->[$i]" if $c->[$i - 1] eq '-e' && grep({ $_ eq 'JavaScript' } @$c) && $c->[$i] =~ /\bbusyClass\(/ && $c->[$i] !~ /function busyClass\(/ } }    # window code read from lzrprf registers its classes through the busy meter (ticket 1543); run alone it has the plain registration
     defined $about{$name} or die "selftest: the run $name has no line that says what it tries\n";
     my $folder = "$base.$name";
     mkdir $folder or die "selftest: cannot make $folder: $!\n";
@@ -3404,8 +3405,8 @@ my $cog_js = join("\n", 'function run(argv) {',    # the cogwheel's menu placed 
 run_of('cogfits', command => ['/usr/bin/osascript', '-l', 'JavaScript', '-e', $cog_js]);
 my $cog_keys_js = join("\n", 'ObjC.import("AppKit");', 'function run(argv) {',    # the open box's own keys, through AppKit's own asking of a window's views for a key press, read from lzrprf and run with no window: the box under a plain view as in the window
     ($text_of_lzrprf =~ /^(var cogBox = null, .*)$/m), q{cogCatch = {}; var hover = {}, cogItems = function () { return []; }; function redrawn() {}},
-    map({ my $name = $_; $text_of_lzrprf =~ /^(function $name\(.*?^\}\n)/ms } qw(cogScrolled cogKeyed cogHidden cogComposing)), q{var win = null;},
-    ($text_of_lzrprf =~ /^(ObjC\.registerSubclass\(\{ name: 'LzrprfCogMenu'.*?^\} \}\);\n)/ms),
+    map({ my $name = $_; $text_of_lzrprf =~ /^(function $name\(.*?^\}\n)/ms } qw(cogScrolled cogKeyed cogHidden cogComposing)), q{var win = null; function busyClass(spec) { return ObjC.registerSubclass(spec); }},
+    ($text_of_lzrprf =~ /^(busyClass\(\{ name: 'LzrprfCogMenu'.*?^\} \}\);\n)/ms),
     q{var root = $.NSView.alloc.initWithFrame($.NSMakeRect(0, 0, 600, 400)); cogBox = $.LzrprfCogMenu.alloc.initWithFrame($.NSMakeRect(10, 10, 270, 300)); root.addSubview(cogBox); cogRow = 22;
     function pressed(code, flags) { var key = $.NSEvent.keyEventWithTypeLocationModifierFlagsTimestampWindowNumberContextCharactersCharactersIgnoringModifiersIsARepeatKeyCode(10, $.NSMakePoint(0, 0), flags || 0, 0, 0, $(), $('a'), $('a'), false, code); return root.performKeyEquivalent(key) ? 'taken' : 'passed'; }
     var ARROW = 1 << 23 | 1 << 21, FN = 1 << 23, SHIFT = 1 << 17, said = [];    // the flags AppKit sends with them: the arrows are function keys of the keypad, Home, End, Page Up and Page Down function keys
@@ -3741,7 +3742,7 @@ run_of('novideodecoder', command => ['/usr/bin/sandbox-exec', '-D', "HOME=$home"
 # gives only the converter that makes an MP4 of such a stream [C24]; that MP4 is played below.
 sub hls_js {
     my ($clip, $kind) = @_;
-    return join("\n", 'ObjC.import("Cocoa");', 'function run(argv) {',
+    return join("\n", 'ObjC.import("Cocoa");', 'function busyClass(spec) { return ObjC.registerSubclass(spec); }', 'function run(argv) {',
         q{var sheet = { ops: [[0, 36, 'V', 0, 64, 0]] }, free = true, perlTab = 0, selected = 0, said = [], canvas = $.NSView.alloc.initWithFrame($.NSMakeRect(0, 0, 320, 240)); function say(line) { said.push(line); }},
         ($text_of_lzrprf =~ /^(var (?:videos|VIDEO_MOST|VIDEO_PIECE) = .*)$/mg), ($text_of_lzrprf =~ /^(function video\w*\(.*?^\}\n)/msg),
         q{function wait(until) { for (var i = 0; i < 100 && !until(); i++) $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.1)); }},
@@ -6219,7 +6220,7 @@ check(@opens == 1 && $opens[0] eq "            become(undef, undef, undef, defin
 check(join(' ', sort keys %programs) eq "@known" && $text_of_lzrprf !~ /\bsystem\(|\bqx\b|`/, 'the programs lzrprf starts are the system\'s own, and these nineteen: ' . join(' ', map { m{([^/]+)$} } @known), scalar(keys %programs) . ' programs named');
 my @supers = grep { !m{^\s*//} } grep { /ObjC\.super\(/ } split /\n/, $text_of_lzrprf;
 my @blocks_on_press = grep { !m{^\s*//} } grep { /MonitorForEvents|'sendEvent:'/ } split /\n/, $text_of_lzrprf;
-my %pressed_first = map { $_ => 1 } ($text_of_lzrprf =~ /^ObjC\.registerSubclass\(\{ name: 'Lzrprf(\w+)', superclass: 'NSView', methods: (?:clickThrough\()?\{\n(?:    .*\n)*?    'mouseDown:': \{ implementation: function \(event\) \{ pressSeen\(event\); \w+\((?:event)?\); \} \}/mg);
+my %pressed_first = map { $_ => 1 } ($text_of_lzrprf =~ /^busyClass\(\{ name: 'Lzrprf(\w+)', superclass: 'NSView', methods: (?:clickThrough\()?\{\n(?:    .*\n)*?    'mouseDown:': \{ implementation: function \(event\) \{ pressSeen\(event\); \w+\((?:event)?\); \} \}/mg);
 check(!@supers && !@blocks_on_press && join(' ', sort keys %pressed_first) eq 'Belt Cog Cover Faces Frame Home Marks Star Tabs' && $text_of_lzrprf =~ /^function pressSeen\(event\) \{ \}/m,
     'the chrome handles a press from the mouseDown: of each of its own views (the frame, the home page, the tabs, the belt, the cover over the address bar, the cogwheel, Profiles, the star, the bookmarks bar), before the view\'s own handling of it; no press depends on what a block hands back (no monitor of the application\'s events: the bridge hands AppKit back its own wrapper of the event, and in release 75 every press was lost), and no class of the window takes sendEvent: or calls ObjC.super (in release 74 that went back into itself once the system observed the window, and every press hung it)',
     scalar(@supers) . ' calls of ObjC.super, ' . scalar(@blocks_on_press) . ' monitors or sendEvent:, pressed first by ' . (join(' ', sort keys %pressed_first) || 'none'));

@@ -242,7 +242,7 @@ function tnnlTold(rest) {
     tnnlRefresh();
 }
 function partsMade() {    // the boxes of the two modals, made once with the panel, and the object their presses reach
-    ObjC.registerSubclass({ name: 'LzrprfParts', superclass: 'NSObject', methods: {
+    busyClass({ name: 'LzrprfParts', superclass: 'NSObject', methods: {
         'ticked:': { types: ['void', ['id']], implementation: function (sender) { partTicked(sender); } },
         'vpn:': { types: ['void', ['id']], implementation: function (sender) { tnnlTicked(sender); } },
         'tnnlShown:': { types: ['void', ['id']], implementation: function () { tnnlShown(); } }
