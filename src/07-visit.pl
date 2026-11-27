@@ -210,7 +210,14 @@ sub visit {
         $DRAWN = 1;
         timed('list');
     }
-    my ($shown, $fetched, $wanted, $decoded) = pictured($lines, $paths, $host, $where, $kept, undef, $got);
+    my $progress = $first && sub {        # the pictures decoded so far, drawn while the rest still come, as long as the window still holds the list sent last
+        my ($so_far) = @_;
+        return unless defined $first_mark && $first_mark == $WINDOW_LISTS;
+        my ($now) = pictured($lines, $paths, $host, $where, $kept, $so_far) or return;
+        window_changed($sent, $now);
+        ($sent, $first_mark) = ($now, $WINDOW_LISTS);
+    };
+    my ($shown, $fetched, $wanted, $decoded) = pictured($lines, $paths, $host, $where, $kept, undef, $got, $progress || undef);
     undef $PICTURES_BEFORE;                # the page's own pictures are here: what was kept of the page before is dropped
     window("page $TAB", '.') if !$shown && $first;    # a line of a picture could not be written: the page drawn at once is taken away again, as nothing of this answer would have been shown before
     return live_dropped($live, $UNWRITTEN) unless $shown;

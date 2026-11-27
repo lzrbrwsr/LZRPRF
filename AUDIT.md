@@ -214,12 +214,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 02-limits-and-state.pl	19	unblocked	C20 C16 C17
 02-limits-and-state.pl	32	kept_in	-
 02-limits-and-state.pl	36	shared	C16 C19 C18 C12 C22 C21 C24 C30 C23 C11 C29 C32 C26
-02-limits-and-state.pl	213	sandbox_says	C26 C27 C4
-02-limits-and-state.pl	265	permit_class	C26
-02-limits-and-state.pl	266	permit_kinds	C26
-02-limits-and-state.pl	296	fresh_tab	C19
-02-limits-and-state.pl	312	now	C19 C6 C8 C14 C30
-02-limits-and-state.pl	331	timed	C28
+02-limits-and-state.pl	214	sandbox_says	C26 C27 C4
+02-limits-and-state.pl	266	permit_class	C26
+02-limits-and-state.pl	267	permit_kinds	C26
+02-limits-and-state.pl	297	fresh_tab	C19
+02-limits-and-state.pl	313	now	C19 C6 C8 C14 C30
+02-limits-and-state.pl	332	timed	C28
 03-containers.pl	1	-	C1 C28 C21 C3 C24 C12
 03-containers.pl	185	shell_held	-
 03-containers.pl	190	shell_measured	-
@@ -311,28 +311,28 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 07-visit-beside.pl	98	run_read	C19 C26 C28
 07-visit.pl	1	-	-
 07-visit.pl	4	visit	C19 C29 C32 C17 C23 C26 C5 C28 C8 C7 C4 C14 C30
-07-visit.pl	245	laid_out	C28 C9
-07-visit.pl	261	outrun	-
-07-visit.pl	276	faces	C13
-07-visit.pl	312	contained	C28 C20 C13 C14 C26 C7 C3
-07-visit.pl	370	page_started	C1 C3
-07-visit.pl	393	spare_for	-
-07-visit.pl	401	spare_taken	-
-07-visit.pl	412	spare_dropped	-
-07-visit.pl	420	spare_work	-
-07-visit.pl	427	idle_taken	C1
-07-visit.pl	439	run_seal	-
-07-visit.pl	465	keeper	C9
-07-visit.pl	553	unhung	-
-07-visit.pl	561	parted	-
-07-visit.pl	570	checked	C30 C9 C22 C14
-07-visit.pl	673	laid	-
-07-visit.pl	686	laid_run	C4
-07-visit.pl	736	redirect_noted	C4
-07-visit.pl	748	redirect_answered	-
-07-visit.pl	755	redirects_listed	C4
-07-visit.pl	768	redirects_told	C4 C23
-07-visit.pl	770	redirects_decide	C4
+07-visit.pl	252	laid_out	C28 C9
+07-visit.pl	268	outrun	-
+07-visit.pl	283	faces	C13
+07-visit.pl	319	contained	C28 C20 C13 C14 C26 C7 C3
+07-visit.pl	377	page_started	C1 C3
+07-visit.pl	400	spare_for	-
+07-visit.pl	408	spare_taken	-
+07-visit.pl	419	spare_dropped	-
+07-visit.pl	427	spare_work	-
+07-visit.pl	434	idle_taken	C1
+07-visit.pl	446	run_seal	-
+07-visit.pl	472	keeper	C9
+07-visit.pl	560	unhung	-
+07-visit.pl	568	parted	-
+07-visit.pl	577	checked	C30 C9 C22 C14
+07-visit.pl	680	laid	-
+07-visit.pl	693	laid_run	C4
+07-visit.pl	743	redirect_noted	C4
+07-visit.pl	755	redirect_answered	-
+07-visit.pl	762	redirects_listed	C4
+07-visit.pl	775	redirects_told	C4 C23
+07-visit.pl	777	redirects_decide	C4
 08-pictures.pl	1	-	C7 C5 C17 C8 C22
 08-pictures.pl	46	pictures_state	C28
 08-pictures.pl	57	pictures_begun	C23 C28 C27 C4 C5 C8 C6 C7 C1 C3 C21
@@ -346,19 +346,19 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 08-pictures.pl	208	pictures_before	-
 08-pictures.pl	224	pictures_dropped	-
 08-pictures.pl	231	pictured	C28
-08-pictures.pl	288	picture_named	-
-08-pictures.pl	312	picture_one	-
-08-pictures.pl	319	picture_like	-
-08-pictures.pl	324	picture_same	-
-08-pictures.pl	331	named_owed	-
-08-pictures.pl	344	named_again	-
-08-pictures.pl	358	fit_crop	C21
-08-pictures.pl	395	system_decoded	C21 C24
-08-pictures.pl	434	plain_read	C24
-08-pictures.pl	454	ts_sounds	C24 C21
-08-pictures.pl	506	system_converted	C21
-08-pictures.pl	532	stated_size	C21
-08-pictures.pl	563	decoders_removed	C24
+08-pictures.pl	294	picture_named	-
+08-pictures.pl	318	picture_one	-
+08-pictures.pl	325	picture_like	-
+08-pictures.pl	330	picture_same	-
+08-pictures.pl	337	named_owed	-
+08-pictures.pl	350	named_again	-
+08-pictures.pl	364	fit_crop	C21
+08-pictures.pl	401	system_decoded	C21 C24
+08-pictures.pl	440	plain_read	C24
+08-pictures.pl	460	ts_sounds	C24 C21
+08-pictures.pl	512	system_converted	C21
+08-pictures.pl	538	stated_size	C21
+08-pictures.pl	569	decoders_removed	C24
 09-videos.pl	1	-	C22
 09-videos.pl	28	videoed	C23 C27 C5 C4 C28 C8 C6 C7 C22 C24
 09-videos.pl	162	hls_fetched	C5 C6 C7 C22 C23 C28

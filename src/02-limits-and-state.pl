@@ -103,10 +103,11 @@ my %LAID = (R => 20_000, X => 30_000, G => 1000, M => 64, I => 1000, K => 32, J 
 my $RUN_TEXT = 2000;                      # the most characters in one run of text of a laid page
 my $ALL_TEXT = 1_000_000;                 # the most characters in all its runs together
 my $PIXELS = 262_144;                     # the most pixels in all its pictures together: one picture of 512 by 512
-my $PICTURES = 24;                        # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURES, the same number): the most pictures one page may name, each fetched by a run of its own
+my $PICTURES = 512;                       # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURES, the same number, and the window's NAMED_MOST bitmaps): the most pictures one page may name, each fetched by a run of its own; 24 until 2026-11-27, when the owner's long pages of a hundred small pictures went grey past the 24th
 my $PICTURE_SITES = 8;                    # DECLARED(lzrbrwsr src/page/pictures.rs MOST_PICTURE_SITES, the same number): the most other sites, neither the page's host nor a name under it (sub under), that are asked for one page's pictures; a picture on one more is not fetched, and the log says why
 my $PICTURES_AT_ONCE = 8;                 # DECLARED: the most pictures of one page fetched and decoded side by side, the owner's order of 2026-11-21: 24 one after the other took over 4 seconds; 8 since 2026-11-24, when hs.fi's 24 AVIF pictures took 2.4 s at 4 (scripts/load-timeline.pl)
-my $PICTURE_SECONDS = 20;                 # one clock for all of a page's pictures: a picture not begun by then stays a grey box
+my $PICTURE_SECONDS = 60;                 # one clock for all of a page's pictures: a picture not begun by then stays a grey box; 60 since 2026-11-27, as a page may name 512 and 8 at a time take about 50 ms each
+my $PICTURES_TOLD_EVERY = 0.4;            # DECLARED(seconds): while a page's pictures come in, the window is given the ones decoded so far at most this often (sub pictured)
 my $PICTURE_PIXELS = 800_000;             # the most pixels in one fetched picture: four times 200,000 since retina pictures, sharp at two device pixels a point
 my $SIPS = '/usr/bin/sips';               # [C21] the system's own; it decodes for lzrprf what the application cannot (AVIF, HEIC, HEIF), lzrprf holds no code for it
 my $DECODE_SECONDS = 10;                  # DECLARED([C21] the most one run of the system's decoder may take in all: a picture of 1024 pixels a side takes it under one second)
@@ -141,7 +142,7 @@ my %NAMED;                                # the decoded pictures this lzrprf nam
 my %NAMED_AT;                             # the same, by where the picture stands in memory
 my ($NAMED_RUN, $NAMED_OWNER, $NAMED_COUNT) = ('', 0, 0);    # the eight random characters every name of this process begins with, the process they were made in, and how many it named: a copy made by fork, or lzrprf started again behind a window that lives on, never names a bitmap another one sent
 my $AHEAD_PAGE;                           # the answer being read now, with its host, its addresses and how its lines are kept: what a picture begun ahead is checked against (sub prefetch_begin)
-my $DRAWN_PIXELS = 8 * $PICTURE_PIXELS;   # the most pixels the window is given for fetched pictures on one page, however often one is placed: a place beyond that stays a grey box
+my $DRAWN_PIXELS = 64 * $PICTURE_PIXELS;  # the most pixels the window is given for fetched pictures on one page, however often one is placed: a place beyond that stays a grey box; 51.2 million (205 MB) is inside the window's NAMED_BYTES of 512 MB and about 600 news thumbnails of 392 by 220; 8 pictures' worth until 2026-11-27
 my @FACES = map { "/System/Library/Fonts/Supplemental/$_.ttf" } 'Arial', 'Arial Bold', 'Arial Italic', 'Arial Bold Italic', 'Courier New', 'Courier New Bold', 'Courier New Italic', 'Courier New Bold Italic';    # the fonts a page is drawn with, in the application's order: plain, bold, italic, both, then the same in fixed width
 my $FACE_BYTES = 2 * 1024 * 1024;         # the most of one font that is handed over: the largest of the eight is 773,236 bytes on this macOS
 my $ANSWER_SECONDS = 600;                 # a question that is still open then counts as answered with its first button
