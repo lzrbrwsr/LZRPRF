@@ -166,11 +166,11 @@ BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 # that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="c2b8dca730d5b6687e71cf026fa1d0bc5a36a076656543264336df342078d2b6"
-RELEASE="166"
-LZRPRF_COMMIT="37aaed22a789ad648db231f12d87219249cead11"
+SHA256="9c2801afb7a00b1337f8c8fd52e3a0b6afe325009f4a1a26437f09b0fe1a02e5"
+RELEASE="172"
+LZRPRF_COMMIT="5149c8dd27e3af184ff30c04d0cd301d4c2e0398"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="faf757b105e18e580b12c9c7ccc6dcd243a3eacf44f03659d2d1881cb135fc11"
+LZRPRF_SHA256="fbcd668caee9b40db86581f27ee6c21a7f2bd30d0588f4ee123b681323c2ee23"
 SELFTEST_SHA256="5213cb6dee3118dc36bc03898650f12090756726933042f7dcc387f7d45a0599"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
 BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
@@ -787,24 +787,24 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 166
+release 172
 home local
+new A file you choose is read as text in the encoding the site names, and a page knows when its window is in front.
 new Sites can read a file you choose before they send it (FileReader), as Discord does with an attachment.
-new LZRCHT has Discord: sign in once with your own account in a sealed tab; it loads in full, stays signed in, and you can send, edit and delete messages.
+new LZRCHT's Discord may load all 372 of its scripts and its 13 MB main one, so it no longer stops half-loaded and blank. Sign in with your own account in its sealed tab.
 new yle.fi works: its articles, the electricity price graph, link clicks and the Kirjaudu login window.
 new A window a site opens in a frame after a click now loads and runs, even when the page has spent its fuel.
 new When a newer release is out, LZRBRWSR offers it in a clear centred window: Install it or Later.
-new Sites get four times more room to run their scripts, and building long text no longer runs them out of it.
 newest https://lzrbrwsr.com/latest
 installer https://lzrbrwsr.com/install.sh
 same https://lzrbrwsr.vercel.app/install.sh
 report https://origin.lzrbrwsr.com/report
 file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-file lzrbrwsr-bin 113c006a02f4bdf79b0c209c4fa397b0d666a01df59322fa4129afe5e3db7688
+file lzrbrwsr-bin 3287d30d3c3e08947440c98f454e139a9c442fae722e8c4d9e7d9235d221ee4d
 file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
 file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
-lzrprf faf757b105e18e580b12c9c7ccc6dcd243a3eacf44f03659d2d1881cb135fc11
+lzrprf fbcd668caee9b40db86581f27ee6c21a7f2bd30d0588f4ee123b681323c2ee23
 blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."
