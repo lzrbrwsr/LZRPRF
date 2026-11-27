@@ -980,6 +980,7 @@ sub holds {
         push @run, said_started(decoding($folder, $SIPS, '--version')), said_started(decoding($folder, '/usr/bin/perl', '-e', $GATE, $SIPS, '--version'));    # [C3] [C21] sips says its version in the decoder container, and behind the gate, sent no byte (its input leads nowhere), it never starts
     }
     my $named = decoder_named($folder);    # [C21] the one system service the decoder may ask for, and no other; asked while the tries run beside it
+    list_read();                          # [C23] the list is read while they run too (18 ms at a start, Ticket #1552); behind asks for it again below, which is then its answer kept
     my @said = said_read(10, @run, $free);    # [what it printed, whether it ended well] each
     my ($inside, $decoder, $sips, $outside, $gated, $gate_well) = ((map { $_->[0] } @said[0, 1, 2, 4]), @{ $said[3] });    # each started at once and read side by side, none waiting for another (342 ms one after another, measured 2026-11-24)
     unlink map { ("$_/here", "$_/made", "$_/out.png") } $folder, $apart;

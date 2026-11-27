@@ -235,12 +235,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 03-containers.pl	468	said_started	-
 03-containers.pl	477	said_read	-
 03-containers.pl	497	ended	C2
-03-containers.pl	545	holds	C21 C3
-03-containers.pl	588	decoder_named	C3
-03-containers.pl	635	witnessed	-
-03-containers.pl	653	inside	-
-03-containers.pl	675	witness_lost	-
-03-containers.pl	684	named_asked	C21
+03-containers.pl	545	holds	C21 C3 C23
+03-containers.pl	589	decoder_named	C3
+03-containers.pl	636	witnessed	-
+03-containers.pl	654	inside	-
+03-containers.pl	676	witness_lost	-
+03-containers.pl	685	named_asked	C21
 04-start.pl	1	-	-
 04-start.pl	4	run	C16 C17 C29
 04-start.pl	50	window_host	-
