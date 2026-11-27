@@ -267,13 +267,13 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 178
+    release 179
+    new Stopping Tor from a tab asks first and Cancel keeps it on; short notices appear briefly at the top, and the black strip under the bar is gone.
     new Long pages draw to their end: every picture is fetched, not just the first 24, and pictures appear as they arrive.
     new LZRBRWSR no longer gets stuck at full CPU or stops answering: macOS AutoFill kept retrying inside its window.
     new Discord in LZRCHT now opens titled Discord in its own tab, instead of a "not supported yet" notice.
     new Scrolling is smoother with a little more momentum, a page no longer jumps while it loads, and a minimized LZRDFNDR question waits in its icon with a count.
     new The menu bar says LZRBRWSR, questions open in the same box as everything else and never hold your tabs, and Discord connects from LZRCHT in its own tab.
-    new Pages and files in 27 older encodings (Cyrillic, Greek, Central European, Hebrew and more) now read correctly.
     home local
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
@@ -285,7 +285,7 @@ record:
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
     file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
     file lzrbrwsr-window 6472a7855c52851bd8db375b86a7f3b400b77353bcab70a663c39574497867c9
-    lzrprf 8c6584abd5203310e606b425b53825577667fc5da63f3c7351521c5d08e1ba65
+    lzrprf 48c0fefed9c08f2019f72ed6b2a9663ba1083f1f0f63e1a30b2243ab853275ab
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

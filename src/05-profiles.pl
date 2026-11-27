@@ -91,7 +91,7 @@ sub profiles_told {                       # the list, for the Profiles icon: not
     window('profiles begin', (map { "profiles one $_ " . (($PROFILE // 'first') eq $_ ? 'this' : profile_open(profile_folder($_)) ? 'open' : 'shut') . " $name{$_}" } $first, @others), 'profiles end');
 }
 
-sub profiles_refused { my ($says) = @_; window("profiles refused $says"); return idle($says) }
+sub profiles_refused { my ($says) = @_; window("profiles refused $says"); return alert($says) }
 
 sub profiles_locked {                     # one window at a time counts, makes, renames or removes profiles: an exclusive lock on the folder of the profiles, held while the handle lives
     my $all = profiles_folder() // return;

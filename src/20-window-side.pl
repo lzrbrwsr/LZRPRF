@@ -26,6 +26,7 @@ sub strip_back {                          # what the strip said, said again: wit
     return sub { defined $_[0] ? idle(index($was // '', $_[0]) >= 0 ? $was : join(' ', grep { length } $was // '', $_[0]), $_[0]) : idle($was // '', $short); return };    # a sentence the words already end with, a locked video clicked again, is not said twice
 }
 sub busy { window('busy ' . $_[0] =~ s/\s+/ /gr) }
+sub alert { my ($says) = @_; window('alert ' . $says =~ s/\s+/ /gr); return idle($says) }    # ticket 1535: a fault or refusal someone must read: the window's standard modal, and the words as idle says them
 sub idle {                                # what lzrprf says, in full; with $short the strip shows that instead ("brief"), and the full words stand where they belong: with what the page is made of, or on the log page
     my ($says, $short) = map { defined ? s/\s+/ /gr : undef } @_[0, 1];
     @{ $TABS[$TAB] }{qw(says brief)} = ($says, $short);

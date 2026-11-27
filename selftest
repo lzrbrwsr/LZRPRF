@@ -5,17 +5,14 @@
 #
 #   perl selftest            about half a minute
 #
-# It uses no host outside this computer, shows no window and asks you
-# nothing. Its tries at an address outside go to 192.0.2.1, an address kept for
-# documentation that no host answers: inside a container the try counts as
-# refused only when the sandbox itself refuses it, and outside every container
-# it must not be refused. So the tries made outside every container can put the
-# opening packet of a connection to 192.0.2.1 on your network: it holds
-# nothing of yours, and nothing answers it. It starts lzrprf with "try": the same program, with its state in a
-# folder of its own, every name leading to a test site on this computer whose
-# certificate is signed by an authority made here a moment ago, and the
-# window's part played by the test. One run uses lzrprf's real window, kept
-# off the screen. Everything else is the code "lzrprf run" uses.
+# It uses no host outside this computer, shows no window and asks you nothing. Its tries at an address outside go to
+# 192.0.2.1, an address kept for documentation that no host answers: inside a container the try counts as refused
+# only when the sandbox itself refuses it, and outside every container it must not be refused. So the tries made
+# outside every container can put the opening packet of a connection to 192.0.2.1 on your network: it holds nothing
+# of yours, and nothing answers it. It starts lzrprf with "try": the same program, with its state in a folder of its
+# own, every name leading to a test site on this computer whose certificate is signed by an authority made here a
+# moment ago, and the window's part played by the test. One run uses lzrprf's real window, kept off the screen.
+# Everything else is the code "lzrprf run" uses.
 #
 # The hostile application is the text "$hostile" below. It is the published
 # probe: read it, add to it, run it again.
@@ -34,15 +31,13 @@
 # The test site keeps its own record of every connection and every byte it
 # received, and what lzrprf says it did is compared with that record.
 #
-# At its start the test takes out of ~/.lzrprf/proven the mark of what it
-# tests (this build of macOS, this lzrprf, this selftest), and when nothing
-# failed it writes that mark again: "lzrprf run" shows no page without it, so
-# a run that fails takes back the proof of an earlier run that held. When a
-# check could not be tried on this computer, the mark is followed by
-# ", untested: " and the checks that could not be tried, and "lzrprf run"
-# shows no page before you said yes to starting without exactly those. Nothing else is left behind but the empty file ~/.lzrprf/selftest.lock,
-# which keeps two tests from running at once. A test that is stopped from
-# outside ends every process it started and takes its files away.
+# At its start the test takes out of ~/.lzrprf/proven the mark of what it tests (this build of macOS, this lzrprf,
+# this selftest), and when nothing failed it writes that mark again: "lzrprf run" shows no page without it, so a run
+# that fails takes back the proof of an earlier run that held. When a check could not be tried on this computer, the
+# mark is followed by ", untested: " and the checks that could not be tried, and "lzrprf run" shows no page before
+# you said yes to starting without exactly those. Nothing else is left behind but the empty file
+# ~/.lzrprf/selftest.lock, which keeps two tests from running at once. A test that is stopped from outside ends
+# every process it started and takes its files away.
 use strict;
 use warnings;
 use Cwd 'abs_path';
@@ -93,14 +88,11 @@ flock $mine, LOCK_EX | LOCK_NB or do {    # a test with another home folder runs
     print "now    Another selftest runs on this Mac with another home folder: this one waits until it has ended.\n";
     flock $mine, LOCK_EX or die "selftest: cannot wait for the other selftest: $!\n";
 };
-# The order: the lock first, so two tests never write the file of marks at
-# once; then the mark of what is tested is taken out, before anything else
-# can stop the test. Only a test that cannot say what it tests, or that is
-# not the selftest beside lzrprf, stops before that, and then no mark of
-# its own stands to be taken out. What the test site needs and perl does not
-# bring itself (IO::Socket::SSL) is loaded after the mark is out, so a Mac
-# that lacks it ends with the mark taken out too; the lines "use" above name
-# only what comes with perl itself.
+# The order: the lock first, so two tests never write the file of marks at once; then the mark of what is tested is
+# taken out, before anything else can stop the test. Only a test that cannot say what it tests, or that is not the
+# selftest beside lzrprf, stops before that, and then no mark of its own stands to be taken out. What the test site
+# needs and perl does not bring itself (IO::Socket::SSL) is loaded after the mark is out, so a Mac that lacks it
+# ends with the mark taken out too; the lines "use" above name only what comes with perl itself.
 chomp(my $mark = qx{/usr/bin/perl "$lzrprf" mark} // '');    # what is tested: this build of macOS, this lzrprf, and this selftest
 length $mark or die "selftest: lzrprf could not say what is tested (the build of macOS, its own SHA-256 and that of the selftest beside it)\n";
 my $own = Digest::SHA->new(256)->addfile(abs_path($0))->hexdigest;
@@ -108,12 +100,10 @@ $mark =~ /, selftest \Q$own\E$/ or die "selftest: the selftest beside lzrprf is 
 unmark();                                 # a run that fails must not leave standing the mark an earlier run wrote for this same copy
 require IO::Socket::SSL;
 my ($paired) = $mark =~ /, lzrprf ([0-9a-f]{64}),/ or die "selftest: the mark does not name lzrprf's SHA-256\n";    # the SHA-256 of the lzrprf under test, as the release file of an application names it
-# The file in the home folder that the probes try to read. It is made here,
-# while the lock is held and before anything of the test is made or started,
-# so a refusal leaves nothing behind. A run that was killed leaves its file:
-# a plain file of yours, no link, that holds the test's own line and nothing
-# else, is that one and is removed. Anything else at the name is not the
-# test's: it is left as it is and the test does not run.
+# The file in the home folder that the probes try to read. It is made here, while the lock is held and before
+# anything of the test is made or started, so a refusal leaves nothing behind. A run that was killed leaves its
+# file: a plain file of yours, no link, that holds the test's own line and nothing else, is that one and is removed.
+# Anything else at the name is not the test's: it is left as it is and the test does not run.
 my $secret_line = "a file in the home folder\n";
 if (my @there = lstat $secret) {
     -f _ && $there[4] == $< && $there[7] == length $secret_line && slurp($secret) eq $secret_line && unlink $secret
@@ -131,19 +121,17 @@ $SIG{$_} = sub { tidy("it was stopped from outside by SIG$_[0]") if $$ == $outsi
 my $text_of_lzrprf = slurp($lzrprf);
 length $text_of_lzrprf or die "selftest: there is no lzrprf beside selftest\n";
 
-# The test site's two certificates, both for the name site.test, for
-# img.site.test, the name under it a page's picture is fetched from, and for
-# pictures.test and the names under it, other sites a picture may come from
-# (other.test stays without one: a page kept running fails to reach it). lzrprf is
-# told to trust the first as its authority; nothing trusts the second.
+# The test site's two certificates, both for the name site.test, for img.site.test, the name under it a page's
+# picture is fetched from, and for pictures.test and the names under it, other sites a picture may come from
+# (other.test stays without one: a page kept running fails to reach it). lzrprf is told to trust the first as its
+# authority; nothing trusts the second.
 for my $name ('trusted', 'untrusted') {
     system("/usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -keyout '$site_folder/$name.key' -out '$site_folder/$name.pem' -subj /CN=site.test -days 2 -addext subjectAltName=DNS:site.test,DNS:img.site.test,DNS:pictures.test,DNS:*.pictures.test,DNS:provider.test,DNS:*.provider.test,DNS:providertv.test,DNS:*.providertv.test -batch 2>/dev/null") == 0
         or die "selftest: cannot make a certificate\n";
 }
 
-# A picture of one colour, 32 by 24, made here as a PNG, and the AVIF and the
-# HEIC the system's own sips makes of it: the test site serves both, and the
-# system's decoder must give that colour back [C21].
+# A picture of one colour, 32 by 24, made here as a PNG, and the AVIF and the HEIC the system's own sips makes of it.
+# The test site serves both, and the system's decoder must give that colour back [C21].
 {
     require Compress::Zlib;
     my $chunk = sub { my ($type, $data) = @_; pack('N', length $data) . $type . $data . pack('N', Compress::Zlib::crc32($type . $data)) };
@@ -185,11 +173,10 @@ my $clip = MIME::Base64::decode_base64(join '', qw(
     i5fKcqYYC+SFZUaQQvy8uI8BOzuGmnDIAAAAKUGagFeT7/88Ak2Ed+qA6702GVgIlVXVnw3CVfzXrgNAb+BUQzZ+43MX
 ));
 
-# An HLS stream of the test site [C22]: a clip of one second, 64 by 36, H.264 in MPEG-TS
-# with no sound (3196 bytes, made with ffmpeg for this test), whose three segments are pieces of it at its packets of 188
-# bytes, so the stream joined is the clip again; and playlists that point at another site, at
-# http, that are too large, locked, too long, and a live one in fragmented MP4 at an address
-# with no .m3u8 in it.
+# An HLS stream of the test site [C22]: a clip of one second, 64 by 36, H.264 in MPEG-TS with no sound (3196 bytes,
+# made with ffmpeg for this test), whose three segments are pieces of it at its packets of 188 bytes, so the stream
+# joined is the clip again; and playlists that point at another site, at http, that are too large, locked, too long,
+# and a live one in fragmented MP4 at an address with no .m3u8 in it.
 my $hls_ts = MIME::Base64::decode_base64(join '', qw(
     R0AREABC8CUAAcEAAP8B/wAB/IAUSBIBBkZGbXBlZwlTZXJ2aWNlMDF3fEPK////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -529,26 +516,19 @@ my $high = POSIX::dup2(fileno $left_open, 700) // 19;    # and as descriptor 700
 $ENV{LZRPRF_SELFTEST_MARK} = 'a variable of the user';
 my $computer = (POSIX::uname())[1] // '';
 
-# The hostile application. lzrprf starts it in a page container, once for
-# every answer that was fetched. In one run it also stands in curl's place,
-# in the fetch container. Before all that it is run here, outside every
-# container, where each of its attempts must succeed. Each attempt says its
-# name and what happened: on its error output, which only a test is given;
-# and in curl's place on its output, which lzrprf takes for a site's answer.
-# What it does in a page container depends on the address: it tries
-# everything, or it writes one of the lists that lzrprf must refuse.
-# Its try at an address outside this computer ("sub nowhere") goes to
-# 192.0.2.1, kept for documentation (RFC 5737), which no host answers. It
-# does not wait: outside a sandbox the try is left pending, and pending is
-# not refused. Only the sandbox's own refusal counts as refused, and the same
-# try is made outside every container, where it must not be refused: so a
-# firewall of yours that refuses it is not taken for the sandbox.
-# Its try at memory asks the system for 3 GiB of addresses (mmap, call 197
-# on macOS) and touches none of it: the answer is yes or no at once, and no
-# memory of the tester's Mac is filled outside the containers. A string that
-# large would be filled, and would end the program where eval cannot catch it.
-# No comment stands in its text before the part for curl's place: there its
-# lines are joined into one, and a comment would take the rest with it.
+# The hostile application. lzrprf starts it in a page container, once for every answer that was fetched. In one run
+# it also stands in curl's place, in the fetch container. Before all that it is run here, outside every container,
+# where each of its attempts must succeed. Each attempt says its name and what happened: on its error output, which
+# only a test is given; and in curl's place on its output, which lzrprf takes for a site's answer. What it does in a
+# page container depends on the address: it tries everything, or it writes one of the lists that lzrprf must refuse.
+# Its try at an address outside this computer ("sub nowhere") goes to 192.0.2.1, kept for documentation (RFC 5737),
+# which no host answers. It does not wait: outside a sandbox the try is left pending, and pending is not refused.
+# Only the sandbox's own refusal counts as refused, and the same try is made outside every container, where it must
+# not be refused: so a firewall of yours that refuses it is not taken for the sandbox. Its try at memory asks the
+# system for 3 GiB of addresses (mmap, call 197 on macOS) and touches none of it: the answer is yes or no at once,
+# and no memory of the tester's Mac is filled outside the containers. A string that large would be filled, and would
+# end the program where eval cannot catch it. No comment stands in its text before the part for curl's place: there
+# its lines are joined into one, and a comment would take the rest with it.
 # In it the limit of processor time is number 0 and the limit of memory number 5 (setrlimit, call 195): outside every container neither try is a raise, in a container both are.
 my $hostile = <<'END';
 use IO::Socket::IP; use IO::Socket::UNIX; use Socket; use POSIX (); use MIME::Base64 ();
@@ -1632,6 +1612,7 @@ function noteTried() {                       // no note under the bar (Henry, 20
     var out = [], held = [words.stringValue.js, words.toolTip.js];
     function beltPicture() { var size = belt.frame.size, image = $.NSImage.alloc.initWithSize(size); image.lockFocus; paintBelt(); image.unlockFocus; return image.TIFFRepresentation; }
     function texts() { var row = belt.frame.origin.y, n = 0, all = root.subviews; for (var i = 0; i < all.count; i++) { var v = all.objectAtIndex(i), f = v.frame; if (v.isKindOfClass($.NSTextField) && !v.hidden && f.origin.y >= row && f.origin.y < row + PILL.origin.y && f.origin.x > PILL.origin.x && f.origin.x + f.size.width < PILL.origin.x + PILL.size.width) n++; } return n; }
+    var clock = Date.now, sayAll = say, caught = [], askedBefore = asked, pendingBefore = pendingTab, freeBefore = free;
     try {
         var before = texts();
         wordsTold('A tip');
@@ -1641,12 +1622,31 @@ function noteTried() {                       // no note under the bar (Henry, 20
         var lined = beltPicture();
         loadingAt = 0;
         out.push('line=' + !lined.isEqualToData(still));
-        strip(['Loading the page'], false, false);
+        heard('busy Loading the page');
+        var f = toast.frame, belowTop = f.origin.y + f.size.height < root.frame.size.height - TOP;
+        out.push('toast=' + (!toast.hidden && belowTop) + ':' + toast.stringValue.js);
         out.push('busy=' + !!loadingAt + ' under=' + texts());
-        strip([''], true, false);
+        heard('idle Page ready');
+        out.push('ready=' + (!toast.hidden && toast.stringValue.js == 'Page ready'));
+        Date.now = function () { return toastAt + 2500; };
+        toastDue();
+        out.push('early=' + !toast.hidden);
+        Date.now = function () { return toastAt + 2600; };
+        toastDue();
+        out.push('due=' + toast.hidden);
         out.push('idle=' + !loadingAt);
+        heard('alert Read this fault');
+        out.push('alert=' + (modalOpen && panelSub.stringValue.js == 'Read this fault' && panelButtons.length == 1 && panelButtons[0].title.js == 'OK'));
+        say = function (line) { caught.push(line); };
+        torAsking = true;
+        heard('ask Stop Tor?\tCancel\tStop Tor');
+        var question = modalOpen && panelTitle.stringValue.js == 'Stop Tor?';
+        free = false;
+        tabSaid('tab select 0', undefined, false);
+        out.push('tor=' + (question && !torAsking && !modalOpen && caught.join(',') == 'button ' + (askedBefore + 1) + ' 1'));
     } catch (e) { out.push('fault ' + plain(e).slice(0, 120)); }
-    loadingSet(false);
+    Date.now = clock; say = sayAll; asked = askedBefore; pendingTab = pendingBefore; free = freeBefore; torAsking = false; torAskNumber = 0;
+    loadingSet(false); if (modalOpen) closeModal(); if (toast) toast.hidden = true;
     words.stringValue = $(held[0]); words.toolTip = $(held[1]);
     return out.join(' ; ');
 }
@@ -6095,8 +6095,8 @@ check(($at{toolshow} // q{}) eq q{shut said=tool open ; panel=tool tab=computer 
 check(($at{footer} // q{}) eq qq{footer=true page=0/0 ; first=200 \xc2\xb7 61049 ms \xc2\xb7 950 kB last=What this page is made of below=true ; icons=tool<tor<faces<cog sorted=true beside=true row=true ; menu=Show log said=log ; open=Hide log},
     q{no footer, read from lzrprf and run with no window: nothing stands at the window's foot between questions and the page reaches down to it; the lock's panel says first how the site answered (status, time, size) and ends with what the page is made of; LZRDFNDR then Tor stand just right of the bar, left of the Profiles icon and the cogwheel, in the bar's row; and the log is "Show log" in the cogwheel's menu, which asks lzrprf for it, and reads "Hide log" while it is open},
     $at{footer} // q{});
-check(($at{note} // q{}) eq q{under=0/0 zoom=undefined note=undefined ; line=true ; busy=true under=0 ; idle=true},
-    q{no note under the address bar (Henry, 2026-11-24: "we dont need that information"), read from lzrprf and run with no window: a tip and lzrprf's words while it works put no text in the belt under the bar, and the window has no note left to show; while lzrprf works a thin line is still drawn along the bar, gone once it is idle},
+check(($at{note} // q{}) eq q{under=0/0 zoom=undefined note=undefined ; line=true ; toast=true:Loading the page ; busy=true under=0 ; ready=true ; early=true ; due=true ; idle=true ; alert=true ; tor=true},
+    q{no note under the address bar (Henry, 2026-11-24: "we dont need that information"), read from lzrprf and run with no window: a tip and lzrprf's words while it works put no text in the belt under the bar, and the window has no note left to show; while lzrprf works a thin line is still drawn along the bar, gone once it is idle. Busy and idle words replace the toast below TOP, which stays up at 2.5 s and hides at 2.6 s. An alert opens its words with OK. A tab press answers Stop Tor? with button one},
     $at{note} // q{});
 check(($at{licencepanel} // '') eq q{open=true field=true ; empty=Type or paste your licence code first. said=0 ; wrong=That is not a licence code: a code has 120 letters and digits, in groups of 5. said=0 ; sent=licence set abcde fghij ; refused=The code is not a support member licence: its signature does not check. field=true ; kept=The code is kept. This browser is a support member's, since  field=false item=since November 2026 ; remove=licence remove ; none item=true field=true ; incognito tip=true modal=false said=2},
     'the licence panel in the window, told by lines as lzrprf writes them: "Enter licence code" opens it with its one field; an empty field or one with other signs is answered in the panel and nothing is said; a code is said as "licence set" with its spaces made single; a refusal is shown plainly; a kept code shows since when and hides the field; Remove code says "licence remove"; in an incognito window the item only says why it is not offered', $at{licencepanel} // 'nothing came: the window stopped before');
@@ -6192,9 +6192,9 @@ if (($fork_threads // 0) == 1) { untested('a copy made by fork of a process with
 else { check(out('forklookup') =~ /\Aparent threads=([2-9]|[1-9][0-9]+) lookup=127\.0\.0\.1(,::1)?\ncopy fresh=0 said=127\.0\.0\.1(,::1)? clean=1 invalid=none clean=1 numbered=2 lookup=-\nstatus=0\n\z/,
     'a copy made by fork of a process with two threads, as the picture runs and the keeper are, looks up "localhost" and a name that is nowhere through $LOOKUP in a fresh perl and is not ended by the system, turns a number into an address, and gets nothing from sub lookup, which looks up a name only in a process started afresh (lzrprf\'s own subs, run here)',
     out('forklookup') . err('forklookup')) }
-my @draw_rects = $text_of_lzrprf =~ /^\s*'drawRect:': (.*)$/mg;
-my @draw_named = map { /\A\{ implementation: function \(dirty\) \{ viewDrawn\('([a-z]{1,20})', function \(\) \{ .* \}\); \} \},?(?:\s+\/\/.*)?\z/ ? $1 : () } @draw_rects;
-my %draw_once; $draw_once{$_}++ for @draw_named;
+my @ask_calls = grep { !/^sub ask / } $text_of_lzrprf =~ /^(.*\bask\(.*)$/mg; my @ask_unsafe = grep { !/\bask\(.*\)\s*[=!]= 2\b/ && !/",\s*'[^']+'\);/ } @ask_calls;    # ticket 1535: a tab press gives a question its first button, so only the second may act
+check(@ask_calls >= 10 && !@ask_unsafe, 'every question lzrprf asks acts only on its second button, so the first is the safe answer a tab press gives it (ticket 1535)', scalar(@ask_calls) . ' questions; acting on button 1: ' . join(' | ', map { substr($_, 0, 120) } @ask_unsafe));
+my @draw_rects = $text_of_lzrprf =~ /^\s*'drawRect:': (.*)$/mg; my @draw_named = map { /\A\{ implementation: function \(dirty\) \{ viewDrawn\('([a-z]{1,20})', function \(\) \{ .* \}\); \} \},?(?:\s+\/\/.*)?\z/ ? $1 : () } @draw_rects; my %draw_once; $draw_once{$_}++ for @draw_named;
 check(@draw_rects >= 23 && @draw_named == @draw_rects && keys(%draw_once) == @draw_named && out('drawguard') eq "painted=4 drawn=red,red,red smooth=true,true,true,true pdf=1 read=undrawn test TypeError: null is not an object (evaluating 'null.nothing')| after=quiet\n"
     && $text_of_lzrprf =~ /^            if \(\$line =~ \/\^undrawn \(\[a-z\]\{1,20\}\) \(\[\\x20-\\x7e\]\{0,200\}\)\$\/\) \{ record\(.*\); next \}/m && $text_of_lzrprf =~ /^function behindGone\(\) \{\n    behindEnded = true;/m,
     'every drawRect: of the window goes through viewDrawn, each view by a name of its own: what a painting function throws is caught there and never leaves through AppKit, which ends the window (+[NSApplication _crashOnException:] from _NSViewDrawRect); what the view painted before its fault stays and the graphics state it changed is given back, it is drawn again next time, its first fault alone is said to lzrprf behind the window, which keeps it in the log wherever it listens (sub hear), and once lzrprf is gone nothing is written into its pipe, where a write would end the window by the signal PIPE (viewDrawn and say of lzrprf around a view of the test\'s own, drawn with no window into a real pipe)',
