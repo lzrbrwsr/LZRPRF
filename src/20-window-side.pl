@@ -81,6 +81,10 @@ sub hear {                                # the next thing the window says; noth
             return $line;
         }
         my ($ready, $writable, $wait) = ('', '', defined $until ? $until - now() : undef);
+        for my $live (grep { $_->{kept_app} && keys %{ $_->{kept_app}{sockets} } } @LIVE) {
+            ws_pump($live);
+            $wait = 0.2 if !defined $wait || $wait > 0.2;
+        }
         for my $live (@LIVE) { vec($writable, fileno $live->{relay}, 1) = 1 if length($live->{input_held} // '') }
         return '' if defined $wait && $wait <= 0;    # the time is over, and the window is still there
         vec($ready, fileno $FROM, 1) = 1 if $FROM;
@@ -96,11 +100,13 @@ sub hear {                                # the next thing the window says; noth
             $wait = $home if defined $home && $home < $wait;
         }
         trmnl_select(\$ready, \$writable);    # [C29] each terminal's shell and container, heard as the window is
+        cht_select(\$ready, \$writable);    # [C32] each LZRCHT's roles and connections
         if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
         prefetch_select(\$ready);         # [C19] the scripts begun ahead are read as they come (17-prefetch.pl)
         select($ready, $writable, undef, $wait) > 0 or next;
         prefetch_heard($ready);
         trmnl_heard($ready, $writable);
+        cht_heard($ready, $writable);
         live_flushed($_) for grep { length($_->{input_held} // '') && vec($writable, fileno $_->{relay}, 1) } @LIVE;
         live_read($_) for grep { !live_due($_) && vec($ready, fileno $_->{from}, 1) } @LIVE;
         sound_flushed() if $SOUND && length $SOUND->{out} && vec($writable, fileno $SOUND->{to}, 1);

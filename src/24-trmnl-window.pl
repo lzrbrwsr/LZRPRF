@@ -23,9 +23,13 @@
 #     and lzrprf answers it with that menu the same way;
 #   a key of TRMNL_SHORTCUTS, while the terminal has the keyboard: "page tkey
 #     ID", and the key goes nowhere else (24-trmnl-panes.pl lists them).
+# LZRCHT's tab ("live on 0 cht", [C32]) takes the wheel and the press of this
+# part and nothing else of it: no key of the terminal's, no paste and no read
+# of the clipboard, and a copy it hands back ("trmnlcopy TEXT", sub
+# cht_copied) is written only within five seconds of your press in it.
 sub window_trmnl_text {
     return <<'END';
-var TRMNL_PASTE = 65536, trmnlCopyAsked = 0, trmnlWheelHeld = 0, trmnlDragSaid = '';    // DECLARED(lzrprf $TRMNL_PASTE)
+var TRMNL_PASTE = 65536, trmnlCopyAsked = 0, trmnlWheelHeld = 0, trmnlDragSaid = '', trmnlPressAt = 0, chtTab = false;    // DECLARED(lzrprf $TRMNL_PASTE); chtTab: the tab shown is LZRCHT's [C32]
 var TRMNL_SHORTCUTS = { 'c \\': 'split-right', 'cs d': 'split-down', 'cs w': 'close-pane', 'cs left': 'focus-left', 'cs right': 'focus-right', 'cs up': 'focus-up', 'cs down': 'focus-down',
     'ct left': 'size-left', 'ct right': 'size-right', 'ct up': 'size-up', 'ct down': 'size-down', 'ct =': 'equalise', 'ts t': 'tab-new', 'ts w': 'tab-close',
     't pagedown': 'tab-next', 't pageup': 'tab-prev', 'ts pagedown': 'tab-right', 'ts pageup': 'tab-left', 'c s': 'save' };    // DECLARED(lzrprf %TRMNL_KEYED): none of them is a key of the window's menus
@@ -34,17 +38,17 @@ var trmnlOffered = [], trmnlHand = null;
 function trmnlMethods(methods) {    // the methods of LzrprfLaid, with the terminal's own added
     methods['scrollWheel:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlWheeled(event)) canvas.nextResponder.scrollWheel(event); } };    // on any other page the wheel goes where it always went
     var pressed = methods['mouseDown:'].implementation, typed = methods['keyDown:'].implementation;
-    methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; pressed(event); } };    // a press starts a selection afresh
+    methods['mouseDown:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragSaid = ''; trmnlPressAt = Date.now(); pressed(event); } };    // a press starts a selection afresh, and is the press a copy of LZRCHT's answers [C32]
     methods['mouseDragged:'] = { types: ['void', ['id']], implementation: function (event) { trmnlDragged(event); } };
     methods['rightMouseDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlContext(event) && !inspectContext(event)) canvas.nextResponder.rightMouseDown(event); } };
     methods['keyDown:'] = { types: ['void', ['id']], implementation: function (event) { if (!trmnlShortcut(event)) typed(event); } };
     methods['performKeyEquivalent:'] = { types: ['bool', ['id']], implementation: function (event) { return trmnlShortcut(event); } };    // a key with Command reaches a view before the window's menus: only the terminal's own keys are taken here
     methods['copy:'] = { types: ['void', ['id']], implementation: function (sender) { trmnlCopy(); } };
     methods['paste:'] = { types: ['void', ['id']], implementation: function (sender) { trmnlPaste(); } };
-    methods['validateMenuItem:'] = { types: ['bool', ['id']], implementation: function (item) { return trmnlKeys && !modalOpen; } };    // Copy and Paste, the two items of the menu this view answers
+    methods['validateMenuItem:'] = { types: ['bool', ['id']], implementation: function (item) { return trmnlKeys && !chtTab && !modalOpen; } };    // Copy and Paste, the two items of the menu this view answers
     return methods;
 }
-function trmnlTakes() { return trmnlKeys && liveOn && sheet && free && !modalOpen && canvas && win.firstResponder.isEqual(canvas); }    // the terminal is shown and has the keyboard
+function trmnlTakes() { return trmnlKeys && !chtTab && liveOn && sheet && free && !modalOpen && canvas && win.firstResponder.isEqual(canvas); }    // the terminal is shown and has the keyboard
 function trmnlKeyOf(event) {    // a key as TRMNL_SHORTCUTS names it: its modifiers (c Command, t Control, o Option, s Shift) and the key
     var flags = event.modifierFlags, mods = (flags & CMD ? 'c' : '') + (flags & CONTROL ? 't' : '') + (flags & OPTION ? 'o' : '') + (flags & SHIFT ? 's' : '');
     var key = TRMNL_NAMED_KEYS[event.keyCode] || String(event.charactersIgnoringModifiers.js || '').toLowerCase();
@@ -58,7 +62,7 @@ function trmnlShortcut(event) {
     return true;
 }
 function trmnlContext(event) {
-    if (!trmnlKeys || !liveOn || !sheet || !free || modalOpen) return false;
+    if (!trmnlKeys || chtTab || !liveOn || !sheet || !free || modalOpen) return false;
     win.makeFirstResponder(canvas);
     var at = pointIn(canvas, event), x = Math.round(at.x), y = Math.round(at.y);
     if (x >= 0 && y >= 0 && x < sheet.wide && y < sheet.high) say('page context ' + x + ' ' + y);
@@ -118,26 +122,26 @@ function trmnlWheeled(event) {
     return true;
 }
 function trmnlDragged(event) {
-    if (!trmnlKeys || !sheet || !free || modalOpen) return;
+    if (!trmnlKeys || chtTab || !sheet || !free || modalOpen) return;
     var at = pointIn(canvas, event), x = Math.max(0, Math.min(sheet.wide - 1, Math.round(at.x))), y = Math.max(0, Math.min(sheet.high - 1, Math.round(at.y)));
     if (x + ' ' + y == trmnlDragSaid) return;
     trmnlDragSaid = x + ' ' + y;
     say('page drag ' + trmnlDragSaid);
 }
 function trmnlCopy() {
-    if (!trmnlKeys || modalOpen) return;
+    if (!trmnlKeys || chtTab || modalOpen) return;
     trmnlCopyAsked = Date.now();
     say('page copy');
 }
 function trmnlCopied(rest) {    // lzrprf's answer to your copy: the selected text, written to the clipboard
-    if (!trmnlKeys || Date.now() - trmnlCopyAsked > 5000) return;
-    trmnlCopyAsked = 0;
+    if (!trmnlKeys || Date.now() - (chtTab ? trmnlPressAt : trmnlCopyAsked) > 5000) return;    // LZRCHT's: within five seconds of your press [C32]
+    trmnlCopyAsked = trmnlPressAt = 0;
     var text;
     try { text = decodeURIComponent(rest); } catch (fault) { return; }
     clipboardWrite(text);
 }
 function trmnlPaste() {
-    if (!trmnlKeys || modalOpen) return;
+    if (!trmnlKeys || chtTab || modalOpen) return;
     var got = $.NSPasteboard.generalPasteboard.stringForType($('public.utf8-plain-text'));    // [C29] the one read of the clipboard, on your paste
     if (!got || got.isNil()) return;
     var said;

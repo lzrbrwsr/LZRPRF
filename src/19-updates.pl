@@ -425,7 +425,9 @@ sub install_run {
             print {$INSTALL_LOG} "lzrprf behind this window could no longer write to the window (signal PIPE): the installer's lines go on into this file.\n" if $INSTALL_LOG;
             record('the window stopped reading while the installer ran (signal PIPE): its lines go on into install.txt');
         };
+        our $INSTALL_PULSE;                # optional progress callback while the installer owns this loop
         while ((my $left = $run->{until} - now()) > 0) {
+            $INSTALL_PULSE->() if $INSTALL_PULSE;
             my $ready = '';
             vec($ready, fileno $from, 1) = 1;
             select($ready, undef, undef, $left > 1 ? 1 : $left) > 0 or next;

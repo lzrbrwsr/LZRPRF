@@ -31,6 +31,7 @@ Subs are cited by name. To find their lines, run `perl tools/sub-map` (see AUDIT
 | The stream converter (`avconvert`) | `[C22]` `[C24]` | `$CONVERTER` | click a video that is an MPEG-TS stream with sound |
 | The sound process (`osascript`, core-lzrbrwsr-sound) | `[C3]` `[C12]` | `$SOUND_CONTAINER` | a click or a key in a page kept running, which then plays a sound |
 | The terminal (LZRTRMNL): your login shell | `[C29]` | the shell outside every container, as you; its drawing in `$TRMNL_CONTAINER` | press the terminal icon of the local home |
+| LZRCHT: your messages, and a connection each connector asks for | `[C32]` | its three roles in `$TRMNL_CONTAINER` (the keeper with read of its config); the connection outside every container, held by lzrprf | press the LZRCHT icon of the local home; then Connect for a platform whose credentials are in place |
 
 ## The tool: processes and launchd jobs `[C20]`
 
@@ -265,12 +266,38 @@ Subs are cited by name. To find their lines, run `perl tools/sub-map` (see AUDIT
   `tests/trmnl_panes.rs` of the browser. Measured headless on macOS 27.2: see
   `managed-projects/lzrbrwsr/architecture/lzrtrmnl.md` in the repository the browser is built from.
 
+## LZRCHT: your messages `[C32]`
+
+- **Subs:** `sub cht_opened`, `sub cht_program`, `sub cht_box`, `sub cht_keeper`, `sub cht_input`,
+  `sub cht_drew`, `sub cht_paged`, `sub cht_copied`, `sub cht_kept`, `sub cht_linked`, `sub cht_reachable`,
+  `sub cht_heard_link`, `sub cht_dialed`, `sub cht_net`, `sub cht_unlinked`, `sub cht_end` (`25-cht.pl`).
+- **Programs:** `core-lzrbrwsr-cht`, a program of the application named by its SHA-256 in the release
+  file, started by `sub cht_box` three ways: the drawing role and each connector in `$TRMNL_CONTAINER`
+  with `$TRMNL_LIMITS` (no network, no file written, no program started), and the keeper in that
+  container with read alone of `~/.config/lzrbrwsr/lzrcht.conf` and the paths that config names.
+- **Why:** LZRCHT shows your Telegram and Discord messages in one tab. Everything of it is the
+  application's; lzrprf holds only what keeps the roles apart and you safe. A long-lived connection is
+  the one new power, and lzrprf holds it rather than giving a container the network: the address is
+  checked against the ranges the platform publishes before it is opened, each opening is a line of the
+  log, and the connector sees only bytes (SYSTEM.md section 10, D20, in the browser's repository).
+- **The act:** a press of the LZRCHT icon on the local home, taken only within a second of a press the
+  window said, and only from the local home; never in an incognito or Tor window. A connector starts
+  only in the drawing role's answer to a press of yours, and only after the keeper said that platform's
+  credentials are in place. Its connection goes only to an IPv4 address inside Telegram's published
+  ranges, on 443, 80 or 5222; Discord publishes none and our own LZRCHT service is coming, so no connection of theirs is opened.
+  The clipboard is written with one line of text, checked as text, only in the answer to a press of
+  yours and within five seconds of it; nothing reads it. Closing the tab, an address opened in it or
+  the window's close ends every role and connection.
+- **Runs:** `selftest` checks the address check (`sub cht_reachable`) against Telegram's ranges and
+  addresses outside them, and that no other part of lzrprf opens a socket for a connector. The roles'
+  frames are held by the program's own tests (`src/cht/main.rs`, `keep.rs`, `link.rs` of the browser).
+
 ## Every system program lzrprf names
 
 | program | subs | when |
 | --- | --- | --- |
 | `/usr/bin/perl` | the start of the file, `lzr_bin`, `find`, `proven`, `incognito_opened`, `pulled_command`, `profile_command`, `tor_window_opened`, `import_reader`, `decoder_named`, `system_decoded`, `system_converted`, `holds`, `run`, `tor_on`, `limited` | lzrprf re-runs itself by the system's perl. `lzr_bin` writes the script by which LZRTRMNL's shell runs `lzrprf lzr` on the system's perl `[C20]`. `find` looks up a host after its line is in the log `[C5]`, outside the containers. `proven` runs `selftest` after a yes to testing `[C11]`. The four `*_command`/`*_opened` subs start a new window after New Incognito Window, a tab pulled out, a profile opened, or Tor asked for in a window that is not a Tor window `[C17]`. The rest start a contained program, which `decoding` and `converting` are handed. `limited` starts one only when lzrprf holds more memory than a container may: a perl that sets that limit and becomes `sandbox-exec` (`$ROOM_SET`). |
-| `/usr/bin/sandbox-exec` | `contain`, `run`, `tor_on`, `trmnl_started` | every contained start (lzr's contain too, through `contain`) |
+| `/usr/bin/sandbox-exec` | `contain`, `run`, `tor_on`, `trmnl_started`, `cht_box` | every contained start (lzr's contain too, through `contain`) |
 | `/usr/bin/osascript` | `run`, `witnessed`, `sounding` | the window, in `$WINDOW_CONTAINER` `[C10]`; the sound process, in `$SOUND_CONTAINER` `[C12]`; and the question whether a process is contained (`$WITNESS`, started by `witnessed` and asked by `inside`, and by `named_asked` for the decoder's two names) `[C3]` |
 | `/usr/bin/curl` | `curl_started` | each request, in `$FETCH`, started by `fetch` or a moment before it (`curl_for`) `[C3]` `[C6]` `[C7]` |
 | `/usr/bin/sips` | `system_decoded`, `holds` | see the decoder |
@@ -283,7 +310,7 @@ Subs are cited by name. To find their lines, run `perl tools/sub-map` (see AUDIT
 | `/sbin/ifconfig` | `tnnl_interface` | `ifconfig -v`, read only: the interface of the VPN chosen for LZRTNNL, and its index |
 | `/sbin/route` | `route_asked` (run by `route` and `find`) | `route -n get`, read only: whether an address leads into the person's own network `[C8]` |
 | `/usr/bin/env` | `install_run`; the limits strings `$SOUND_LIMITS`, `$TRMNL_LIMITS` | the installer, after Install it `[C25]`; the sound and terminal shells, their limits set, become `env -i` with lzrprf's own names alone, which starts `sandbox-exec` |
-| `/bin/sh` | `install_run`, `shell_held`, `signature_checked`, `sounding`, `tool_signed`, `tor_on`, `trmnl_started` | sets the limits of the sound and terminal containers, and redirections, before a program starts; measures a shell once; runs the installer |
+| `/bin/sh` | `install_run`, `shell_held`, `signature_checked`, `sounding`, `tool_signed`, `tor_on`, `trmnl_started`, `cht_box` | sets the limits of the sound and terminal containers, and redirections, before a program starts; measures a shell once; runs the installer |
 | `/usr/bin/open` | `restarted` | after a finished install and a press on restart |
 | `/usr/bin/xattr` | `excluded` | marks a kept log to be left out of Time Machine; only when the person chose to keep a log |
 | `/usr/sbin/sysctl` | `mark` | reads the build of macOS for the selftest mark `[C11]` |

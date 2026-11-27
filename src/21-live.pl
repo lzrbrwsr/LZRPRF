@@ -27,7 +27,7 @@ sub live_dropped {                        # a run that kept its page and is not 
 
 sub live_told {                           # the window is told whether the page shown is kept running, and whether a text field of it has the focus: "live on|off 1|0"
     my $live = live_of($TABS[$TAB]);
-    my @now = $TABS[$TAB]{trmnl} ? ('on', 1, 'trmnl') : $live ? ('on', $live->{focus} ? 1 : 0) : ('off', 0);    # [C29] a terminal's tab takes every key, and keys held with Control
+    my @now = $TABS[$TAB]{trmnl} ? ('on', 1, 'trmnl') : $TABS[$TAB]{cht} ? ('on', 0, 'cht') : $live ? ('on', $live->{focus} ? 1 : 0) : ('off', 0);    # [C29] a terminal's tab takes every key, and keys held with Control
     return if "@now" eq "@LIVE_TOLD";
     @LIVE_TOLD = @now;
     window("live @now");
@@ -38,6 +38,7 @@ sub live_end {                            # "=end" for the page, then its keeper
     @LIVE = grep { $_ != $live } @LIVE;
     delete @$live{qw(unknown unknown_more)};    # what it counted of lines lzrprf does not know goes with it
     return if $live->{ended}++;
+    ws_end($live) if $live->{kept_app};
     my $gone = 0;
     syswrite($live->{relay}, "=end\n");    # never waited for: a page that reads nothing is ended below all the same
     close $live->{relay};
@@ -89,6 +90,7 @@ sub live_due {                            # a page kept running has a whole answ
 }
 
 sub live_turn {
+    ws_pump($_) for grep { $_->{kept_app} } @LIVE;
     my @due = grep { live_due($_) } @LIVE;
     $_->{starting} ? home_arrived($_) : live_answered($_) for @due;
     live_scroll_told($_) for grep { (live_scroll_left($_) // 1) <= 0 } @LIVE;    # [C18] a place of the page's own scroll that waited for the frame to be over
@@ -147,6 +149,8 @@ sub live_turn {
 # "=fetched 0 0 0". A request line of no form ends the page.
 sub live_asked {                          # [C19] the request at the front of what the page wrote: nothing when there is none, 0 while it is not all there, else [its line, its body, the bytes it takes], or [its line] when it is of no form
     my ($live) = @_;
+    return kept_storage_asked($live->{held}) if substr($live->{held}, 0, 7) eq '=store ';
+    return ws_asked($live->{held}) if $live->{held} =~ /\A=ws(?:open|send|close) /;
     my $permit = substr($live->{held}, 0, 8) eq '=permit ';    # [C26] a question whether a script may run: one line, no body
     if (substr($live->{held}, 0, 7) eq '=early ') {    # the page as it is before its scripts run: one line "=early BYTES", then that many bytes of a list, answered with nothing (sub live_early)
         my $end = index $live->{held}, "\n";
@@ -162,6 +166,13 @@ sub live_asked {                          # [C19] the request at the front of wh
     if ($end < 0 || $end > $LIVE_FETCH_LINE) { return $end < 0 && length $live->{held} <= $LIVE_FETCH_LINE ? 0 : [''] }
     my $line = substr($live->{held}, 0, $end);
     return [$line, '', $end + 1] if $permit || $soon;
+    if ($live->{kept_app}) {
+        my (undef, $size, undef, undef, $auth_bytes) = kept_app_request($line);
+        return [$line] unless defined $size;
+        return 0 if length($live->{held}) < $end + 1 + $auth_bytes + $size;
+        my $auth = $auth_bytes ? substr($live->{held}, $end + 1, $auth_bytes) : undef;
+        return [$line, substr($live->{held}, $end + 1 + $auth_bytes, $size), $end + 1 + $auth_bytes + $size, $auth];
+    }
     my ($size) = $line =~ /^=fetch [A-Z]{1,8} (0|[1-9][0-9]{0,5}) / or return [$line];
     return [$line] if $size > $LIVE_FETCH_UP;
     return 0 if length($live->{held}) < $end + 1 + $size;
@@ -202,13 +213,16 @@ sub live_fetched {                        # [C19]
     timed('live-asked') if $TIMED;
     pictures_pumped();
     my ($live, $asked) = @_;
-    my ($line, $body, $took) = @$asked;
+    my ($line, $body, $took, $auth) = @$asked;
     return live_end($live, 'it wrote a line of no form') unless defined $took;
     substr($live->{held}, 0, $took, '');
     $live->{looked} = 0;
+    return kept_storage_change($live, $body) if substr($line, 0, 7) eq '=store ';
+    return ws_request($live, $line, $body) if $line =~ /\A=ws/;
     return live_early($live, $body) if $line eq '=early';
     return live_permitted($live, $line) if substr($line, 0, 8) eq '=permit ';
-    if (substr($line, 0, 6) eq '=soon ') { $line =~ m{^=soon (script|image|data) ([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form'); return prefetch_soon($live, $1, $2) }
+    if (substr($line, 0, 6) eq '=soon ') { return if $live->{kept_app}; $line =~ m{^=soon (script|image|data) ([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form'); return prefetch_soon($live, $1, $2) }
+    return kept_app_fetched($live, $line, $body, $auth) if $live->{kept_app};
     return live_replied($live, 0, '', '') if $live->{home};    # the local home has no network door, including absolute script requests    # [C26]
     my ($method, $size, $type, $dest, $as, $to) = $line =~ m{^=fetch (GET|HEAD|POST) (0|[1-9][0-9]{0,5}) (-|text/plain|application/x-www-form-urlencoded|application/json) (?:(data|script|module|worker|frame|image) )?(?:as ([a-z]{1,16}) )?([\x21-\x7e]{1,8192})$} or return live_end($live, 'it wrote a line of no form');
     return live_end($live, 'it wrote a line of no form') if $method ne 'POST' && ($size || $type ne '-');

@@ -201,6 +201,7 @@ sub trmnl_keys {                          # your keys, written into the terminal
 # wheel, a copy, a paste) is sub trmnl_viewed's, for the focused pane.
 sub trmnl_input {
     my ($what) = @_;
+    return cht_input($what) if $TABS[$TAB]{cht};    # [C32] the wheel in LZRCHT's tab, which takes the terminal's part of the window
     my $w = $TABS[$TAB]{trmnl} or return;
     return trmnl_pressed($TABS[$TAB], $what) if $what =~ /^(?:click|drag|context|menu|tkey) /;
     my $t = trmnl_shown_tab($w)->{focus};

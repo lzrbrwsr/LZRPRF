@@ -79,7 +79,7 @@ sub behind {
         if ($event =~ /^go ([\x20-\x7f]{1,2100})$/) { typed($1) }    # [C4] the one place an address comes from: the bar of lzrprf's own window; a size said while it was fetched and laid out is the size it is laid out again at
         elsif ($event =~ /^home ([1-9][0-9]{2,3}) ([1-9][0-9]{1,3})(?: (game))?$/ && $1 <= 8192 && $2 <= 8192) { home_shown(0+$1, 0+$2, $3) }
         elsif ($event =~ /^page refresh (0|[1-9][0-9]?)$/ && $1 == $TAB) { my $live = live_of($TABS[$TAB]); named_again(); my $list = $live && $live->{shown} ? $live->{shown} : $SHOWN && $SHOWN->{list}; window("relaid $TAB", @$list, '.') if $list; live_layers_again() }
-        elsif ($event eq 'live') { live_turn(); trmnl_opened() if $TRMNL_OPEN; permits_later(); my $home = live_of($TABS[$TAB]); if ($home_update_due && $home && $home->{home_ready}) { $home_update_due = 0; newer() } $IDLE_WORK //= \&identity_asked if $local_home && $home && $home->{home_ready} }    # a page kept running with its tab answered, or is to end (sub live_answered); [C26] what it asked meanwhile is put to you after
+        elsif ($event eq 'live') { live_turn(); trmnl_opened() if $TRMNL_OPEN; cht_opened() if $CHT_OPEN; permits_later(); my $home = live_of($TABS[$TAB]); if ($home_update_due && $home && $home->{home_ready}) { $home_update_due = 0; newer() } $IDLE_WORK //= \&identity_asked if $local_home && $home && $home->{home_ready} }    # a page kept running with its tab answered, or is to end (sub live_answered); [C26] what it asked meanwhile is put to you after
         elsif ($event =~ /^scripts (list|reset|revoke|set)(?: (0|[1-9][0-9]{0,3}))?(?: (always|deny))?$/ && ($1 eq 'revoke' ? defined $2 && !defined $3 : $1 eq 'set' ? defined $2 && defined $3 : !defined $2 && !defined $3)) { scripts_set($1, $2, $3); said_noted() }    # [C26] [C4] LZRDFNDR scripts, from the cogwheel's menu
         elsif ($event =~ /^scripts (e1|curated)(?: (0|[1-9][0-9]{0,3}))? (on|off)$/ && ($1 eq 'curated') == defined $2) { scripts_set($1, $2, $3); said_noted() }    # [C26] the switch of the sandbox (E1), or of one curated rule (E2)
         elsif ($event =~ /^button ([1-9][0-9]{0,8}) ([1-5])$/) { my $again = permit_button($1, $2); go($again, 'you reloaded') if $again; said_noted() }    # [C26] the answer to the question about scripts, which never held the page
@@ -242,6 +242,7 @@ sub leave {
     live_end($_, 'the window closed', 1) for @live;    # no page kept running outlives its window
     jar_end();                            # [C7] nor the cookie jar: its lasting cookies written first, in a window of a profile
     trmnl_end($_, 'its window closed') for grep { $_->{trmnl} } @TABS;    # [C29] nor a terminal: its shell is hung up
+    cht_end($_, 'its window closed') for grep { $_->{cht} } @TABS;    # [C32] nor LZRCHT: its roles and connections
     kill 'KILL', $witness if $witness;
     spare_dropped();                      # a page run's process started before its run, never handed anything
     curl_ended($CURL_SPARE);              # and curl started before its request

@@ -184,6 +184,7 @@ my ($CURL_SPARE, $CURL_WANTED) = (undef, 1);    # curl started before its reques
 my @LIVE;                                 # the pages kept running with their tabs, the oldest first (sub live_kept)
 my $LAID_TALLY;                           # what the last laid list checked holds: its counts, text, pixels and tiles (sub laid), kept by a page kept running for a splice of it (sub live_patched)
 my $TRMNL_OPEN = 0;                       # [C29] the local home's terminal icon was pressed: a terminal is opened once the answer that said so is taken (sub trmnl_opened)
+my $CHT_OPEN = 0;                         # [C32] the local home's LZRCHT icon was pressed: LZRCHT is opened once the answer that said so is taken (sub cht_opened)
 my @TRMNL_VIEW;                           # the size of the window's page as it said it, before it is held to a page's steps: a terminal's screen fills it (sub trmnl_sized)
 my @LIVE_TOLD = ('off', 0);               # what the window was last told of the selected tab's page kept running (sub live_told)
 my $LIVE_STOP_SECONDS = 0.25;             # DECLARED(a quarter of a second, many frames of the screen: the window says where it stopped on the frame after it read lzrprf's scroll): how long after the window said a page's own scroll back its next place may say where its view stopped short of it (sub live_input)

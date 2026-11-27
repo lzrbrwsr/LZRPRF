@@ -3478,7 +3478,7 @@ run_of('quick', app => $quick, typed => "$t/out/quick", fetches => ['/out/quick'
 my $lost_page = mutant('lostpage', %{ $lost{page} });
 run_of('lostpage', lzrprf => $lost_page, app => bundle('lostpage', 'release 3', "report $t/report", pair_line($lost_page)), typed => "$t/lostpage", fetches => ['/lostpage', $reported_container]);
 my $reported_sheets = "/report-sheets?fault=container&release=3&macos=" . ($build // '');
-my $unstarted_copy = mutant('sheetsunstarted', q{    my $run = spare_taken($url, $sheets, $tool, $local_home) // page_started($url, $sheets, $tool, $local_home) // return (undef, 'unstarted');} => q{    my $run = (defined $sheets && $sheets ne "=sheets\n" ? undef : spare_taken($url, $sheets, $tool, $local_home) // page_started($url, $sheets, $tool, $local_home)) // return (undef, 'unstarted');});    # [C14] a copy whose container cannot be started for a page run given style sheets: the second run of a page fails as a container that the system could not start does
+my $unstarted_copy = mutant('sheetsunstarted', q{    my $run = (!$app ? spare_taken($url, $sheets, $tool, $local_home) : undef) // page_started($url, $sheets, $tool, $local_home, $app) // return (undef, 'unstarted');} => q{    my $run = (defined $sheets && $sheets ne "=sheets\n" ? undef : spare_taken($url, $sheets, $tool, $local_home) // page_started($url, $sheets, $tool, $local_home)) // return (undef, 'unstarted');});    # [C14] a copy whose container cannot be started for a page run given style sheets: the second run of a page fails as a container that the system could not start does
 run_of('sheetsunstarted', lzrprf => $unstarted_copy, app => bundle('sheetsunstarted', 'release 3', "report $t/report-sheets", pair_line($unstarted_copy)), typed => "$t/out/sheetsunstarted", fetches => ['/out/sheetsunstarted', '/sheet/css?unstarted', $reported_sheets]);
 run_of('lostmemory', lzrprf => mutant('lostmemory', %{ $lost{memory} }), typed => "$t/lostmemory");
 run_of('lostmemoryprobe', lzrprf => mutant('lostmemoryprobe', %{ $lost{memory} }, %{ $lost{probe} }), typed => "$t/lostmemoryprobe", fetches => ['/lostmemoryprobe']);
@@ -6210,7 +6210,7 @@ print "\n9. Verifying the text of lzrprf, read by the test.\n";
 my @started = grep { /\$PROGRAM/ && /become\(/ } split /\n/, $text_of_lzrprf;
 check(@started == 1 && $started[0] =~ /contain\('', \$PROGRAM\)/, 'the application is started on one line, and that line puts it in the page container', scalar(@started) . ' line');
 my $connects = () = $text_of_lzrprf =~ /\bconnect\(/g;
-check($connects == 5 && $text_of_lzrprf =~ /^    connect\(\$out, \$kind == 1 \? pack_sockaddr_in\(\$port, \$where\) : pack_sockaddr_in6\(\$port, \$where\)\);\n/m && $text_of_lzrprf =~ /^sub tnnl_dialed \{ my \$s; socket\(\$s, AF_INET, SOCK_STREAM, 0\) && connect\(\$s, pack_sockaddr_in\(\$_\[0\], inet_aton\('127\.0\.0\.1'\)\)\) or return; return \$s \}/m && $text_of_lzrprf =~ /^print 'network ', \(connect\(\$s, pack_sockaddr_in\(\$port, inet_aton\('127\.0\.0\.1'\)\)\)/m && $text_of_lzrprf =~ /^        connect\(\$site, \$one->\{addr\}\);/m && $text_of_lzrprf =~ /^    connect\(\$tor, pack_sockaddr_in\(\$TOR->\{port\}, inet_aton\('127\.0\.0\.1'\)\)\) or return;/m, 'lzrprf connects in five places: to the site, from "reach"; to the Tor client on this computer\'s loopback, from "tor_reach", only while Tor is on; as one of the tries at the start, to a listener it opened itself on this computer; LZRTNNL\'s relay, for the Tor client\'s own connections alone, bound to the VPN\'s interface (sub tnnl_carried); and the package test\'s own connection to that relay on the loopback ("lzrprf tnnlrelay", sub tnnl_dialed)', "$connects places");
+check($connects == 6 && $text_of_lzrprf =~ /^    connect\(\$out, \$kind == 1 \? pack_sockaddr_in\(\$port, \$where\) : pack_sockaddr_in6\(\$port, \$where\)\);\n/m && $text_of_lzrprf =~ /^sub tnnl_dialed \{ my \$s; socket\(\$s, AF_INET, SOCK_STREAM, 0\) && connect\(\$s, pack_sockaddr_in\(\$_\[0\], inet_aton\('127\.0\.0\.1'\)\)\) or return; return \$s \}/m && $text_of_lzrprf =~ /^print 'network ', \(connect\(\$s, pack_sockaddr_in\(\$port, inet_aton\('127\.0\.0\.1'\)\)\)/m && $text_of_lzrprf =~ /^        connect\(\$site, \$one->\{addr\}\);/m && $text_of_lzrprf =~ /^    if \(connect\(\$sock, pack_sockaddr_in\(\$port, pack 'C4', split \/\\\.\/, \$ip\)\)\) \{ \@\$link\{qw\(sock up\)\} = \(\$sock, 1\); return cht_send\(\$link, "=up\\n"\) \}    # \[C32\]/m && $text_of_lzrprf =~ /^    connect\(\$tor, pack_sockaddr_in\(\$TOR->\{port\}, inet_aton\('127\.0\.0\.1'\)\)\) or return;/m, 'lzrprf connects in six places: to the site, from "reach"; to the Tor client on this computer\'s loopback, from "tor_reach", only while Tor is on; as one of the tries at the start, to a listener it opened itself on this computer; LZRTNNL\'s relay, for the Tor client\'s own connections alone, bound to the VPN\'s interface (sub tnnl_carried); and the package test\'s own connection to that relay on the loopback ("lzrprf tnnlrelay", sub tnnl_dialed); and for a connector of LZRCHT, from "cht_dialed", to the four numbers of an address "cht_reachable" found in its platform\'s published ranges [C32]', "$connects places");
 my %programs = map { $_ => 1 } $text_of_lzrprf =~ m{(?<![\w/.])(/(?:usr/)?s?bin/[a-z-]+)}g;
 my @known = qw(/bin/launchctl /bin/ps /bin/sh /sbin/ifconfig /sbin/route /usr/bin/avconvert /usr/bin/codesign /usr/bin/curl /usr/bin/env /usr/bin/open /usr/bin/osascript /usr/bin/perl /usr/bin/plutil /usr/bin/sandbox-exec /usr/bin/sips /usr/bin/ssh-keygen /usr/bin/true /usr/bin/xattr /usr/sbin/sysctl);    # "open" only to start the application again after a done install, when you pressed Close and restart: the installer itself runs in lzrprf's own window, and nothing is opened in Terminal
 my @opens = grep { m{/usr/bin/open} } split /\n/, $text_of_lzrprf;
@@ -6232,8 +6232,167 @@ check($text_of_lzrprf =~ /^            my \$pid = fork \/\/ next;\n            i
     'a request begun ahead by the one copy that makes them all is ended as one lzrprf began itself was: each is a group of its own, ended with the curl it started when the visit is dropped (sub prefetch_end ends every one not done, by the number its maker told, and then the maker, and reaps it); and when lzrprf goes away its maker sees that and ends, and each of its copies then carries nothing on (sub alive: its parent is no longer the one it began under)',
     'the lines of sub prefetch_made, sub prefetch_ended, sub prefetch_end and sub alive');
 my %calls = map { my $name = $_; $name => scalar(() = $text_of_lzrprf =~ /(?<![\w\$])$name\(/g) } 'fetch', 'visit', 'fixed', 'reach', 'laid_out', 'pictured', 'sheeted', 'fonted', 'videoed', 'hls_fetched', 'prefetch_begin';
-check("@calls{'fetch', 'visit', 'fixed', 'reach', 'laid_out', 'pictured', 'sheeted', 'fonted', 'videoed', 'hls_fetched', 'prefetch_begin'}" eq '8 1 10 1 7 7 2 2 1 1 1' && $text_of_lzrprf =~ /^        my \$got = fixed\("the live debug link sent " \. /m && $text_of_lzrprf =~ /^            fixed\("the live debug link sent a picture of the window: /m && $text_of_lzrprf =~ /^    return if \(\$LINK\{local\} \/\/ 0\) == 2;    # this Mac only: no sender is started\n/m && $text_of_lzrprf =~ /^                my \(\$got, \$why, \$peer\) = fetch\(\$one->\{url\}, \$one->\{where\}, \$one->\{ask\}\);/m && $text_of_lzrprf =~ /^    beside_wanted\(\$url, \$host, \$got, \$kept, \$where\);/m && $text_of_lzrprf =~ /^sub beside_wanted \{ \$BESIDE_WANTED = \[\@_\]; prefetch_begin\(\@_\); return \}/m && $text_of_lzrprf =~ /^    my \@sheeted = sheeted\(\$named, \$host, \$where, \$kept\) or return;/m && $text_of_lzrprf =~ /^        my \(\$frame, \$with\) = sheeted\(\$named, \$host, \$where, \$kept\) or return idle\(\$UNWRITTEN\);/m && $text_of_lzrprf =~ /^    my \$got = fixed\('you chose to add ' \. join/m && $text_of_lzrprf =~ m{^        elsif \(\$event =~ /\^video \(0\|\[1-9\]\[0-9\]\?\)\$/ && \$1 < \$VIDEOS\) \{ videoed\(\$1\) \}    # \[C22\] }m && $text_of_lzrprf =~ /^    my \(\$got, \$why, \$from\) = fetch\(\$url, \$to, undef, undef, \[\$listed \? \$HLS_PLAYLIST : \$VIDEO_BYTES, \$VIDEO_SECONDS\], \$heard\);/m && $text_of_lzrprf =~ /^        my \(\$got, \$why\) = fetch\(\$address, \$to, undef, undef, \[/m && $text_of_lzrprf =~ /^            \(\$stream, \$words, \$locked, \$kind, \$how\) = hls_fetched\(\$url, /m && $text_of_lzrprf =~ /^    my \$got = fixed\("you sent a report of a wrong block: /m && $text_of_lzrprf =~ /^    my \$got = fixed\('you sent a support request' /m && $text_of_lzrprf =~ /^    my \$got = fixed\("you read the answer to your support request: /m && $text_of_lzrprf =~ /^        \(\$got, \$why, \$from\) = fetch\(\$url, \$where, \{ method => \$method, /m && $text_of_lzrprf =~ /^sub live_fetched \{/m && $text_of_lzrprf =~ /^    my \(\$shown, \$fetched, \$wanted, \$decoded\) = pictured\(\$lines, \$paths, \$host, \$where, \$kept, undef, \$got\);$/m && $text_of_lzrprf =~ /^    my \$sent = \$first \? \(pictured\(\$lines, \$paths, \$host, \$where, \$kept, pictures_so_far\(\$host\)\)\)\[0\] : undef;\n    my \$first_mark; .*\n    if \(\$first\) \{\n        window\("page \$TAB", \@\$sent, '\.'\); \$first_mark = \$WINDOW_LISTS;    # nothing is fetched/m && $text_of_lzrprf =~ /^        my \(\$shown\) = pictured\(@\{ \$P->\{early\} \}, undef, undef, pictures_so_far\(\$P->\{host\}\)\);$/m && $text_of_lzrprf =~ /^        my \(\$shown\) = pictured\(\$again\[0\], \$again\[2\], \$SHOWN->\{host\}, undef, undef, \$SHOWN->\{pictures\}\);$/m && $text_of_lzrprf =~ /^                \(\$shown\) = pictured\(\$checked, \$live->\{paths\}, \$live->\{host\}, undef, undef, \$live->\{pictures\}\);/m && $text_of_lzrprf =~ /^        my \(\$frame, \$with\) = sheeted\(\$named, \$host, \$where, \$kept\) or return idle\(\$UNWRITTEN\);$/m && $text_of_lzrprf =~ m{^        if \(\$event =~ /\^go \(\[\\x20-\\x7f\]\{1,2100\}\)\$/\) \{ typed\(\$1\) \}}m && $text_of_lzrprf =~ m{^sub typed \{\n(?:    (?!.*\b(?:fetch|visit|fixed|reach)\().*\n){1,8}\}\n}m && $text_of_lzrprf =~ m{^sub navigated \{\n(?:    (?!.*\b(?:fetch|visit|fixed|reach)\().*\n){1,8}\}\n}m && $text_of_lzrprf =~ /^sub go \{\n    my \@next = \@_;\n    \@WAY = \(\);\n    \$WENT = now\(\);  +# [^\n]*\n    while \(\@next\) \{\n        undef \$NEXT;\n        visit\(\@next\);\n/m && $text_of_lzrprf =~ /^    return idle\(\$says\) unless ask\(.* == 2;.*\n    idle\(.*fixed\(/m && $text_of_lzrprf =~ /^    return unless \$may eq 'yes';\n    return newer_looked\(/m && $text_of_lzrprf =~ /^    return newer_looked\(.*, 1\) if \$asked;\n/m && $text_of_lzrprf =~ /^sub newer_looked \{\n(?:    .*\n){4}    my \$got = fixed\(/m && $text_of_lzrprf =~ /^    if \(asked\("updateoffer \$there \$release", 'Later', 'Install it'\) != 2\) \{ window\('updateoffer'\); return \$back->\(\) \}\n    installed\(/m,
-    'a request has six roads and no seventh: "visit", through "go" alone, for an address from the bar (or the search made of its words, "sub typed"), back, forward or reload ("sub navigated", an address the tab went to), a bookmark, the home page or a redirect you said yes to; "pictured" and "sheeted" from "visit" for the pictures of its page, on its host or another, and its style sheets on its own host ("pictured" once more from "relaid" and once from "live_answered", for a page kept running that drew again, each with the pictures kept and nothing to fetch; and once from "live_early", for the list a page hands over before its scripts run, with grey boxes and nothing to fetch, and once from "pictures_pumped", for that list drawn again when the pictures begun ahead are all decoded, nothing fetched by it); "fixed" five times, each behind a yes: a report, a report of a wrong block a filter list or the content shield made [C28], the look for a newer release, the signed manifest beside each installer of a newer release that look found [C25], the installer after "Install it"; "fixed" once from Add or remove LZR modules, behind its Restart, for the number of the published release whose installer adds a part (sub parts_fetched); "fixed" twice more, from the cogwheel\'s menu, for a support request you send and for the reading of its answer, both to the one support address of the release file; "fixed" twice more from the sender of the live debug link, which runs only while you switched the link on and never when it was asked for this Mac only [C31], for its lines and for a picture the window drew of itself, both to the one address of the link; "live_fetched", for an address a page kept running asked for [C19], and "prefetch_begin" from "visit" alone, for the scripts that page names, each fetched ahead with the very request the page makes [C19]; and "videoed", from a click on a video\'s place, for that one video of the page shown, which fetches once itself and, for an HLS stream, once more for each playlist and segment of it from "hls_fetched", called from "videoed" alone [C22]; "fetch" is called from those six and from what "prefetch_begin" starts and "reach" from "fetch" alone', join(' ', map { "$_:$calls{$_}" } sort keys %calls));
+{
+    my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms } qw(ws_asked ws_request);
+    my $tested = eval 'package WebSocketWireTest; sub live_sent { return $_[1] } sub ws_open { return } ' . $source . ' 1;';
+    my $open = "=wsopen 17 wss://gateway.discord.gg/?v=10 -\n";
+    my $send = "=wssend 17 binary 3\n";
+    my $parsed = $tested ? WebSocketWireTest::ws_asked($send . "\0\n\xFF" . $open) : undef;
+    check($tested && $parsed && $parsed->[1] eq "\0\n\xFF" &&
+        $parsed->[2] == length($send) + 3 && !WebSocketWireTest::ws_asked($send . 'ab') &&
+        @{ WebSocketWireTest::ws_asked("=wssend 17 binary 65537\n") } == 1 &&
+        WebSocketWireTest::ws_request({}, WebSocketWireTest::ws_asked($open)->[0], '') eq "=wsfailed 17\n",
+        'a WebSocket wire request takes exactly its bounded binary message, and an ordinary page gets a failed socket',
+        $tested ? 'binary framing, partial input, oversized input and failed open checked' : "$@");
+}
+{
+    my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms }
+        qw(ws_endpoint ws_upgrade ws_frame ws_read_frame ws_valid_text);
+    my $tested = eval 'package WebSocketTransportTest; my $WS_DOWN = 1048576; my $WS_UP = 65536; ' . $source . ' 1;';
+    my $app = { spec => { socket_host => 'gateway.discord.gg', hosts => { 'gateway.discord.gg' => 1 } } };
+    my @endpoint = $tested ? WebSocketTransportTest::ws_endpoint($app, 'wss://gateway.discord.gg/?v=10', 'json,chat') : ();
+    my $upgrade = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: keep-alive, Upgrade\r\nSec-WebSocket-Accept: expected\r\n";
+    my $good = { in => $upgrade . "Sec-WebSocket-Protocol: chat\r\n\r\n" . pack('CC', 129, 0), accept => 'expected', offered => { chat => 1 } };
+    my $bad = { %$good, in => $upgrade . "Sec-WebSocket-Extensions: unknown\r\n\r\n" };
+    my $bad_protocol = { %$good, in => $upgrade . "Sec-WebSocket-Protocol: other\r\n\r\n" };
+    my $bad_length = pack('CCn', 130, 126, 123);
+    my $masked_server = pack('CC', 129, 128);
+    my $encoded = $tested ? WebSocketTransportTest::ws_frame(2, "abcd", "1234") : '';
+    check($tested && @endpoint == 3 && $endpoint[0] eq 'gateway.discord.gg' && $endpoint[1] eq '/?v=10' &&
+        join(',', @{ $endpoint[2] }) eq 'json,chat' &&
+        !WebSocketTransportTest::ws_endpoint($app, 'wss://gateway.discord.gg.evil.test/', '-') &&
+        !WebSocketTransportTest::ws_endpoint($app, 'ws://gateway.discord.gg/', '-') &&
+        WebSocketTransportTest::ws_upgrade($good) && $good->{selected} eq 'chat' &&
+        $good->{in} eq pack('CC', 129, 0) && !defined WebSocketTransportTest::ws_upgrade($bad) &&
+        !defined WebSocketTransportTest::ws_upgrade($bad_protocol) &&
+        $encoded eq pack('CC', 130, 132) . '1234' . ("abcd" ^ "1234") &&
+        WebSocketTransportTest::ws_read_frame(\$good->{in})->[1] == 1 &&
+        !defined WebSocketTransportTest::ws_read_frame(\$bad_length) &&
+        !defined WebSocketTransportTest::ws_read_frame(\$masked_server),
+        'the kept-app WebSocket accepts only the exact secure gateway, matches the HTTP upgrade, and caps and masks frames',
+        $tested ? 'valid upgrade, rejected extension and protocol, exact host, masked client and checked server frames' : "$@");
+}
+{
+    my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms } qw(kept_app_folder kept_app_jar jar_directory jar_file);
+    my $tested = eval 'package KeptAppJarTest; our ($ROOT, $DIR, $JAR_FOLDER, $JAR, $JAR_STARTS, $JAR_SAVED); '
+        . 'sub paths { ($ROOT, $DIR) = @_ } sub start { $JAR = shift } sub current { return $JAR } ' . $source . ' 1;';
+    my $app_folder;
+    my ($safe, $profile, $private_mode, $refused);
+    if ($tested) {
+        KeptAppJarTest::paths($site_folder, "$site_folder/profile");
+        KeptAppJarTest::start('profile jar');
+        $app_folder = KeptAppJarTest::kept_app_folder('discord');
+        my $app = { folder => $app_folder };
+        $safe = KeptAppJarTest::kept_app_jar($app, sub {
+            return if defined KeptAppJarTest::current();
+            KeptAppJarTest::start('app jar');
+            return KeptAppJarTest::jar_file();
+        });
+        $profile = KeptAppJarTest::current() eq 'profile jar' && KeptAppJarTest::jar_file() eq "$site_folder/profile/cookies";
+        my @folder = stat $app_folder;
+        $private_mode = @folder && ($folder[2] & 0777) == 0700;
+        symlink($app_folder, "$site_folder/cht/web/linked");
+        $refused = !KeptAppJarTest::kept_app_folder('linked');
+    }
+    check($tested && $safe eq "$site_folder/cht/web/discord/cookies" && $profile && $private_mode && $refused,
+        'the kept app uses its own private cookie directory and worker state and refuses a symlink in place of its directory',
+        $tested ? 'separate jar state and file, private directory and symlink refusal' : "$@");
+}
+{
+    my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms } qw(kept_app_budget kept_app_request kept_app_fetched kept_app_response);
+    my $tested = eval 'package KeptAppFetchTest; our ($INCOGNITO, $TOR_WANTED, $TOR_WINDOW, $TOR_SESSION, %FILTER_DEST, $FETCH_BYTES, $FETCH_SECONDS, $AT, $TOUCHED); my $LIVE_FETCH_UP = 65536; '
+        . q{sub now { return $AT } sub at { $AT = shift } sub touched { return $TOUCHED }
+            sub address { return ($_[0], ($_[0] =~ m{^https://([^/]+)})) }
+            sub listed { $TOUCHED++; return 0 } sub live_replied { return $_[1] }} . $source . ' 1;';
+    my $fits;
+    if ($tested) {
+        my $app = { spec => { hosts => { 'discord.com' => 1, 'cdn.discordapp.com' => 1 }, requests => 120, reply => 16 * 1024 * 1024, bytes => 48 * 1024 * 1024 },
+            until => 121, minute => 0, requests => 0, bytes => 0 };
+        KeptAppFetchTest::at(1);
+        my $unknown = KeptAppFetchTest::kept_app_fetched({ kept_app => $app }, '=fetch GET 0 - data https://unknown.test/', '');
+        my $bad = KeptAppFetchTest::kept_app_fetched({ kept_app => $app }, '=fetch GET 1 - data https://discord.com/', 'x');
+        my $auth_cdn = KeptAppFetchTest::kept_app_fetched({ kept_app => $app }, '=fetch GET 0 - data auth 4 https://cdn.discordapp.com/api/probe', '', 'fake');
+        $fits = $unknown == 403 && $bad == 403 && $auth_cdn == 403 && !KeptAppFetchTest::touched() &&
+            KeptAppFetchTest::kept_app_budget($app, 120, 48 * 1024 * 1024) &&
+            !KeptAppFetchTest::kept_app_budget($app, 1, 0) && !KeptAppFetchTest::kept_app_budget($app, 0, 1);
+        KeptAppFetchTest::at(60);
+        $fits &&= KeptAppFetchTest::kept_app_budget($app, 1, 1) && $app->{requests} == 1 && $app->{bytes} == 1;
+        KeptAppFetchTest::at(121);
+        $fits &&= !KeptAppFetchTest::kept_app_budget($app, 0, 0);
+    }
+    check($tested && $fits, 'a kept app refuses malformed requests and unlisted hosts before network checks and enforces both minute budgets and its deadline',
+        $tested ? 'refusal before network checks and minute and deadline boundaries checked' : "$@");
+}
+{
+    my ($source) = $text_of_lzrprf =~ /^(sub cht_drew \{.*?^\}\n)/ms;
+    my $tested = eval 'package KeptAppPressTest; my $CHT_PAGE = 10; my $CHT_PAGE_BYTES = 100; our $OPENED = 0; '
+        . 'sub kept_app_open_tab { $OPENED++ } sub opened { $OPENED } ' . ($source // '') . ' 1;';
+    my $first;
+    if ($tested) {
+        my $tab = {};
+        my $valid = { asked => ['p'] };
+        my $invalid = { asked => ['c'] };
+        $first = !KeptAppPressTest::cht_drew($tab, $valid, [['=app discord']]) &&
+            !KeptAppPressTest::opened() &&
+            KeptAppPressTest::cht_drew($tab, $invalid, [['=app discord']]) eq 'wrote a line of no form' &&
+            !KeptAppPressTest::cht_drew($tab, $valid, [['=drawn']]) && KeptAppPressTest::opened() == 1;
+    }
+    check($tested && $first, 'the contained LZRCHT drawing role opens Discord only when its press frame finishes',
+        $tested ? 'open deferred until completion; a non-press frame refused' : "$@");
+}
+{
+    my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms }
+        qw(kept_storage_file kept_storage_locked kept_storage_read kept_storage_replace kept_storage_items
+           kept_storage_frame kept_storage_asked kept_storage_change kept_storage_forget);
+    my $tested = eval 'package DiscordStorageTest; use Fcntl qw(:DEFAULT :flock); my ($STORAGE_BYTES, $STORAGE_ITEMS) = (2097152, 100000); my $nonce = 0; '
+        . q{sub kept_app_valid { 1 } sub link_random { sprintf '%032x', ++$nonce }} . $source . ' 1;';
+    my $fits;
+    if ($tested) {
+        my $folder = "$site_folder/discord-storage";
+        mkdir $folder, 0700;
+        my $url = 'https://discord.com/app';
+        my $app = { folder => $folder };
+        my ($empty, $epoch) = DiscordStorageTest::kept_storage_frame($app, $url);
+        my $run = { kept_app => $app, url => $url, storage_epoch => $epoch };
+        my ($key, $value) = (pack('n', 0xd800), pack('n', 10));
+        my $set = pack('CNN', 2, length($key), length($value)) . $key . $value;
+        my $wrote = DiscordStorageTest::kept_storage_change($run, $set);
+        my ($reopened) = DiscordStorageTest::kept_storage_frame({ folder => $folder }, $url);
+        my ($other) = DiscordStorageTest::kept_storage_frame($app, 'https://discord.gg/app');
+        my $forgot = DiscordStorageTest::kept_storage_forget($app, $url);
+        my $stale = DiscordStorageTest::kept_storage_change($run, $set);
+        my ($cleared) = DiscordStorageTest::kept_storage_frame({ folder => $folder }, $url);
+        my @file = stat "$folder/discord.com.storage";
+        $fits = $empty eq "=webstore 0\n" && $wrote &&
+            $reopened eq "=webstore 12\n" . pack('NN', 2, 2) . $key . $value && $other eq $empty &&
+            $forgot && !$stale && $cleared eq $empty && @file && ($file[2] & 0777) == 0600;
+    }
+    check($tested && $fits, 'Discord local storage survives a fresh kept app, never crosses origins, and Forget prevents a stale renderer from restoring it',
+        $tested ? 'restart, origin separation, private mode and old-generation rejection checked' : "$@");
+}
+{
+    my $source = join "\n", map { $text_of_lzrprf =~ /^(sub $_ \{.*?^\}\n)/ms }
+        qw(kept_app_request live_asked curl_body_config);
+    my $tested = eval 'package KeptAuthWireTest; my ($PAGE_BYTES, $LIVE_FETCH_LINE, $LIVE_FETCH_UP) = (50331648, 8300, 65536); ' . $source . ' 1;';
+    my $fits;
+    if ($tested) {
+        my $line = '=fetch PATCH 2 application/json data auth 4 https://discord.com/api/test';
+        my $packet = "$line\nfake{}";
+        my $app = { kept_app => 1, held => substr($packet, 0, -1) };
+        my $partial = KeptAuthWireTest::live_asked($app);
+        $app->{held} = "$packet=ready\n";
+        my $frame = KeptAuthWireTest::live_asked($app);
+        my @args = ('--data-binary', '@-', '--request', 'PATCH');
+        my $config = KeptAuthWireTest::curl_body_config('{}', \@args, 'Authorization: fake');
+        $fits = !$partial && $frame->[1] eq '{}' && $frame->[2] == length($packet) && $frame->[3] eq 'fake' &&
+            !KeptAuthWireTest::kept_app_request('=fetch GET 0 - data auth 4097 https://discord.com/api/test') &&
+            "@args" eq '-K - --request PATCH' && $config eq qq{header = "Authorization: fake"\ndata-raw = "{}"\n};
+    }
+    check($tested && $fits, 'the kept app separates bounded authorization bytes from the body and passes the header only on curl stdin',
+        $tested ? 'partial frame, following frame boundary, length cap and private curl config checked' : "$@");
+}
+check("@calls{'fetch', 'visit', 'fixed', 'reach', 'laid_out', 'pictured', 'sheeted', 'fonted', 'videoed', 'hls_fetched', 'prefetch_begin'}" eq '9 1 10 2 9 7 2 2 1 1 1' && $text_of_lzrprf =~ /^        my \$got = fixed\("the live debug link sent " \. /m && $text_of_lzrprf =~ /^            fixed\("the live debug link sent a picture of the window: /m && $text_of_lzrprf =~ /^    return if \(\$LINK\{local\} \/\/ 0\) == 2;    # this Mac only: no sender is started\n/m && $text_of_lzrprf =~ /^                my \(\$got, \$why, \$peer\) = fetch\(\$one->\{url\}, \$one->\{where\}, \$one->\{ask\}\);/m && $text_of_lzrprf =~ /^    beside_wanted\(\$url, \$host, \$got, \$kept, \$where\);/m && $text_of_lzrprf =~ /^sub beside_wanted \{ \$BESIDE_WANTED = \[\@_\]; prefetch_begin\(\@_\); return \}/m && $text_of_lzrprf =~ /^    my \@sheeted = sheeted\(\$named, \$host, \$where, \$kept\) or return;/m && $text_of_lzrprf =~ /^        my \(\$frame, \$with\) = sheeted\(\$named, \$host, \$where, \$kept\) or return idle\(\$UNWRITTEN\);/m && $text_of_lzrprf =~ /^    my \$got = fixed\('you chose to add ' \. join/m && $text_of_lzrprf =~ m{^        elsif \(\$event =~ /\^video \(0\|\[1-9\]\[0-9\]\?\)\$/ && \$1 < \$VIDEOS\) \{ videoed\(\$1\) \}    # \[C22\] }m && $text_of_lzrprf =~ /^    my \(\$got, \$why, \$from\) = fetch\(\$url, \$to, undef, undef, \[\$listed \? \$HLS_PLAYLIST : \$VIDEO_BYTES, \$VIDEO_SECONDS\], \$heard\);/m && $text_of_lzrprf =~ /^        my \(\$got, \$why\) = fetch\(\$address, \$to, undef, undef, \[/m && $text_of_lzrprf =~ /^            \(\$stream, \$words, \$locked, \$kind, \$how\) = hls_fetched\(\$url, /m && $text_of_lzrprf =~ /^    my \$got = fixed\("you sent a report of a wrong block: /m && $text_of_lzrprf =~ /^    my \$got = fixed\('you sent a support request' /m && $text_of_lzrprf =~ /^    my \$got = fixed\("you read the answer to your support request: /m && $text_of_lzrprf =~ /^        \(\$got, \$why, \$from\) = fetch\(\$url, \$where, \{ method => \$method, /m && $text_of_lzrprf =~ /^sub live_fetched \{/m && $text_of_lzrprf =~ /^    my \(\$shown, \$fetched, \$wanted, \$decoded\) = pictured\(\$lines, \$paths, \$host, \$where, \$kept, undef, \$got\);$/m && $text_of_lzrprf =~ /^    my \$sent = \$first \? \(pictured\(\$lines, \$paths, \$host, \$where, \$kept, pictures_so_far\(\$host\)\)\)\[0\] : undef;\n    my \$first_mark; .*\n    if \(\$first\) \{\n        window\("page \$TAB", \@\$sent, '\.'\); \$first_mark = \$WINDOW_LISTS;    # nothing is fetched/m && $text_of_lzrprf =~ /^        my \(\$shown\) = pictured\(@\{ \$P->\{early\} \}, undef, undef, pictures_so_far\(\$P->\{host\}\)\);$/m && $text_of_lzrprf =~ /^        my \(\$shown\) = pictured\(\$again\[0\], \$again\[2\], \$SHOWN->\{host\}, undef, undef, \$SHOWN->\{pictures\}\);$/m && $text_of_lzrprf =~ /^                \(\$shown\) = pictured\(\$checked, \$live->\{paths\}, \$live->\{host\}, undef, undef, \$live->\{pictures\}\);/m && $text_of_lzrprf =~ /^        my \(\$frame, \$with\) = sheeted\(\$named, \$host, \$where, \$kept\) or return idle\(\$UNWRITTEN\);$/m && $text_of_lzrprf =~ m{^        if \(\$event =~ /\^go \(\[\\x20-\\x7f\]\{1,2100\}\)\$/\) \{ typed\(\$1\) \}}m && $text_of_lzrprf =~ m{^sub typed \{\n(?:    (?!.*\b(?:fetch|visit|fixed|reach)\().*\n){1,8}\}\n}m && $text_of_lzrprf =~ m{^sub navigated \{\n(?:    (?!.*\b(?:fetch|visit|fixed|reach)\().*\n){1,8}\}\n}m && $text_of_lzrprf =~ /^sub go \{\n    my \@next = \@_;\n    \@WAY = \(\);\n    \$WENT = now\(\);  +# [^\n]*\n    while \(\@next\) \{\n        undef \$NEXT;\n        visit\(\@next\);\n/m && $text_of_lzrprf =~ /^    return idle\(\$says\) unless ask\(.* == 2;.*\n    idle\(.*fixed\(/m && $text_of_lzrprf =~ /^    return unless \$may eq 'yes';\n    return newer_looked\(/m && $text_of_lzrprf =~ /^    return newer_looked\(.*, 1\) if \$asked;\n/m && $text_of_lzrprf =~ /^sub newer_looked \{\n(?:    .*\n){4}    my \$got = fixed\(/m && $text_of_lzrprf =~ /^    if \(asked\("updateoffer \$there \$release", 'Later', 'Install it'\) != 2\) \{ window\('updateoffer'\); return \$back->\(\) \}\n    installed\(/m,
+    'a standard request has six roads, and a separate route is used only by a named app from LZRCHT: "visit", through "go" alone, for an address from the bar (or the search made of its words, "sub typed"), back, forward or reload ("sub navigated", an address the tab went to), a bookmark, the home page or a redirect you said yes to; "pictured" and "sheeted" from "visit" for the pictures of its page, on its host or another, and its style sheets on its own host ("pictured" once more from "relaid" and once from "live_answered", for a page kept running that drew again, each with the pictures kept and nothing to fetch; and once from "live_early", for the list a page hands over before its scripts run, with grey boxes and nothing to fetch, and once from "pictures_pumped", for that list drawn again when the pictures begun ahead are all decoded, nothing fetched by it); "fixed" five times, each behind a yes: a report, a report of a wrong block a filter list or the content shield made [C28], the look for a newer release, the signed manifest beside each installer of a newer release that look found [C25], the installer after "Install it"; "fixed" once from Add or remove LZR modules, behind its Restart, for the number of the published release whose installer adds a part (sub parts_fetched); "fixed" twice more, from the cogwheel\'s menu, for a support request you send and for the reading of its answer, both to the one support address of the release file; "fixed" twice more from the sender of the live debug link, which runs only while you switched the link on and never when it was asked for this Mac only [C31], for its lines and for a picture the window drew of itself, both to the one address of the link; "live_fetched", for an address a page kept running asked for [C19], and "prefetch_begin" from "visit" alone, for the scripts that page names, each fetched ahead with the very request the page makes [C19]; and "videoed", from a click on a video\'s place, for that one video of the page shown, which fetches once itself and, for an HLS stream, once more for each playlist and segment of it from "hls_fetched", called from "videoed" alone [C22]; "fetch" is called from those six, from what "prefetch_begin" starts and from the kept-app HTTP broker, and "reach" only from those TLS paths', join(' ', map { "$_:$calls{$_}" } sort keys %calls));
 my $window_js = join '', map { ($text_of_lzrprf =~ /^sub $_ \{\n    return <<'END';\n(.*?)^END$/ms)[0] // '' } qw(window_text window_trmnl_text window_inspect_text);
 my %functions; $functions{$_}++ for ($window_js // '') =~ /^function (\w+)\(/mg;
 my @twice = grep { $functions{$_} > 1 } sort keys %functions;
@@ -6248,6 +6407,18 @@ my @kept_on = grep { !$off{$_} } qw(continuousSpellCheckingEnabled grammarChecki
 check(@text_views >= 5 && !@unchecked && !@kept_on && ($window_js // '') =~ /^    win\.delegate = hand;$/m && ($window_js // '') =~ /^    'windowWillReturnFieldEditor:toObject:': \{ types: \['id', \['id', 'id'\]\], implementation: function \(sender, client\) \{ return typingView\(\); \} \},/m && ($window_js // '') =~ /^    if \(!fieldEditor\) \{ fieldEditor = unchecked\(\$\.NSTextView\.alloc/m,
     'no text of the window is spelled, graded, corrected or replaced as it is typed: every text view is made through "unchecked", which turns off spelling, grammar, correction, replacement, quote and dash changes, completion and link and data detection, and every text field types into the one field editor that "typingView" makes the same way',
     @unchecked ? "made without unchecked: @unchecked" : @kept_on ? "left on: @kept_on" : scalar(@text_views) . ' text views');
+sub cht_reaches {                         # "sub cht_reachable" of lzrprf, taken out and run here [C32]: for each [platform, address, port], 1 when lzrprf would open that connection for a connector
+    my ($text) = $text_of_lzrprf =~ /^(sub cht_reachable \{.*?^\})/ms;
+    my ($ranges) = $text_of_lzrprf =~ /^(my %CHT_RANGES = .*?;)/m;
+    my ($ports) = $text_of_lzrprf =~ /^(my \@CHT_PORTS = .*?;)/m;
+    defined $text && defined $ranges && defined $ports or return 'x';
+    return join ' ', map { my $asked = $_; eval("package Reached; no warnings; $ranges $ports $text; cht_reachable(\@\$asked)") ? 1 : 0 } @_;
+}
+my $cht_reached = cht_reaches(['telegram', '149.154.167.51', 443], ['telegram', '91.108.56.130', 5222], ['telegram', '185.76.151.255', 80], ['telegram', '149.154.176.1', 443], ['telegram', '8.8.8.8', 443], ['telegram', '149.154.167.51', 22], ['telegram', '149.154.167.051', 443], ['telegram', '149.154.167.51 ', 443], ['lzrcht', '149.154.167.51', 443], ['discord', '162.159.128.233', 443], ['telegram', '185.76.152.0', 443]);
+my @cht_sockets = map { /^sub (\w+)/ ? $1 : () } grep { /\bsocket\(|IO::Socket|\bconnect\(/ } $text_of_lzrprf =~ /^(sub cht_\w+ \{.*?^\})/msg;
+check($cht_reached eq '1 1 1 0 0 0 0 0 0 0 0' && "@cht_sockets" eq 'cht_dialed',
+    'LZRCHT\'s connector is given a connection only to an IPv4 address in its one form inside a range its platform publishes, on a port that platform serves: Telegram\'s own ranges on 443, 80 or 5222, and nothing of Discord, which publishes none, or of our own LZRCHT service, which is coming; and "sub cht_dialed" is the one sub of LZRCHT that opens a socket [C32]',
+    "reached: $cht_reached; sockets in: @cht_sockets");
 my %marks = map { $_ => 1 } $text_of_lzrprf =~ /^#   \[(C\d+)\]/mg;
 my ($head, $body) = split /^use strict;$/m, $text_of_lzrprf, 2;
 my %marked = map { $_ => 1 } ($body // '') =~ /\[(C\d+)\]/g;
@@ -6261,7 +6432,7 @@ my ($in_time, $gone) = hears();
 check(defined $in_time && $in_time eq '' && !defined $gone, 'the two ends of a question are told apart: "sub hear" of lzrprf, run against a pipe of the test\'s own, gives an empty line when nothing is said in time, so "sub ask" answers 1, and nothing when the window is gone, so lzrprf ends', defined $in_time ? (defined $gone ? 'the same for both' : 'time over: an empty line; window gone: nothing') : 'time over: nothing, as if the window were gone');
 my @no_folder = grep { my $pid = open(my $in, '-|') // die "selftest: cannot fork: $!\n"; if (!$pid) { open STDERR, '>&', \*STDOUT; { no warnings; exec '/usr/bin/perl', $cli, 'try', "$base.keepcli/$_", '-', '-', 'deny', '/usr/bin/true'; } POSIX::_exit(127) } my $all = do { local $/; <$in> } // ''; close $in; $all !~ /^usage: lzrprf run / } '.', '..', '.x';    # nothing is typed and every answer is the first button, so a folder that was taken would have nothing done in it
 check(!@no_folder, 'the door for tests takes no folder named ".", ".." or with a dot first, so it cannot be pointed at the folder lzrprf itself keeps its state in', @no_folder ? "taken: @no_folder" : 'usage, three times');
-check(keys %marks == 31 && join(' ', sort keys %marks) eq join(' ', sort keys %marked), 'each of the 31 conditions in lzrprf\'s first lines is marked at the line that holds it', scalar(keys %marked) . ' marks in the code');
+check(keys %marks == 32 && join(' ', sort keys %marks) eq join(' ', sort keys %marked), 'each of the 32 conditions in lzrprf\'s first lines is marked at the line that holds it', scalar(keys %marked) . ' marks in the code');
 my $readme = slurp("$here/README.md");
 if (length $readme) {
     my %cited = map { $_ => 1 } $readme =~ /\[(C\d+)\]/g;
@@ -6733,7 +6904,7 @@ sub parts_copy {                          # a copy of the parts in src/ at $to, 
 sub hears {                               # "sub hear" of lzrprf, taken out and run here against a pipe: what it returns when nothing is said in time, then when the other end is gone
     my ($text) = $text_of_lzrprf =~ /^(sub hear \{.*?^\})/ms;
     defined $text && pipe(my $from, my $to) or return ('x', 'x');
-    my @got = eval "package Heard; no warnings; my \$FROM = \$from; my \$FROM_HELD = ''; my \$IDLE_WORK; my \$SPARE_WANTED; my \$CURL_WANTED; my \@EVENTS; my \@HELD; my \@LATER; my \@LIVE; my \$TRY = 0; my \$TRY_QUIET = 2; my \$SOUND; sub trmnl_select { } sub trmnl_heard { } sub prefetch_select { } sub prefetch_heard { } sub now { require Time::HiRes; Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) } $text; my \$quiet = hear(0.2); close \$to; (\$quiet, scalar hear(0.2))";    # with no page kept running, which it also hears
+    my @got = eval "package Heard; no warnings; my \$FROM = \$from; my \$FROM_HELD = ''; my \$IDLE_WORK; my \$SPARE_WANTED; my \$CURL_WANTED; my \@EVENTS; my \@HELD; my \@LATER; my \@LIVE; my \$TRY = 0; my \$TRY_QUIET = 2; my \$SOUND; sub trmnl_select { } sub trmnl_heard { } sub prefetch_select { } sub prefetch_heard { } sub cht_select { } sub cht_heard { } sub now { require Time::HiRes; Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC()) } $text; my \$quiet = hear(0.2); close \$to; (\$quiet, scalar hear(0.2))";    # with no page kept running, which it also hears
     return @got == 2 ? @got : ('x', 'x');
 }
 

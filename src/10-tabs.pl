@@ -12,6 +12,7 @@ sub viewing {
     my ($event) = @_;
     my ($wide, $high, $scale) = $event =~ /^view ([1-9][0-9]{0,4}) ([1-9][0-9]{0,4})(?: (2))?$/ or return; $VIEW_SCALE = $scale ? 2 : 1;
     @TRMNL_VIEW = ($wide, $high);
+    cht_sized($TABS[$TAB]) if $TABS[$TAB]{cht};    # [C32] LZRCHT is drawn at that size too
     trmnl_relaid($TABS[$TAB]) if $TABS[$TAB]{trmnl};    # [C29] a terminal fills the page as it is, not as a page is laid: its panes laid out again in it
     ($wide, $high) = map { my $step = $VIEW_STEP[$_]; $step * int(($_ ? $high : $wide) / $step + 0.5) } 0, 1;
     @VIEW = ($wide < $VIEW_WIDE[0] ? $VIEW_WIDE[0] : $wide > $VIEW_WIDE[1] ? $VIEW_WIDE[1] : $wide, $high < $VIEW_HIGH[0] ? $VIEW_HIGH[0] : $high > $VIEW_HIGH[1] ? $VIEW_HIGH[1] : $high);
@@ -47,7 +48,7 @@ sub relaid {
         $SHOWN->{wide} = $VIEW[0]; $SHOWN->{scale} = $VIEW_SCALE;
         my $kept = live_of($TABS[$TAB]);
         if ($kept && $kept->{wide} == $VIEW[0] && ($kept->{scale} // 1) == $VIEW_SCALE && $kept->{shown}) { window("relaid $TAB", @{ $kept->{shown} }, '.'); $kept->{unsent} = 0; $DRAWN = 1; next }    # the page kept running was laid at this width: its last drawing, as its scripts left it, and nothing is laid out
-        $OUTRUN = 1; my @again = laid_out($SHOWN->{url}, $SHOWN->{got}, $SHOWN->{frame}, 1); $OUTRUN = 0;    # a newer size said while it runs ends it ('outrun'), and the newest is laid next
+        $OUTRUN = 1; my @again = laid_out($SHOWN->{url}, $SHOWN->{got}, $SHOWN->{frame}, 1, $TABS[$TAB]{kept_app}); $OUTRUN = 0;    # a newer size said while it runs ends it ('outrun'), and the newest is laid next
         if (!$again[0] || $SHOWN->{two} && @{ $again[4] }) { live_dropped($again[5]); next }    # not shown: the page as it is shown stays, and so does the run kept running with it
         my ($shown) = pictured($again[0], $again[2], $SHOWN->{host}, undef, undef, $SHOWN->{pictures});
         window("relaid $TAB", @$shown, '.');
@@ -58,7 +59,7 @@ sub relaid {
         live_kept($again[5], $TABS[$TAB], $again[0], $again[2], $SHOWN->{host}, $SHOWN->{pictures}, $shown, $again[6]) if $again[5];
     }
     $CURL_WANTED = 1;
-    if ($SHOWN) { $SPARE_WANTED = $SHOWN->{url} } else { spare_dropped() }    # a process for the page shown's next run, at the next quiet moment (sub spare_work); none waits for a page that is not shown
+    if ($SHOWN && !$TABS[$TAB]{kept_app}) { $SPARE_WANTED = $SHOWN->{url} } else { spare_dropped() }    # a process for the page shown's next run, at the next quiet moment (sub spare_work); none waits for a page that is not shown
     live_told();
 }
 
@@ -84,6 +85,7 @@ sub tabbed {
     elsif ($how eq 'close' && defined $n && $n < @TABS) {
         my $live = live_of($TABS[$n]);
         live_end($live, 'its tab was closed', 1) if $live;
+        cht_end($TABS[$n], 'its tab was closed') if $TABS[$n]{cht};    # [C32]
         trmnl_end($TABS[$n], 'its tab was closed') if $TABS[$n]{trmnl};    # [C29]    # at once: a closed tab's page is not waited for, and the window is not kept waiting the moment it took to end by itself (17 to 40 ms a close, measured 2026-11-23)
         noted(($pulled ? 'you pulled a tab out into a new window' : 'you closed a tab') . (length($TABS[$n]{url} // '') ? ": $TABS[$n]{url}" : ''));
         my ($gone) = splice @TABS, $n, 1;
@@ -160,6 +162,7 @@ sub tab_shown {
     my $tab = $TABS[$TAB];
     window('tabs ' . @TABS . " $TAB", map { "title $_ $TABS[$_]{title}" } 0 .. $#TABS);
     return trmnl_shown($tab) if $tab->{trmnl};    # [C29]
+    return cht_shown($tab) if $tab->{cht};    # [C32]
     window("address $tab->{url}");
     my $live = live_of($tab);
     my $list = $live && $live->{shown} && ($live->{home} || $live->{wide} == $VIEW[0] && ($live->{scale} // 1) == $VIEW_SCALE) ? $live->{shown} : $SHOWN && $SHOWN->{list} && $SHOWN->{wide} == $VIEW[0] && ($SHOWN->{scale} // 1) == $VIEW_SCALE ? $SHOWN->{list} : undef;
@@ -194,7 +197,11 @@ sub menu {
     if ($what eq 'forget-cookies') {      # [C7] the cookies of the shown tab's site, under every site they were set under
         my ($url, $host) = address($TABS[$TAB]{url} // '');
         return idle('No cookie was cleared: this tab shows no site.') unless $url && length $TABS[$TAB]{url};
-        my $gone = jar_forget($url);
+        my $app = $TABS[$TAB]{kept_app};
+        my $gone = $app ? kept_app_jar($app, sub { jar_clear() }) : jar_forget($url);
+        my $stored = kept_storage_forget_site($url);
+        return idle('The cookies were cleared, but Discord storage could not be cleared.') unless defined $stored;
+        return idle('Discord storage and site cookies were cleared. Reload Discord to sign in again.') if $stored && $app;
         noted("you cleared the cookies of $host: $gone");
         return idle("The cookies of $host were cleared: $gone. Reload the page to see it without them.");
     }
@@ -420,7 +427,7 @@ sub home_shown {
     my ($wide, $high, $game) = @_;
     my $fit = $wide > $VIEW_WIDE[1] ? $VIEW_WIDE[1] / $wide : 1;    # a window wider than a page is ever laid: the home is laid at the widest and as much lower, and the window scales it to its room as it does a page (function fit). The application refuses a =view outside the bounds and ends, which left the home black in a window 1611 wide (release 98)
     ($wide, $high) = map { my ($least, $most) = $_ ? @VIEW_HIGH : @VIEW_WIDE; my $is = int(($_ ? $high : $wide) * $fit + 0.5); $is < $least ? $least : $is > $most ? $most : $is } 0, 1;
-    return if $TABS[$TAB]{trmnl};         # [C29] a terminal's tab is no home
+    return if $TABS[$TAB]{trmnl} || $TABS[$TAB]{cht};    # [C29] [C32] a terminal's tab is no home, nor LZRCHT's
     if (length($TABS[$TAB]{url} // '')) {
         return unless $game && @TABS < $TABS_MOST;
         $TABS[$TAB]{shown} = $SHOWN; push @TABS, fresh_tab(); $TAB = $#TABS; undef $SHOWN; tab_shown();
