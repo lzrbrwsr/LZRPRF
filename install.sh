@@ -166,12 +166,12 @@ BASE="${LZRBRWSR_BASE:-https://lzrbrwsr.com}"
 # that differ. lzrprf itself still comes from its public repository at one fixed commit (LZRPRF_BASE), which no cache delays.
 SECOND="${LZRBRWSR_SECOND:-${LZRBRWSR_BASE:-https://lzrbrwsr.vercel.app}}"
 FILE="lzrbrwsr-macos-arm64.tar.gz"
-SHA256="c419185063b0a55f5e5a87b07928f87450a0ea405c937ce86de0a77d6bd905e4"
-RELEASE="176"
-LZRPRF_COMMIT="ad882ad168dd1029ec62ee1e219c6d5a78ad9857"
+SHA256="1b04fab315536ecf5639466c1f7848daa0af9b17fdb2dc2238b6be2863ef6d8f"
+RELEASE="177"
+LZRPRF_COMMIT="d1bf71ae19620cd9f481babbe34d7a7120671776"
 LZRPRF_BASE="${LZRPRF_BASE:-https://raw.githubusercontent.com/lzrbrwsr/lzrprf/$LZRPRF_COMMIT}"
-LZRPRF_SHA256="fe3c2d59f13422ddce9086e64dee8902ba7970a82a90e6a91844f5b29e774b8b"
-SELFTEST_SHA256="79dd0ea944698c7cb7195c3b7e8ab0931dd9b2eaee63c8acbc155c554480310b"
+LZRPRF_SHA256="1aca723c10f7ea4566f52429c65b1a1f5d71d87235e41f1e204251941b46d3cc"
+SELFTEST_SHA256="71cc2a54d49c0a211babbc33366f57a745340067e7dad4535b0acaa8b464a40c"
 # BLOCKLIST_SHA256: the list of addresses lzrprf never opens, digests only, read by lzrprf from beside itself
 BLOCKLIST_SHA256="9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092"
 # RELEASE_KEY: the public half of the release key; a release is installed only when its manifest is signed with it
@@ -787,14 +787,14 @@ cmp -s "$tmp/plist" "$tmp/unpacked/LZRBRWSR.app/Contents/Info.plist" || stop "th
 # installer is fetched from, by Terminal, after you chose to install it. "report" is where a report
 # goes, and only when you pressed Send.
 cat >"$tmp/release" <<'RELEASEFILE'
-release 176
+release 177
+new LZRBRWSR no longer gets stuck at full CPU or stops answering: macOS AutoFill kept retrying inside its window.
 new Discord in LZRCHT now opens titled Discord in its own tab, instead of a "not supported yet" notice.
 new Scrolling is smoother with a little more momentum, a page no longer jumps while it loads, and a minimized LZRDFNDR question waits in its icon with a count.
 new The menu bar says LZRBRWSR, questions open in the same box as everything else and never hold your tabs, and Discord connects from LZRCHT in its own tab.
 new Pages and files in 27 older encodings (Cyrillic, Greek, Central European, Hebrew and more) now read correctly.
 home local
 new A file you choose is read as text in the encoding the site names, and a page knows when its window is in front.
-new Sites can read a file you choose before they send it (FileReader), as Discord does with an attachment.
 newest https://lzrbrwsr.com/latest
 installer https://lzrbrwsr.com/install.sh
 same https://lzrbrwsr.vercel.app/install.sh
@@ -805,7 +805,7 @@ file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
 file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
 file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
 file lzrbrwsr-window 6472a7855c52851bd8db375b86a7f3b400b77353bcab70a663c39574497867c9
-lzrprf fe3c2d59f13422ddce9086e64dee8902ba7970a82a90e6a91844f5b29e774b8b
+lzrprf 1aca723c10f7ea4566f52429c65b1a1f5d71d87235e41f1e204251941b46d3cc
 blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 RELEASEFILE
 cmp -s "$tmp/release" "$tmp/unpacked/LZRBRWSR.app/Contents/Resources/release" || stop "the app's release file is not the one written out in the installer."
