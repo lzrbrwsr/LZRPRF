@@ -21,8 +21,8 @@ function webRow(one, words, sayWhat, y, w, tall) {
     var detail = tall(words, sans(11.5), w - 32);
     return { web: one, words: words, says: sayWhat, y: y, h: 91 + detail, detail: detail };
 }
-function webLaid(items, w, tall) {
-    var y = 2, headline = ESSENTIAL_TITLE + (essentialOpen ? '  \u25be' : '  \u25b8');
+function webLaid(items, w, tall, y0) {
+    var y = y0 || 2, headline = ESSENTIAL_TITLE + (essentialOpen ? '  \u25be' : '  \u25b8');
     items.push({ essentialHead: true, y: y, h: 48, text: headline });
     y += 59;
     if (essentialOpen) {

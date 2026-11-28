@@ -259,7 +259,7 @@ my ($FROM, @EVENTS);                      # what the window says; or, without a 
 my $WELCOMING;                            # the release whose welcome card is shown, until its Got it (sub welcome, sub welcomed)
 my $FROM_HELD = '';                       # what the window said that is not a whole line yet (sub hear)
 my $IDLE_WORK;                            # a sub run once, the first moment the window and every page are quiet (sub hear), set by sub behind: the identity question, asked before the first address is typed
-my ($SPARE, $SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)
+my ($SPARE, $SPARE_WANTED, $HOME_SPARE, $HOME_SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)
 my ($CURL_SPARE, $CURL_WANTED) = (undef, 1);    # curl started before its request (sub curl_for); whether the next quiet moment starts one
 my @LIVE;                                 # the pages kept running with their tabs, the oldest first (sub live_kept)
 my $LAID_TALLY;                           # what the last laid list checked holds: its counts, text, pixels and tiles (sub laid), kept by a page kept running for a splice of it (sub live_patched)
@@ -980,6 +980,7 @@ sub holds {
         push @run, said_started(decoding($folder, $SIPS, '--version')), said_started(decoding($folder, '/usr/bin/perl', '-e', $GATE, $SIPS, '--version'));    # [C3] [C21] sips says its version in the decoder container, and behind the gate, sent no byte (its input leads nowhere), it never starts
     }
     my $named = decoder_named($folder);    # [C21] the one system service the decoder may ask for, and no other; asked while the tries run beside it
+    list_read();                          # [C23] the list is read while they run too (18 ms at a start, Ticket #1552); behind asks for it again below, which is then its answer kept
     my @said = said_read(10, @run, $free);    # [what it printed, whether it ended well] each
     my ($inside, $decoder, $sips, $outside, $gated, $gate_well) = ((map { $_->[0] } @said[0, 1, 2, 4]), @{ $said[3] });    # each started at once and read side by side, none waiting for another (342 ms one after another, measured 2026-11-24)
     unlink map { ("$_/here", "$_/made", "$_/out.png") } $folder, $apart;
@@ -1151,7 +1152,7 @@ sub run {
     my $behind = fork // die "lzrprf: cannot fork: $!\n";
     become($from, $to, $TRY ? \*STDOUT : undef, '/usr/bin/perl', $SELF, 'behind', $TRY, defined $PROFILE && !$INCOGNITO ? $ROOT : $DIR, $PEER, $ANSWER, $window, $INCOGNITO ? $ROOT : '-', $PROFILE // '-', $program, @arguments) unless $behind;    # descriptor 0 is what the window says, descriptor 1 what it is told; a profile by its id alone, never by its name, and behind finds its folder from the state folder
     close $_ for $to, $from;
-    my $more = window_pointer_text() . window_trmnl_text() . window_link_text() . window_menu_text() . window_inspect_text() . window_website_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
+    my $more = window_pointer_text() . window_trmnl_text() . window_link_text() . window_menu_text() . window_inspect_text() . window_website_text() . window_defender_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)
@@ -1816,6 +1817,7 @@ sub behind {
     window('home available') if $local_home;
     window('startup ready') unless $local_home && !length($pulled) && !home() && !$TOR_SESSION;
     sso_told();                           # the sign-ins of this profile, for the Profiles list's "Connect seamless SSO accounts"; in an incognito window, why there are none
+    defender_told();                      # Ticket #1546: LZRDFNDR's switches, for the top of each tab of its panel
     window('game helper ' . game_helper(), 'marksbar ' . (marks_bar() ? 'on' : 'off'), 'search ' . (engine() ? 'set' : 'none'), $PICTURES_SHOWN ? 'pictures ' . (pictures_elsewhere() ? 'allow' : 'block') : ());
     parts_told();                         # the parts installed: the window shows the icons and menus of those alone
     nav_told();
@@ -1836,6 +1838,7 @@ sub behind {
         my $event = eval { hear(scalar(link_due(scalar tnnl_due(scalar tool_due()))), 1) };    # what a page kept running wrote is read here too: an error of lzrprf's own in it ends that page, never the window
         if (!defined $event) { last unless $@; unheard('', $@, $behind, ++$faults); next }
         timed('heard ' . ($event =~ /^(\S+)/ ? $1 : '')) if $TIMED;    # "lzrprf try" with "times": the moment each line of the window was taken up, so a test reads how long lzrprf took to answer it (scripts/snappy.pl)
+        $HOME_SPARE_WANTED = 1 if length $event && !$HOME_SPARE;    # Ticket #1447: a new tab's home process ready by the next quiet moment (sub home_spare_for)
         eval { link_watch() } if length $event;    # [C31] a window that is never quiet still sends the link's lines when they are due (a cheap look, read once in two seconds)
         eval {    # each line taken up below; an error of lzrprf's own in it is caught after the last elsif (sub unheard)
         if ($event =~ /^go ([\x20-\x7f]{1,2100})$/) { typed($1) }    # [C4] the one place an address comes from: the bar of lzrprf's own window; a size said while it was fetched and laid out is the size it is laid out again at
@@ -1878,6 +1881,7 @@ sub behind {
         elsif ($event eq 'menu debug-link') { link_menu(); said_noted() }    # [C31] the live debug link, switched on or off in the cogwheel's menu
         elsif ($event =~ /^link drew ([0-9]{1,6})$/) { link_drew($1) }    # [C31] how long the window took to draw a list, said only while the link is on
         elsif ($event =~ /^link shot ([0-9a-f]{16,32}) ([A-Za-z0-9+\/]+={0,2})$/) { link_shot($1, $2) }    # [C31] the window's picture of itself, for a signed command that asked for it
+        elsif ($event =~ /^defender (computer|scripts|redirects|sends) (on|off)$/) { defender_set($1, $2 eq 'on'); said_noted() }    # Ticket #1546: a switch at the top of a tab of LZRDFNDR's panel
         elsif ($event =~ /^game helper (on|off)$/) { game_helper_set($1 eq 'on'); said_noted() }    # H-0071: LZRDFNDR's satellite in the minigame, from the switch in the Other tab of its panel
         elsif ($event =~ /^mark open (0|[1-9][0-9]{0,2})$/) { $MARKS[$1] ? go($MARKS[$1][2], 'you opened a bookmark', $1) : idle('That bookmark is no longer there.') }    # [C4] an address kept from the bar or typed into the window's own modal
         elsif ($event =~ /^mark remove (0|[1-9][0-9]{0,2})$/) { mark_removed($1); said_noted() }
@@ -2011,7 +2015,7 @@ sub leave {
     trmnl_end($_, 'its window closed') for grep { $_->{trmnl} } @TABS;    # [C29] nor a terminal: its shell is hung up
     cht_end($_, 'its window closed') for grep { $_->{cht} } @TABS;    # [C32] nor LZRCHT: its roles and connections
     kill 'KILL', $witness if $witness;
-    spare_dropped();                      # a page run's process started before its run, never handed anything
+    spare_dropped(); home_spare_dropped();    # a page run's process started before its run, and a home's, never handed anything
     curl_ended($CURL_SPARE);              # and curl started before its request
     sound_ended();                       # [C12] the sound process ends with its window
     removed($DIR) if $TOR_SESSION;        # [C17] a Tor window whose end was held: its folder goes before Tor does
@@ -2518,7 +2522,7 @@ sub contained {
         return (undef, 'unstarted');
     }
     if (!$feeder) {                       # the keeper of this page
-        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), cht_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
+        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), cht_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $HOME_SPARE ? @$HOME_SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
         keeper($held, $answer_in, "=seal $seal\n" . $frame . $got, $page, $input);
         POSIX::_exit(0);                  # the keeper never returns; were it ever to, it ends here and does not go on as a second lzrprf
     }
@@ -2557,7 +2561,7 @@ sub page_started {
     my $seal = run_seal() // return;      # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
     my $page = fork // return;
     if (!$page) {
-        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$app && !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
+        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => home_word()) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$app && !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
         chdir '/';
         the_program($answer_out, $to_lzrprf);    # [C1]
     }
@@ -2584,7 +2588,8 @@ sub spare_for {
 
 sub spare_taken {                         # the process started for this run, when it is the one for its address and is still waiting; else nothing, and one for another run is ended
     my ($url, $sheets, $tool, $local_home) = @_;
-    return unless $SPARE && defined $sheets && !$tool && !$local_home;
+    return home_spare_taken() if $local_home && defined $sheets && !$tool;    # Ticket #1447: a new tab's home, from the process made for it at a quiet moment (10-tabs.pl)
+    return unless $SPARE && defined $sheets && !$tool;
     my $one = $SPARE;
     return spare_dropped() if $one->{of} != $$ || $one->{key} ne "$url\t" . ($TOR_WANTED ? 1 : 0);
     undef $SPARE;
@@ -2593,8 +2598,8 @@ sub spare_taken {                         # the process started for this run, wh
     return;
 }
 
-sub spare_dropped {                       # the process started before its run, ended unused; a copy of lzrprf only forgets it
-    my $one = $SPARE or return;
+sub spare_dropped {                       # the process started before its run, ended unused; a copy of lzrprf only forgets it, the home's too
+    home_spare_dropped() if $HOME_SPARE && $HOME_SPARE->{of} != $$; my $one = $SPARE or return;
     undef $SPARE;
     if ($one->{of} == $$) { kill 'KILL', $one->{page}; waitpid $one->{page}, 0 }
     close $_ for @$one{qw(in from)};
@@ -2602,10 +2607,10 @@ sub spare_dropped {                       # the process started before its run, 
 }
 
 sub spare_work {                          # what the next quiet moment does (sub hear): the process for the next run of the page shown, for a new width, and curl for the next request
-    my ($url, $curl) = ($SPARE_WANTED, $CURL_WANTED);
-    return unless defined $url || $curl;
-    ($SPARE_WANTED, $CURL_WANTED) = ();
-    return sub { spare_for($url) if defined $url; curl_for() if $curl };
+    my ($url, $curl, $home) = ($SPARE_WANTED, $CURL_WANTED, $HOME_SPARE_WANTED);
+    return unless defined $url || $curl || $home;
+    ($SPARE_WANTED, $CURL_WANTED, $HOME_SPARE_WANTED) = ();
+    return sub { spare_for($url) if defined $url; home_spare_for() if $home; curl_for() if $curl };
 }
 
 sub idle_taken {                          # the work of a quiet moment, once: sub behind's first ($IDLE_WORK), then a spare's
@@ -2920,6 +2925,7 @@ sub laid_run {                            # the lines $first to $last of a laid 
 sub redirect_noted {                      # [C4] a redirect about to be put to you, kept as "pending"; returns 2 when your kept decision proceeds (and it can be followed), 1 when it cancels, 0 when you are asked
     my ($url, $to, $status, $fit) = @_;
     my $key = "$url\t" . ($to // '');
+    return $fit ? 2 : 1 if defender_is_off('redirects');    # Ticket #1546: Redirects off asks nothing; a redirect lzrprf may follow is followed
     my $one = $REDIRECTS{$key};
     return $one->{decision} eq 'proceed always' && $fit ? 2 : 1 if $one && $one->{decision} =~ /always\z/;
     if ($one && delete $one->{once}) { return $one->{decision} eq 'proceeded' && $fit ? 2 : 1 }
@@ -4436,6 +4442,34 @@ sub home_shown {
     return window('startup ready'), idle('The local home could not be drawn.') unless $live;
     $live->{starting} = { tab => $TABS[$TAB], high => $high, game => $game };
     push @LIVE, $live;
+}
+
+# A new tab's home is made in a process started for it at a quiet moment (Ticket #1447): the 20 to 40 ms the
+# system takes to start a process and put it in its container are spent then, not after the press. One at a
+# time, made by this process alone with the variables a home is run with now ($HOME_SPARE->{key}); one made
+# for another setting (private, the satellite, a part, Tor) is ended unused, as a page's spare is.
+sub home_word { return ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl') }
+sub home_spare_key { return home_word() . "\t" . ($TOR_WANTED ? 1 : 0) }
+sub home_spare_for {
+    return if $HOME_SPARE && $HOME_SPARE->{of} == $$ && $HOME_SPARE->{key} eq home_spare_key() && waitpid($HOME_SPARE->{page}, POSIX::WNOHANG()) == 0;
+    home_spare_dropped();
+    return unless $$ == $FRESH && program_same();
+    $HOME_SPARE = page_started('https://lzrbrwsr.invalid/_home', "=sheets\n", undef, 1) or return;
+    $HOME_SPARE->{key} = home_spare_key(); timed('home-spare');
+}
+sub home_spare_taken {                    # the home's process, when it was made for the home as it is run now and still waits; else nothing
+    my $one = $HOME_SPARE or return;
+    undef $HOME_SPARE;
+    return timed('home-spare-taken'), $one if $one->{of} == $$ && $one->{key} eq home_spare_key() && waitpid($one->{page}, POSIX::WNOHANG()) == 0;
+    $HOME_SPARE = $one; home_spare_dropped();
+    return;
+}
+sub home_spare_dropped {                  # ended unused; a copy of lzrprf only forgets it
+    my $one = $HOME_SPARE or return;
+    undef $HOME_SPARE;
+    if ($one->{of} == $$) { kill 'KILL', $one->{page}; waitpid $one->{page}, 0 }
+    close $_ for @$one{qw(in from)};
+    return;
 }
 
 sub home_arrived {                        # the first list of a home being made (sub home_shown), read in the loop of sub behind: drawn when its tab is still at home
@@ -6192,7 +6226,7 @@ sub tool_due {                            # the seconds until the next such look
 sub tool_watch {
     return if $INCOGNITO;
     lzr_watch();
-    return if !part_on('lzrdfndr') || defined $TOOL_LOOKED && now() < $TOOL_LOOKED + $TOOL_WATCH;    # what LZRDFNDR switched off is looked at only while it is installed; what lzr deactivated, always
+    return if !part_on('lzrdfndr') || defender_is_off('computer') || defined $TOOL_LOOKED && now() < $TOOL_LOOKED + $TOOL_WATCH;    # what LZRDFNDR switched off is looked at only while it is installed; what lzr deactivated, always
     $TOOL_LOOKED = now();
     my $kept = tool_kept();
     return unless @$kept;
@@ -10267,7 +10301,7 @@ sub hear {                                # the next thing the window says; noth
         }
         trmnl_select(\$ready, \$writable);    # [C29] each terminal's shell and container, heard as the window is
         cht_select(\$ready, \$writable);    # [C32] each LZRCHT's roles and connections
-        if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
+        if ($main && $FROM && ($IDLE_WORK || defined $SPARE_WANTED || $HOME_SPARE_WANTED || $CURL_WANTED) && !length($FROM_HELD) && $writable !~ /[^\0]/ && !grep({ $_->{starting} } @LIVE) && select(my $now = $ready, undef, undef, 0) == 0) { my $work = idle_taken(); $work->() if $work; timed('idle-work'); next }    # once: nothing said, nothing to write and no page being made, so nothing waits for it
         prefetch_select(\$ready);         # [C19] the scripts begun ahead are read as they come (17-prefetch.pl)
         select($ready, $writable, undef, $wait) > 0 or next;
         prefetch_heard($ready);
@@ -11764,6 +11798,52 @@ sub ws_end {
     kept_app_jar($app, sub { jar_end(); return });
     return;
 }
+# LZRDFNDR's switches (Ticket #1546): each protection on or off from the top of its tab in LZRDFNDR's panel.
+# SYNC: managed-projects/lzrbrwsr/architecture/lzrdfndr.md
+# One plain file of yours, defender, holds a line for each protection switched off ("scripts off"); no file,
+# and every protection is on. A file that does not read leaves every protection on, so a damaged file never
+# lets anything through unasked. Off, a protection asks nothing and shows no message: a page's scripts run as
+# after Allow Once, a redirect is followed as after Proceed, a send to another host goes as after Allow Once,
+# and On Your Computer no longer switches a job you switched off back off. What it lets through is still
+# written in the log. An incognito window holds its choice in its memory alone [C16].
+my @DEFENDER_KINDS = qw(computer scripts redirects sends);
+my $DEFENDER_BYTES = 128;    # DECLARED(four lines of at most "redirects off\n": the file is never longer)
+my $HELD_DEFENDER;
+
+sub defender_off {                        # {kind => 1} for each protection switched off
+    return { %$HELD_DEFENDER } if $INCOGNITO && $HELD_DEFENDER;
+    sysopen(my $in, kept_in() . '/defender', O_RDONLY | O_NOFOLLOW | O_NONBLOCK) or return {};
+    my @is = stat $in;
+    my $text = '';
+    return {} unless @is && -f _ && $is[3] == 1 && $is[4] == $< && $is[7] <= $DEFENDER_BYTES && defined sysread($in, $text, $DEFENDER_BYTES + 1) && ($text eq '' || $text =~ /\n\z/);
+    my %off;
+    for (split /\n/, $text) { my ($kind) = /\A(computer|scripts|redirects|sends) off\z/ or return {}; $off{$kind} = 1 }
+    return \%off;
+}
+
+sub defender_is_off { return defender_off()->{ $_[0] } ? 1 : 0 }
+
+sub defender_told { my $off = defender_off(); window('defender ' . join(' ', map { "$_ " . ($off->{$_} ? 'off' : 'on') } @DEFENDER_KINDS)) }
+
+sub defender_set {                        # "defender KIND on" or "off", from the switch at the top of its tab
+    my ($kind, $on) = @_;
+    my %off = %{ defender_off() };
+    if ($on) { delete $off{$kind} } else { $off{$kind} = 1 }
+    my $kept = 1;
+    if ($INCOGNITO) { $HELD_DEFENDER = {%off} }
+    else {
+        my @lines = map { "$_ off" } grep { $off{$_} } @DEFENDER_KINDS;
+        my $file = "$DIR/defender";
+        if (!@lines) { $kept = !(-e $file || -l $file) || unlink $file }
+        else { unlink "$file.new"; $kept = put("$file.new", O_EXCL, @lines) && rename("$file.new", $file); unlink "$file.new" unless $kept }
+        synced() if $kept;
+    }
+    defender_told();
+    my %name = (computer => 'On Your Computer', scripts => 'Scripts', redirects => 'Redirects', sends => 'Sends');
+    return idle("LZRDFNDR's $name{$kind} could not be switched " . ($on ? 'on' : 'off') . ': its setting could not be written.') if !$kept || defender_is_off($kind) == ($on ? 1 : 0);
+    noted("you switched LZRDFNDR's $name{$kind} " . ($on ? 'on' : 'off'));
+    return idle("LZRDFNDR's $name{$kind} is " . ($on ? 'on.' : 'off: it asks nothing and shows no message.'));
+}
 # Website decisions and their opt-in essentials.
 # SYNC: managed-projects/lzrbrwsr/architecture/lzrdfndr.md
 my @WEB_CHOICES = ('Always allow', 'Allow once', 'Always Deny', 'Deny once', 'Forget');
@@ -12593,6 +12673,7 @@ sub permits_asked {                       # [C26] once the page is drawn: its sc
     my $essential = grep { defined permit_essential_id($site, @$_, $ask->{url}) } @items;
     window('essential script') if $essential;
     my $state = { site => $site, url => $ask->{url}, items => \@items, allowed => $allowed, host => $host };
+    return permit_answered($state, 3) if defender_is_off('scripts');    # Ticket #1546: Scripts off asks nothing: they run as after Allow Once
     my @buttons = ('Deny Once', 'Deny Always', 'Allow Once', 'Always Allow', 'Forget');
     return permit_answered($state, asked("permit $site\t$words", @buttons)) unless $FROM;    # "lzrprf try": the test's answer at once
     $state->{n} = asked_later("permit $site\t$words", @buttons); $PERMIT_PENDING = $state;    # Henry 2026-11-25: the page goes on while the question stands; its answer comes as any other line (sub permit_button)
@@ -12759,6 +12840,7 @@ sub sends_decide {
 sub send_question {
     my ($site, $to) = @_;
     my $key = "$site\t$to";
+    return 2 if defender_is_off('sends') && record("$site sent to $to unasked: LZRDFNDR's Sends is off");    # Ticket #1546
     if (my $one = $SEND_NOTED{$key}) {
         my $decision = $one->{decision};
         return 2 if $decision eq 'always';
@@ -16366,6 +16448,30 @@ sub lookup {                              # every address a name leads to, as nu
     print map { (getnameinfo($_->{addr}, NI_NUMERICHOST | NI_NUMERICSERV))[1] . "\n" } $failed ? () : @all;
 }
 
+# LZRDFNDR's switches in its panel (Ticket #1546): at the top of each tab, a switch for each protection of the tab.
+# SYNC: managed-projects/lzrbrwsr/architecture/lzrdfndr.md ; src/22-defender.pl
+sub window_defender_text {
+    return <<'END';
+var DEFEND_TAB = { computer: [['computer', 'On Your Computer']], websites: [['scripts', 'Scripts'], ['redirects', 'Redirects'], ['sends', 'Sends']] };
+var DEFEND_SAID = { computer: 'lzrprf keeps every job you switched off here off, and says so when something switches one back on.', scripts: "a page's scripts that no rule allows are put to you before they run.", redirects: 'a redirect to another address is put to you before it is followed.', sends: 'a page that sends to another host is put to you first.' };
+var defendOff = {};    // from lzrprf's "defender KIND on|off ..." (sub defender_told): each protection switched off
+function defenderTold(rest) { var f = rest.split(' '); defendOff = {}; for (var k = 0; k + 1 < f.length; k += 2) if (f[k + 1] == 'off') defendOff[f[k]] = true; toolItems = null; if (modalOpen && modalKind == 'tool') toolChanged(); }
+// The rows of the shown tab's switches, from y: each a box ticked while its protection is on; returns the y below them.
+function defendLaid(items, w, tall, y) {
+    (DEFEND_TAB[toolTab] || []).forEach(function (one) {
+        var on = !defendOff[one[0]], said = on ? 'On: ' + DEFEND_SAID[one[0]] + ' Untick to switch it off.' : 'Off: nothing is asked and no message is shown; what it lets through is still in the log. Tick to switch it on.';
+        var detail = tall(said, sans(11.5), w - 52), high = 11 + 19 + detail + 11;
+        items.push({ row: { on: on, mode: 'act', tag: on ? 'on' : 'off', title: one[1] + ' protection', detail: said, fact: '' }, defend: one[0], y: y, h: high, detail: detail, fact: 0 });
+        y += high + 8;
+    });
+    return y;
+}
+function defendClicked(at, items) {    // a press on a switch's row: lzrprf is told, and its answer redraws the row
+    for (var k = 0; k < items.length; k++) { var one = items[k]; if (one.defend && at.y >= one.y && at.y < one.y + one.h) { say('defender ' + one.defend + (defendOff[one.defend] ? ' on' : ' off')); return true; } }
+    return false;
+}
+END
+}
 # The window's native Inspect pane. It uses the live page relay and never evaluates JavaScript here.
 # SYNC: managed-projects/lzrbrwsr/ARCHITECTURE.md §7.4 ; src/24-inspect.pl
 # TRIAD(tests: managed-projects/lzrbrwsr/src/page/scripted_inspect.rs, docs: managed-projects/lzrbrwsr/ARCHITECTURE.md)
@@ -17021,8 +17127,8 @@ function webRow(one, words, sayWhat, y, w, tall) {
     var detail = tall(words, sans(11.5), w - 32);
     return { web: one, words: words, says: sayWhat, y: y, h: 91 + detail, detail: detail };
 }
-function webLaid(items, w, tall) {
-    var y = 2, headline = ESSENTIAL_TITLE + (essentialOpen ? '  \u25be' : '  \u25b8');
+function webLaid(items, w, tall, y0) {
+    var y = y0 || 2, headline = ESSENTIAL_TITLE + (essentialOpen ? '  \u25be' : '  \u25b8');
     items.push({ essentialHead: true, y: y, h: 48, text: headline });
     y += 59;
     if (essentialOpen) {
@@ -17663,7 +17769,7 @@ function heard(line) {
     else if (word == 'tor') torTold(rest);
     else if (word == 'torsession') { if (rest == 'made') tnnlShown(); else torSessionTold(rest); } else if (word == 'tnnl') tnnlTold(rest); else if (word == 'parts') partsTold(rest);    // LZRTNNL's modal, before Tor connects, and the modules installed (28-window2.pl)
     else if (word == 'tool') toolTold(rest);
-    else if (word == 'game' && /^helper [01]$/.test(rest)) { gameHelper = gameStaged = rest == 'helper 1'; toolItems = null; if (modalOpen && modalKind == 'tool' && toolTab == 'other') toolChanged(); else if (toolView) toolView.needsDisplay = true; }    // H-0071: LZRDFNDR's satellite in the minigame, as lzrprf keeps it (gamehelper)
+    else if (word == 'game' && /^helper [01]$/.test(rest)) { gameHelper = gameStaged = rest == 'helper 1'; toolItems = null; if (modalOpen && modalKind == 'tool' && toolTab == 'other') toolChanged(); else if (toolView) toolView.needsDisplay = true; } else if (word == 'defender') defenderTold(rest);    // H-0071: LZRDFNDR's satellite in the minigame, as lzrprf keeps it (gamehelper)
     else if (word == 'home' && rest == 'available') { homeAvailable = true; if (!current && free && !pageShown) homeAsked(false); }
     else if (word == 'home' && rest == 'ready') homeSceneReady();
     else if (word == 'startup' && rest == 'ready') { startupReady = true; if (startupRequested) shown(); }
@@ -19781,13 +19887,13 @@ function toolLaid() {    // what the list draws, from its top: each piece with w
         toolItems = { items: items, high: y + high + 10, wide: w }; return toolItems;
     }
     if (toolTab == 'websites' && !tool.confirm) {
-        y = webLaid(items, w, tall);
+        y = webLaid(items, w, tall, defendLaid(items, w, tall, 2));
         toolItems = { items: items, high: y + 2, wide: w };
         return toolItems;
     }
     if (tool.confirm) note('You are about to switch these off. Under each row lzrprf says, in its own words, what it will change and nothing else: a launchd job of your account is switched off and kept off until you switch it on again here, and a process is asked to end. An app that needs what you switch off may start it again or stop working until you switch it on again. Each change is written in the log first.', sans(13), WHITE, 14);
     else {
-        note(tool.words, sans(13), WHITE, 12);
+        y = defendLaid(items, w, tall, y); note(tool.words, sans(13), WHITE, 12);
         note(tool.said, sans(12.5), YELLOW, 12);
     }
     note(tool.busy, sans(12.5, true), GREEN, 12);
@@ -19834,7 +19940,7 @@ function paintTool() {
 }
 function toolClicked(event) {
     if (!tool || tool.confirm || tool.busy && toolTab != 'other') return;
-    var at = pointIn(toolView, event), items = toolLaid().items; if (toolTab == 'other') { items.forEach(function (one) { if (one.game && at.y >= one.y && at.y < one.y + one.h) { gameStaged = !gameStaged; toolChanged(); } }); return; }    // the sentry's box: staged, applied by Switch on or Switch off (gameApplied)
+    var at = pointIn(toolView, event), items = toolLaid().items; if (defendClicked(at, items)) return; if (toolTab == 'other') { items.forEach(function (one) { if (one.game && at.y >= one.y && at.y < one.y + one.h) { gameStaged = !gameStaged; toolChanged(); } }); return; }    // the sentry's box: staged, applied by Switch on or Switch off (gameApplied)
     if (toolTab == 'websites') { webClick(at, items, toolLaid().wide); return; }
     if (procClicked(at, items)) return;
     for (var k = 0; k < items.length; k++) {

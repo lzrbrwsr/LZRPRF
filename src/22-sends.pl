@@ -34,6 +34,7 @@ sub sends_decide {
 sub send_question {
     my ($site, $to) = @_;
     my $key = "$site\t$to";
+    return 2 if defender_is_off('sends') && record("$site sent to $to unasked: LZRDFNDR's Sends is off");    # Ticket #1546
     if (my $one = $SEND_NOTED{$key}) {
         my $decision = $one->{decision};
         return 2 if $decision eq 'always';

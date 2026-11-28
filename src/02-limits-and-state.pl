@@ -181,7 +181,7 @@ my ($FROM, @EVENTS);                      # what the window says; or, without a 
 my $WELCOMING;                            # the release whose welcome card is shown, until its Got it (sub welcome, sub welcomed)
 my $FROM_HELD = '';                       # what the window said that is not a whole line yet (sub hear)
 my $IDLE_WORK;                            # a sub run once, the first moment the window and every page are quiet (sub hear), set by sub behind: the identity question, asked before the first address is typed
-my ($SPARE, $SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)
+my ($SPARE, $SPARE_WANTED, $HOME_SPARE, $HOME_SPARE_WANTED);               # the process of the next page run, started before that run (sub spare_for); the address one is wanted for at the next quiet moment (sub spare_work)
 my ($CURL_SPARE, $CURL_WANTED) = (undef, 1);    # curl started before its request (sub curl_for); whether the next quiet moment starts one
 my @LIVE;                                 # the pages kept running with their tabs, the oldest first (sub live_kept)
 my $LAID_TALLY;                           # what the last laid list checked holds: its counts, text, pixels and tiles (sub laid), kept by a page kept running for a splice of it (sub live_patched)

@@ -341,7 +341,7 @@ sub contained {
         return (undef, 'unstarted');
     }
     if (!$feeder) {                       # the keeper of this page
-        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), cht_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
+        close $_ for $from_page, $hold, grep { defined } $relay, map({ @$_{qw(relay from hold)} } @LIVE), trmnl_fds(), cht_fds(), beside_fds(), $SPARE ? @$SPARE{qw(in from)} : (), $HOME_SPARE ? @$HOME_SPARE{qw(in from)} : (), $CURL_SPARE ? @$CURL_SPARE{qw(to from)} : ();    # and lzrprf's ends of every page kept running: the end of lzrprf is the end of each of their pipes, held by nobody else
         keeper($held, $answer_in, "=seal $seal\n" . $frame . $got, $page, $input);
         POSIX::_exit(0);                  # the keeper never returns; were it ever to, it ends here and does not go on as a second lzrprf
     }
@@ -380,7 +380,7 @@ sub page_started {
     my $seal = run_seal() // return;      # [C1] the run's seal: in its variables, and again as the first line its keeper hands over, only after the system said it is contained
     my $page = fork // return;
     if (!$page) {
-        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl')) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$app && !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
+        %ENV = (LZRPRF_CONTAINED => $url, LZRPRF_SEAL => $seal, $TOR_WANTED ? (LZRPRF_TOR => '1') : (), $local_home ? (LZRPRF_HOME => home_word()) : (), $tool ? ($tool eq 'judge' ? (LZRPRF_JUDGE => '1') : (LZRPRF_TOOL => '1')) : defined $sheets ? () : (LZRPRF_PICTURE => '1'), !$tool && !$local_home && defined $sheets && !$OUTRUN ? (LZRPRF_EARLY => '1') : (), !$app && !$tool && !$local_home && !$TOR_WANTED ? (LZRPRF_SOON => '1') : (), $TIMED && !$tool ? (LZRPRF_TIMES => '1') : ());    # the application is told the address it lays out, and for a picture that it is one, and sees no other variable: these it is given before the system is asked [C3]
         chdir '/';
         the_program($answer_out, $to_lzrprf);    # [C1]
     }
@@ -407,7 +407,8 @@ sub spare_for {
 
 sub spare_taken {                         # the process started for this run, when it is the one for its address and is still waiting; else nothing, and one for another run is ended
     my ($url, $sheets, $tool, $local_home) = @_;
-    return unless $SPARE && defined $sheets && !$tool && !$local_home;
+    return home_spare_taken() if $local_home && defined $sheets && !$tool;    # Ticket #1447: a new tab's home, from the process made for it at a quiet moment (10-tabs.pl)
+    return unless $SPARE && defined $sheets && !$tool;
     my $one = $SPARE;
     return spare_dropped() if $one->{of} != $$ || $one->{key} ne "$url\t" . ($TOR_WANTED ? 1 : 0);
     undef $SPARE;
@@ -416,8 +417,8 @@ sub spare_taken {                         # the process started for this run, wh
     return;
 }
 
-sub spare_dropped {                       # the process started before its run, ended unused; a copy of lzrprf only forgets it
-    my $one = $SPARE or return;
+sub spare_dropped {                       # the process started before its run, ended unused; a copy of lzrprf only forgets it, the home's too
+    home_spare_dropped() if $HOME_SPARE && $HOME_SPARE->{of} != $$; my $one = $SPARE or return;
     undef $SPARE;
     if ($one->{of} == $$) { kill 'KILL', $one->{page}; waitpid $one->{page}, 0 }
     close $_ for @$one{qw(in from)};
@@ -425,10 +426,10 @@ sub spare_dropped {                       # the process started before its run, 
 }
 
 sub spare_work {                          # what the next quiet moment does (sub hear): the process for the next run of the page shown, for a new width, and curl for the next request
-    my ($url, $curl) = ($SPARE_WANTED, $CURL_WANTED);
-    return unless defined $url || $curl;
-    ($SPARE_WANTED, $CURL_WANTED) = ();
-    return sub { spare_for($url) if defined $url; curl_for() if $curl };
+    my ($url, $curl, $home) = ($SPARE_WANTED, $CURL_WANTED, $HOME_SPARE_WANTED);
+    return unless defined $url || $curl || $home;
+    ($SPARE_WANTED, $CURL_WANTED, $HOME_SPARE_WANTED) = ();
+    return sub { spare_for($url) if defined $url; home_spare_for() if $home; curl_for() if $curl };
 }
 
 sub idle_taken {                          # the work of a quiet moment, once: sub behind's first ($IDLE_WORK), then a spare's
@@ -743,6 +744,7 @@ sub laid_run {                            # the lines $first to $last of a laid 
 sub redirect_noted {                      # [C4] a redirect about to be put to you, kept as "pending"; returns 2 when your kept decision proceeds (and it can be followed), 1 when it cancels, 0 when you are asked
     my ($url, $to, $status, $fit) = @_;
     my $key = "$url\t" . ($to // '');
+    return $fit ? 2 : 1 if defender_is_off('redirects');    # Ticket #1546: Redirects off asks nothing; a redirect lzrprf may follow is followed
     my $one = $REDIRECTS{$key};
     return $one->{decision} eq 'proceed always' && $fit ? 2 : 1 if $one && $one->{decision} =~ /always\z/;
     if ($one && delete $one->{once}) { return $one->{decision} eq 'proceeded' && $fit ? 2 : 1 }

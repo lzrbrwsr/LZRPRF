@@ -471,7 +471,7 @@ sub tool_due {                            # the seconds until the next such look
 sub tool_watch {
     return if $INCOGNITO;
     lzr_watch();
-    return if !part_on('lzrdfndr') || defined $TOOL_LOOKED && now() < $TOOL_LOOKED + $TOOL_WATCH;    # what LZRDFNDR switched off is looked at only while it is installed; what lzr deactivated, always
+    return if !part_on('lzrdfndr') || defender_is_off('computer') || defined $TOOL_LOOKED && now() < $TOOL_LOOKED + $TOOL_WATCH;    # what LZRDFNDR switched off is looked at only while it is installed; what lzr deactivated, always
     $TOOL_LOOKED = now();
     my $kept = tool_kept();
     return unless @$kept;

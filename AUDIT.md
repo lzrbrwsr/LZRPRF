@@ -235,12 +235,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 03-containers.pl	468	said_started	-
 03-containers.pl	477	said_read	-
 03-containers.pl	497	ended	C2
-03-containers.pl	545	holds	C21 C3
-03-containers.pl	588	decoder_named	C3
-03-containers.pl	635	witnessed	-
-03-containers.pl	653	inside	-
-03-containers.pl	675	witness_lost	-
-03-containers.pl	684	named_asked	C21
+03-containers.pl	545	holds	C21 C3 C23
+03-containers.pl	589	decoder_named	C3
+03-containers.pl	636	witnessed	-
+03-containers.pl	654	inside	-
+03-containers.pl	676	witness_lost	-
+03-containers.pl	685	named_asked	C21
 04-start.pl	1	-	-
 04-start.pl	4	run	C16 C17 C29
 04-start.pl	50	window_host	-
@@ -295,11 +295,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 06-behind.pl	4	started	-
 06-behind.pl	9	named	-
 06-behind.pl	17	behind	C16 C17 C10 C2 C23 C11 C12 C21 C4 C5 C31 C20 C7 C26 C27 C22 C29 C18 C15
-06-behind.pl	178	unheard	-
-06-behind.pl	222	paired	-
-06-behind.pl	237	unnamed	-
-06-behind.pl	244	leave	C17 C7 C29 C32 C12 C16
-06-behind.pl	262	closed	-
+06-behind.pl	181	unheard	-
+06-behind.pl	225	paired	-
+06-behind.pl	240	unnamed	-
+06-behind.pl	247	leave	C17 C7 C29 C32 C12 C16
+06-behind.pl	265	closed	-
 07-visit-beside.pl	1	-	C14 C17
 07-visit-beside.pl	23	beside_wanted	-
 07-visit-beside.pl	25	beside_fds	-
@@ -318,21 +318,21 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 07-visit.pl	377	page_started	C1 C3
 07-visit.pl	400	spare_for	-
 07-visit.pl	408	spare_taken	-
-07-visit.pl	419	spare_dropped	-
-07-visit.pl	427	spare_work	-
-07-visit.pl	434	idle_taken	C1
-07-visit.pl	446	run_seal	-
-07-visit.pl	472	keeper	C9
-07-visit.pl	560	unhung	-
-07-visit.pl	568	parted	-
-07-visit.pl	577	checked	C30 C9 C22 C14
-07-visit.pl	680	laid	-
-07-visit.pl	693	laid_run	C4
-07-visit.pl	743	redirect_noted	C4
-07-visit.pl	755	redirect_answered	-
-07-visit.pl	762	redirects_listed	C4
-07-visit.pl	775	redirects_told	C4 C23
-07-visit.pl	777	redirects_decide	C4
+07-visit.pl	420	spare_dropped	-
+07-visit.pl	428	spare_work	-
+07-visit.pl	435	idle_taken	C1
+07-visit.pl	447	run_seal	-
+07-visit.pl	473	keeper	C9
+07-visit.pl	561	unhung	-
+07-visit.pl	569	parted	-
+07-visit.pl	578	checked	C30 C9 C22 C14
+07-visit.pl	681	laid	-
+07-visit.pl	694	laid_run	C4
+07-visit.pl	744	redirect_noted	C4
+07-visit.pl	757	redirect_answered	-
+07-visit.pl	764	redirects_listed	C4
+07-visit.pl	777	redirects_told	C4 C23
+07-visit.pl	779	redirects_decide	C4
 08-pictures.pl	1	-	C7 C5 C17 C8 C22
 08-pictures.pl	46	pictures_state	C28
 08-pictures.pl	57	pictures_begun	C23 C28 C27 C4 C5 C8 C6 C7 C1 C3 C21
@@ -396,7 +396,12 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 10-tabs.pl	390	unfit	-
 10-tabs.pl	401	resolved	-
 10-tabs.pl	426	home_shown	C29 C32
-10-tabs.pl	457	home_arrived	C19
+10-tabs.pl	461	home_word	-
+10-tabs.pl	462	home_spare_key	-
+10-tabs.pl	463	home_spare_for	-
+10-tabs.pl	470	home_spare_taken	-
+10-tabs.pl	477	home_spare_dropped	-
+10-tabs.pl	485	home_arrived	C19
 11-bookmarks.pl	1	-	C4
 11-bookmarks.pl	19	marks_root	C16
 11-bookmarks.pl	28	marks_into_bar	C16
@@ -824,6 +829,11 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 21-websocket.pl	238	ws_pump	-
 21-websocket.pl	248	ws_step	-
 21-websocket.pl	290	ws_end	-
+22-defender.pl	1	-	C16
+22-defender.pl	13	defender_off	-
+22-defender.pl	24	defender_is_off	-
+22-defender.pl	26	defender_told	-
+22-defender.pl	28	defender_set	-
 22-essential-web.pl	1	-	-
 22-essential-web.pl	17	essential_web_count	-
 22-essential-web.pl	18	essential_web_clear	-
@@ -876,19 +886,19 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 22-permits.pl	589	live_permitted	C26
 22-permits.pl	610	permit_visited	C26
 22-permits.pl	622	permits_asked	C26
-22-permits.pl	657	permit_button	C26
-22-permits.pl	665	permit_answered	C26
-22-permits.pl	722	permits_later	C26
-22-permits.pl	727	scripts_set	C26 C4
-22-permits.pl	751	scripts_layer	C26 C4
-22-permits.pl	769	scripts_told	C26
+22-permits.pl	658	permit_button	C26
+22-permits.pl	666	permit_answered	C26
+22-permits.pl	723	permits_later	C26
+22-permits.pl	728	scripts_set	C26 C4
+22-permits.pl	752	scripts_layer	C26 C4
+22-permits.pl	770	scripts_told	C26
 22-sends.pl	1	-	-
 22-sends.pl	7	send_keys	-
 22-sends.pl	11	sends_told	-
 22-sends.pl	20	sends_decide	-
 22-sends.pl	34	send_question	-
-22-sends.pl	52	sends_count	-
-22-sends.pl	53	sends_clear	-
+22-sends.pl	53	sends_count	-
+22-sends.pl	54	sends_clear	-
 22-website-scripts.pl	1	-	-
 22-website-scripts.pl	3	sites_decide	C26 C4
 22-website-scripts.pl	37	permit_essentials_saved	-
@@ -1109,6 +1119,8 @@ that moves lines of a part is followed by `perl tools/sub-map --write AUDIT.md`.
 27-proof.pl	101	proven	C16
 27-proof.pl	156	testing	-
 27-proof.pl	162	lookup	C23
+28-window-defender.pl	1	-	-
+28-window-defender.pl	3	window_defender_text	-
 28-window-inspect.pl	1	-	-
 28-window-inspect.pl	4	window_inspect_text	-
 28-window-inspect.pl	206	inspect_window_test_text	-

@@ -33,7 +33,7 @@ sub run {
     my $behind = fork // die "lzrprf: cannot fork: $!\n";
     become($from, $to, $TRY ? \*STDOUT : undef, '/usr/bin/perl', $SELF, 'behind', $TRY, defined $PROFILE && !$INCOGNITO ? $ROOT : $DIR, $PEER, $ANSWER, $window, $INCOGNITO ? $ROOT : '-', $PROFILE // '-', $program, @arguments) unless $behind;    # descriptor 0 is what the window says, descriptor 1 what it is told; a profile by its id alone, never by its name, and behind finds its folder from the state folder
     close $_ for $to, $from;
-    my $more = window_pointer_text() . window_trmnl_text() . window_link_text() . window_menu_text() . window_inspect_text() . window_website_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
+    my $more = window_pointer_text() . window_trmnl_text() . window_link_text() . window_menu_text() . window_inspect_text() . window_website_text() . window_defender_text();    # the pointer over a page kept running (28-window-pointer.pl), and [C29] the part of the window a terminal's tab alone uses (24-trmnl-window.pl), after the rest of it
     if ($TRY && open my $test, '<', "$ROOT/window") { local $/; $more .= <$test> }    # "lzrprf try" only: the test's own text after the window's, so a test can keep the window off the screen and read what it holds
     die "lzrprf: the home folder's path holds a character lzrprf does not pass on\n" if $HOME =~ /["\\\n]/;
     syswrite $window_out, 'start ' . ($OPEN // '-') . "\n";    # the first line behind hears, written here before the window is made, so the window can neither say it nor read it: the address a pulled tab's window opens (sub started)

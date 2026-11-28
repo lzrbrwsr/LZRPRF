@@ -54,6 +54,7 @@ sub behind {
     window('home available') if $local_home;
     window('startup ready') unless $local_home && !length($pulled) && !home() && !$TOR_SESSION;
     sso_told();                           # the sign-ins of this profile, for the Profiles list's "Connect seamless SSO accounts"; in an incognito window, why there are none
+    defender_told();                      # Ticket #1546: LZRDFNDR's switches, for the top of each tab of its panel
     window('game helper ' . game_helper(), 'marksbar ' . (marks_bar() ? 'on' : 'off'), 'search ' . (engine() ? 'set' : 'none'), $PICTURES_SHOWN ? 'pictures ' . (pictures_elsewhere() ? 'allow' : 'block') : ());
     parts_told();                         # the parts installed: the window shows the icons and menus of those alone
     nav_told();
@@ -74,6 +75,7 @@ sub behind {
         my $event = eval { hear(scalar(link_due(scalar tnnl_due(scalar tool_due()))), 1) };    # what a page kept running wrote is read here too: an error of lzrprf's own in it ends that page, never the window
         if (!defined $event) { last unless $@; unheard('', $@, $behind, ++$faults); next }
         timed('heard ' . ($event =~ /^(\S+)/ ? $1 : '')) if $TIMED;    # "lzrprf try" with "times": the moment each line of the window was taken up, so a test reads how long lzrprf took to answer it (scripts/snappy.pl)
+        $HOME_SPARE_WANTED = 1 if length $event && !$HOME_SPARE;    # Ticket #1447: a new tab's home process ready by the next quiet moment (sub home_spare_for)
         eval { link_watch() } if length $event;    # [C31] a window that is never quiet still sends the link's lines when they are due (a cheap look, read once in two seconds)
         eval {    # each line taken up below; an error of lzrprf's own in it is caught after the last elsif (sub unheard)
         if ($event =~ /^go ([\x20-\x7f]{1,2100})$/) { typed($1) }    # [C4] the one place an address comes from: the bar of lzrprf's own window; a size said while it was fetched and laid out is the size it is laid out again at
@@ -116,6 +118,7 @@ sub behind {
         elsif ($event eq 'menu debug-link') { link_menu(); said_noted() }    # [C31] the live debug link, switched on or off in the cogwheel's menu
         elsif ($event =~ /^link drew ([0-9]{1,6})$/) { link_drew($1) }    # [C31] how long the window took to draw a list, said only while the link is on
         elsif ($event =~ /^link shot ([0-9a-f]{16,32}) ([A-Za-z0-9+\/]+={0,2})$/) { link_shot($1, $2) }    # [C31] the window's picture of itself, for a signed command that asked for it
+        elsif ($event =~ /^defender (computer|scripts|redirects|sends) (on|off)$/) { defender_set($1, $2 eq 'on'); said_noted() }    # Ticket #1546: a switch at the top of a tab of LZRDFNDR's panel
         elsif ($event =~ /^game helper (on|off)$/) { game_helper_set($1 eq 'on'); said_noted() }    # H-0071: LZRDFNDR's satellite in the minigame, from the switch in the Other tab of its panel
         elsif ($event =~ /^mark open (0|[1-9][0-9]{0,2})$/) { $MARKS[$1] ? go($MARKS[$1][2], 'you opened a bookmark', $1) : idle('That bookmark is no longer there.') }    # [C4] an address kept from the bar or typed into the window's own modal
         elsif ($event =~ /^mark remove (0|[1-9][0-9]{0,2})$/) { mark_removed($1); said_noted() }
@@ -249,7 +252,7 @@ sub leave {
     trmnl_end($_, 'its window closed') for grep { $_->{trmnl} } @TABS;    # [C29] nor a terminal: its shell is hung up
     cht_end($_, 'its window closed') for grep { $_->{cht} } @TABS;    # [C32] nor LZRCHT: its roles and connections
     kill 'KILL', $witness if $witness;
-    spare_dropped();                      # a page run's process started before its run, never handed anything
+    spare_dropped(); home_spare_dropped();    # a page run's process started before its run, and a home's, never handed anything
     curl_ended($CURL_SPARE);              # and curl started before its request
     sound_ended();                       # [C12] the sound process ends with its window
     removed($DIR) if $TOR_SESSION;        # [C17] a Tor window whose end was held: its folder goes before Tor does

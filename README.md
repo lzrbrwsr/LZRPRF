@@ -267,25 +267,25 @@ and `blocklist` the release installs. The installer compares the file byte for b
 written in the installer, and `release.txt` holds its SHA-256. The release file of the release on
 record:
 
-    release 179
+    release 183
+    new Pages like yle.fi whose scripts change all the time no longer recheck every lazy picture on each frame: 14 ms less work per frame.
+    new A window is ready about 18 ms sooner: the list of blocked addresses is read while the security check runs.
+    new A new tab opens its home page about twice as fast: 92 ms down to 52 ms on our test machine.
+    new Scrolling a long page like yle.fi redraws only the part around the view instead of the whole page: 50 times faster on our test page.
+    new LZRDFNDR's panel has an on/off switch at the top of each tab: On Your Computer, and Scripts, Redirects and Sends each on their own; off lets that kind through without asking.
     new Stopping Tor from a tab asks first and Cancel keeps it on; short notices appear briefly at the top, and the black strip under the bar is gone.
-    new Long pages draw to their end: every picture is fetched, not just the first 24, and pictures appear as they arrive.
-    new LZRBRWSR no longer gets stuck at full CPU or stops answering: macOS AutoFill kept retrying inside its window.
-    new Discord in LZRCHT now opens titled Discord in its own tab, instead of a "not supported yet" notice.
-    new Scrolling is smoother with a little more momentum, a page no longer jumps while it loads, and a minimized LZRDFNDR question waits in its icon with a count.
-    new The menu bar says LZRBRWSR, questions open in the same box as everything else and never hold your tabs, and Discord connects from LZRCHT in its own tab.
     home local
     newest https://lzrbrwsr.com/latest
     installer https://lzrbrwsr.com/install.sh
     same https://lzrbrwsr.vercel.app/install.sh
     report https://origin.lzrbrwsr.com/report
     file lzrbrwsr 604a5cf1225c06b9beb01f80bd01d81645855dd3d63fc16a78b5e91198966eb1
-    file lzrbrwsr-bin d6443f3cbabf7caf3cf1b44d2022c428e4f5ec9c3ef1261035ce341e6658b50f
+    file lzrbrwsr-bin f853660de8de6d5a9e1d6ccac1fb1171b92616ed1e1d56cac61a09b4a0e19800
     file arti b27695a75064d3a768485b17071e7c58c2281cb93694a554fd379b15a134e444
     file core-lzrbrwsr-trmnl 6a60796b6a9510675c6b509d5fa6dd6b8543aa1afb8bc8411f240c93dc95bf03
     file core-lzrbrwsr-cht 30c360815db8fc7fed396b12f64d96ec4b5d7539a283b0f5c5ad8d8aac9af8d2
     file lzrbrwsr-window 6472a7855c52851bd8db375b86a7f3b400b77353bcab70a663c39574497867c9
-    lzrprf 48c0fefed9c08f2019f72ed6b2a9663ba1083f1f0f63e1a30b2243ab853275ab
+    lzrprf 5dfe1292d45ff55d236a80613c923f613bcb856d3275d1bbc17bf8420882f2f3
     blocklist 9a2c542c7b59fd9ba88d84a21f363f18599561e7010e319e45bc9a383fc8a092
 
 docs/updates.md says what each line does.

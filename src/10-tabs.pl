@@ -454,6 +454,34 @@ sub home_shown {
     push @LIVE, $live;
 }
 
+# A new tab's home is made in a process started for it at a quiet moment (Ticket #1447): the 20 to 40 ms the
+# system takes to start a process and put it in its container are spent then, not after the press. One at a
+# time, made by this process alone with the variables a home is run with now ($HOME_SPARE->{key}); one made
+# for another setting (private, the satellite, a part, Tor) is ended unused, as a page's spare is.
+sub home_word { return ($INCOGNITO ? 'private' : 'home') . (game_helper() ? ' satellite' : '') . (part_on('lzrgm') ? '' : ' nogame') . (part_on('lzrtrmnl') ? '' : ' notrmnl') }
+sub home_spare_key { return home_word() . "\t" . ($TOR_WANTED ? 1 : 0) }
+sub home_spare_for {
+    return if $HOME_SPARE && $HOME_SPARE->{of} == $$ && $HOME_SPARE->{key} eq home_spare_key() && waitpid($HOME_SPARE->{page}, POSIX::WNOHANG()) == 0;
+    home_spare_dropped();
+    return unless $$ == $FRESH && program_same();
+    $HOME_SPARE = page_started('https://lzrbrwsr.invalid/_home', "=sheets\n", undef, 1) or return;
+    $HOME_SPARE->{key} = home_spare_key(); timed('home-spare');
+}
+sub home_spare_taken {                    # the home's process, when it was made for the home as it is run now and still waits; else nothing
+    my $one = $HOME_SPARE or return;
+    undef $HOME_SPARE;
+    return timed('home-spare-taken'), $one if $one->{of} == $$ && $one->{key} eq home_spare_key() && waitpid($one->{page}, POSIX::WNOHANG()) == 0;
+    $HOME_SPARE = $one; home_spare_dropped();
+    return;
+}
+sub home_spare_dropped {                  # ended unused; a copy of lzrprf only forgets it
+    my $one = $HOME_SPARE or return;
+    undef $HOME_SPARE;
+    if ($one->{of} == $$) { kill 'KILL', $one->{page}; waitpid $one->{page}, 0 }
+    close $_ for @$one{qw(in from)};
+    return;
+}
+
 sub home_arrived {                        # the first list of a home being made (sub home_shown), read in the loop of sub behind: drawn when its tab is still at home
     my ($live) = @_;
     while (!$live->{ended} && live_due($live)) {
